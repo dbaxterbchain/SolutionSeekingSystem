@@ -1,0 +1,129 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHero from '../components/PageHero.astro';
+import { pillars, glossary } from '../data/concepts';
+
+const aims = [
+  'Help people solve communication breakdowns and interpersonal conflicts',
+  'Foster a healthy workplace democracy',
+  'Turn workplaces and communities into Living Systems — adaptive, participant-driven ecosystems',
+  'Empower individuals to participate in understanding, collaboration, and system design',
+];
+---
+
+<BaseLayout
+  title="The System"
+  description="What the Solution Seeking System is, why it exists, its philosophical foundations, and the key terminology that supports it."
+>
+  <PageHero
+    eyebrow="The System"
+    title="A common-sense framework for great communication"
+    intro="The Solution Seeking System is a structured communication framework that helps individuals and organizations solve interpersonal problems, navigate conflict, and continuously improve their shared environments — without relying on top-down discipline."
+  />
+
+  <div class="container-page py-16">
+    <div class="grid gap-12 lg:grid-cols-[1fr_300px]">
+      <!-- Main content -->
+      <div class="prose-sss">
+        <h2>Introduction</h2>
+        <p>
+          Developed at Beanchain Coffee — a worker-directed café committed to
+          cooperative principles — the Solution Seeking System (SSS) fosters
+          understanding, accountability, and trust. Unlike top-down management methods,
+          it's meant to work <strong>in concert</strong> with whatever tools you already
+          use. It's a philosophy applied in tandem with others to encourage co-creation
+          of solutions through compassion, clarity, and introspection. It fits workplaces,
+          relationships, and community groups alike.
+        </p>
+        <p>
+          The system provides a simplified strategy for creating strong communication,
+          effective leaders, and the shared understanding that democracy needs to thrive.
+          Alongside the <a href="/protocol">Communication Protocol</a>, it documents the
+          <a href="/principles">Wisdom Principles</a> that support its use. There are no
+          shortcuts to good communication; you need to understand your tools and have the
+          courage of your convictions to be effective.
+        </p>
+
+        <h2>Purpose &amp; Vision</h2>
+        <p>What it aims to do:</p>
+        <ul>
+          {aims.map((aim) => <li>{aim}</li>)}
+        </ul>
+        <p>
+          <strong>The bigger picture:</strong> by enabling better communication and
+          decision-making, SSS tackles core drivers of poverty like disempowerment,
+          inequality, and organizational dysfunction. The end goal is to build a
+          cooperative, just, and responsive economy supported by resilient systems.
+        </p>
+        <blockquote>
+          "If we want to have Democracy in the workplace through systems like
+          Cooperatives, we first need great communication. Communication is hard, and
+          we're trying to put a common-sense framework around good communication and
+          problem solving." — David Baxter
+        </blockquote>
+
+        <h2>Philosophical Foundations</h2>
+        <p>
+          The system is based on <strong>mutual understanding</strong>, because no
+          lasting solution can be built on guesses. Before solving a problem, we need to
+          understand what each person experienced, meant, needed, and feared — and we need
+          to understand ourselves. Understanding is the bridge between introspection and
+          action.
+        </p>
+        <p>
+          That's why the system treats patience, vulnerability, bravery, and compassion as
+          practical tools rather than abstract values. Together, they help people build
+          shared language, check assumptions, and move from reaction into clarity. The
+          same process improves larger systems, creating a repeatable path: understand
+          yourself, understand each other, then seek a solution. Used consistently, this
+          path helps systems become <strong>Living Systems</strong> — systems that learn,
+          adapt, and improve through the solutions created by the people inside them.
+        </p>
+      </div>
+
+      <!-- Sidebar: pillars -->
+      <aside class="lg:pt-2">
+        <div class="sticky top-24 rounded-2xl border border-slate-100 bg-slate-50/70 p-6">
+          <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-600">
+            The Four Pillars of Understanding
+          </h2>
+          <ul class="mt-4 space-y-4">
+            {
+              pillars.map((p) => (
+                <li class="flex gap-3">
+                  <span class="text-xl" aria-hidden="true">{p.icon}</span>
+                  <span>
+                    <span class="block font-semibold text-ink-800">{p.name}</span>
+                    <span class="text-sm text-slate-600">{p.description}</span>
+                  </span>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Glossary -->
+    <section class="mt-20">
+      <div class="max-w-2xl">
+        <p class="eyebrow mb-3">Key Terminology</p>
+        <h2 class="text-3xl font-bold text-ink-800">The language of the system</h2>
+        <p class="mt-3 text-slate-600">
+          A shared vocabulary that supports a better understanding of how everything fits
+          together.
+        </p>
+      </div>
+      <dl class="mt-10 grid gap-5 sm:grid-cols-2">
+        {
+          glossary.map((t) => (
+            <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
+              <dt class="font-bold text-ink-800">{t.term}</dt>
+              <dd class="mt-2 text-sm leading-relaxed text-slate-600">{t.definition}</dd>
+            </div>
+          ))
+        }
+      </dl>
+    </section>
+  </div>
+</BaseLayout>

@@ -1,0 +1,45 @@
+---
+import { protocolSteps } from '../data/concepts';
+
+interface Props {
+  /** Render compact (home) or full (protocol overview) variant. */
+  variant?: 'default' | 'compact';
+}
+const { variant = 'default' } = Astro.props;
+---
+
+<ol class="grid gap-4 md:grid-cols-3 md:gap-5">
+  {
+    protocolSteps.map((s, i) => (
+      <li class="relative">
+        <a
+          href={`/protocol/${s.slug}`}
+          class="group flex h-full flex-col rounded-2xl border border-slate-100 bg-white p-6 shadow-card transition-all duration-200 hover:-translate-y-1 hover:border-brand-200 hover:shadow-card-hover"
+        >
+          <div class="flex items-center gap-3">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-500 font-display text-xl text-white">
+              {s.step}
+            </span>
+            <span class="text-2xl" aria-hidden="true">{s.icon}</span>
+          </div>
+          <h3 class="mt-4 text-lg font-bold text-ink-800 group-hover:text-brand-700">
+            {s.title}
+          </h3>
+          {variant === 'default' && (
+            <p class="mt-2 text-sm leading-relaxed text-slate-600">{s.oneLine}</p>
+          )}
+        </a>
+        {i < protocolSteps.length - 1 && (
+          <span
+            class="absolute -right-3.5 top-1/2 z-10 hidden -translate-y-1/2 text-brand-300 md:block"
+            aria-hidden="true"
+          >
+            <svg class="h-7 w-7" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </span>
+        )}
+      </li>
+    ))
+  }
+</ol>

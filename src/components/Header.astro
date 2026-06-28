@@ -1,0 +1,80 @@
+---
+import Logo from './Logo.astro';
+import { navLinks } from '../data/nav';
+
+const currentPath = Astro.url.pathname;
+const isActive = (href: string) =>
+  href === '/' ? currentPath === '/' : currentPath.startsWith(href);
+---
+
+<header class="sticky top-0 z-50 border-b border-slate-100 bg-white/85 backdrop-blur-md">
+  <div class="container-page flex h-16 items-center justify-between gap-4">
+    <Logo />
+
+    <nav class="hidden items-center gap-1 lg:flex" aria-label="Primary">
+      {
+        navLinks.map((link) => (
+          <a
+            href={link.href}
+            aria-current={isActive(link.href) ? 'page' : undefined}
+            class:list={[
+              'rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
+              isActive(link.href)
+                ? 'bg-brand-50 text-brand-700'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-ink-800',
+            ]}
+          >
+            {link.label}
+          </a>
+        ))
+      }
+    </nav>
+
+    <div class="flex items-center gap-3">
+      <a href="/practice" class="btn-primary hidden sm:inline-flex">Talk to the Guide</a>
+      <button
+        type="button"
+        id="menu-toggle"
+        class="btn-ghost px-3 lg:hidden"
+        aria-expanded="false"
+        aria-controls="mobile-menu"
+        aria-label="Toggle navigation menu"
+      >
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"></path>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div id="mobile-menu" class="hidden border-t border-slate-100 bg-white lg:hidden">
+    <nav class="container-page flex flex-col gap-1 py-4" aria-label="Mobile">
+      {
+        navLinks.map((link) => (
+          <a
+            href={link.href}
+            aria-current={isActive(link.href) ? 'page' : undefined}
+            class:list={[
+              'rounded-xl px-4 py-3 text-base font-medium transition-colors',
+              isActive(link.href)
+                ? 'bg-brand-50 text-brand-700'
+                : 'text-slate-700 hover:bg-slate-50',
+            ]}
+          >
+            {link.label}
+          </a>
+        ))
+      }
+      <a href="/practice" class="btn-primary mt-2">Talk to the Guide</a>
+    </nav>
+  </div>
+</header>
+
+<script>
+  const toggle = document.getElementById('menu-toggle');
+  const menu = document.getElementById('mobile-menu');
+  toggle?.addEventListener('click', () => {
+    const open = menu?.classList.toggle('hidden') === false;
+    toggle.setAttribute('aria-expanded', String(open));
+  });
+</script>

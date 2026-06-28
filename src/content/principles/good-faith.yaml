@@ -1,0 +1,57 @@
+title: Good Faith
+order: 2
+icon: "🌱"
+tagline: >-
+  Approaching others with the genuine assumption that they too are trying to act with integrity.
+whatItIs: >-
+  Good Faith is the genuine intention to be honest, fair, and constructive in your
+  interactions. It means approaching communication with the assumption that others
+  are also trying to act with integrity, even if mistakes happen.
+howUsed: >-
+  Good Faith is a prerequisite for trust. It underpins the Communication Protocol,
+  especially in the Mutual Understanding and Solution Seeking stages. Without Good
+  Faith, conversations risk becoming defensive or manipulative, making lasting
+  solutions impossible. At Beanchain it is the first thing we read to people in an
+  interview, to set both tone and good expectations — believing that the others in
+  the conversation will listen and understand, alter their perspective, work toward
+  the same goal, and care about you, and being willing to do the same for them.
+bestPractices:
+  - >-
+    Begin every interaction by assuming positive intent unless there is clear evidence otherwise.
+  - Speak truthfully, even when it's uncomfortable.
+  - Avoid withholding information that would materially affect understanding.
+  - Show consistency between your words and actions.
+  - If you commit, follow through, or explain openly why you cannot.
+goals:
+  - Foster trust between participants.
+  - Reduce defensiveness and suspicion in conversations.
+  - Create a cooperative environment where people feel safe to share honestly.
+  - Encourage openness to feedback and new ideas.
+antigoals:
+  - >-
+    Using Good Faith as an excuse to avoid healthy skepticism (trust should be balanced with discernment).
+  - Blindly accepting harmful actions without questioning them.
+  - Expecting Good Faith from others while acting in bad faith yourself.
+  - Using "assume good faith" to silence valid concerns.
+practices:
+  - title: Intent Check
+    body: 'Before speaking, ask: "Am I saying this to help or to hurt?"'
+  - title: Evidence Balance
+    body: >-
+      Assume positive intent while still verifying facts if something feels off.
+  - title: Transparency Drill
+    body: >-
+      Practice explaining your reasoning when making a decision or taking action.
+faq:
+  - q: What if I suspect they're not acting in good faith?
+    a: >-
+      Use clarifying questions to test your assumption before drawing conclusions.
+      Document behavior patterns if necessary.
+  - q: Does Good Faith mean I have to trust everyone completely?
+    a: >-
+      No, Good Faith is about starting with trust and openness, not ignoring evidence of harm.
+example: >-
+  Two team members disagree about inventory ordering. One thinks the other is
+  deliberately delaying orders. Through Good Faith, they explore possible reasons and
+  find that the ordering system's notifications are going to an old email address.
+  They fix the address and prevent further delays without assigning blame.

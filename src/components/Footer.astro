@@ -1,0 +1,63 @@
+---
+import Logo from './Logo.astro';
+import { navLinks } from '../data/nav';
+const year = new Date().getFullYear();
+---
+
+<footer class="mt-24 border-t border-slate-100 bg-slate-50/60">
+  <div class="container-page grid gap-10 py-14 md:grid-cols-[1.4fr_1fr_1fr]">
+    <div class="max-w-sm">
+      <Logo />
+      <p class="mt-4 text-sm leading-relaxed text-slate-600">
+        A framework for democratic problem solving, leadership, and communication.
+        Understand yourself, understand each other, then seek a solution.
+      </p>
+      <p class="mt-4 text-sm text-slate-500">
+        A Beanchain Process by David &amp; Shannon Baxter.
+      </p>
+    </div>
+
+    <div>
+      <h2 class="text-sm font-semibold text-ink-800">Explore</h2>
+      <ul class="mt-4 space-y-2.5 text-sm">
+        {
+          navLinks.map((link) => (
+            <li>
+              <a href={link.href} class="text-slate-600 transition-colors hover:text-brand-600">
+                {link.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+
+    <div>
+      <h2 class="text-sm font-semibold text-ink-800">Resources</h2>
+      <ul class="mt-4 space-y-2.5 text-sm">
+        <li>
+          <a href="/solution-seeking-complete-guide.pdf" class="text-slate-600 transition-colors hover:text-brand-600">
+            Download the full guide (PDF)
+          </a>
+        </li>
+        <li>
+          <a href="https://www.bchain.coffee" rel="noopener" class="text-slate-600 transition-colors hover:text-brand-600">
+            Beanchain Coffee
+          </a>
+        </li>
+        <li>
+          <a href="/practice" class="text-slate-600 transition-colors hover:text-brand-600">
+            Guide &amp; Mentor assistants
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="border-t border-slate-100">
+    <div class="container-page flex flex-col gap-2 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+      <p>&copy; {year} Beanchain Coffee LLC. All rights reserved.</p>
+      <p>The Solution Seeking System&trade; and related terms are trademarks of Beanchain Coffee LLC.</p>
+    </div>
+  </div>
+</footer>

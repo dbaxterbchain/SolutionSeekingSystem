@@ -1,0 +1,189 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ProtocolDiagram from '../components/ProtocolDiagram.astro';
+import PrincipleCard from '../components/PrincipleCard.astro';
+import { pillars } from '../data/concepts';
+
+const principles = (await getCollection('principles')).sort(
+  (a, b) => a.data.order - b.data.order
+);
+
+const parts = [
+  {
+    title: 'The Communication Protocol',
+    body: 'A repeatable three-step pattern for turning conflict into understanding and understanding into action.',
+    href: '/protocol',
+    icon: '🔄',
+  },
+  {
+    title: '12 Wisdom Principles',
+    body: 'The "source code" of the system — the values that make the protocol actually work.',
+    href: '/principles',
+    icon: '📖',
+  },
+  {
+    title: 'Leadership Tools',
+    body: 'Real practices that apply the protocol to everyday leadership, relationships, and teams.',
+    href: '/tools',
+    icon: '🧰',
+  },
+];
+---
+
+<BaseLayout>
+  <!-- Hero -->
+  <section class="relative overflow-hidden border-b border-slate-100 bg-gradient-to-b from-brand-50/80 via-white to-white">
+    <div class="container-page grid items-center gap-12 py-16 sm:py-24 lg:grid-cols-[1.1fr_0.9fr]">
+      <div>
+        <p class="eyebrow mb-4">A Beanchain Process</p>
+        <h1 class="text-4xl font-extrabold leading-[1.05] tracking-tight text-ink-800 sm:text-5xl lg:text-6xl">
+          Communication is hard.<br />
+          <span class="text-brand-500">Let's make it learnable.</span>
+        </h1>
+        <p class="mt-6 max-w-xl text-lg leading-relaxed text-slate-600">
+          The Solution Seeking System is a structured framework for democratic problem
+          solving, leadership, and communication. Understand yourself, understand each
+          other, then seek a solution.
+        </p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          <a href="/protocol" class="btn-primary">Start learning</a>
+          <a href="/practice" class="btn-secondary">Talk to the Guide</a>
+        </div>
+        <p class="mt-6 text-sm text-slate-500">
+          Free &amp; open to use · Works alongside any leadership style
+        </p>
+      </div>
+
+      <div class="relative mx-auto w-full max-w-sm">
+        <div class="absolute -inset-6 -z-10 rounded-[2.5rem] bg-brand-100/50 blur-2xl"></div>
+        <div class="rounded-3xl border border-slate-100 bg-white p-8 shadow-card">
+          <img
+            src="/brand/logo.svg"
+            alt="Solution Seeking System logo"
+            width="320"
+            height="320"
+            class="mx-auto h-auto w-full max-w-[260px]"
+          />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Protocol -->
+  <section class="container-page py-20">
+    <div class="mx-auto max-w-2xl text-center">
+      <p class="eyebrow mb-3">The core protocol</p>
+      <h2 class="text-3xl font-bold text-ink-800 sm:text-4xl">Three steps to a real solution</h2>
+      <p class="mt-4 text-slate-600">
+        Replace reactive, adversarial conversations with a structured, respectful path
+        to understanding and actionable results.
+      </p>
+    </div>
+    <div class="mt-12">
+      <ProtocolDiagram />
+    </div>
+  </section>
+
+  <!-- Three parts of the system -->
+  <section class="border-y border-slate-100 bg-slate-50/60">
+    <div class="container-page py-20">
+      <div class="mx-auto max-w-2xl text-center">
+        <p class="eyebrow mb-3">How it fits together</p>
+        <h2 class="text-3xl font-bold text-ink-800 sm:text-4xl">One system, three parts</h2>
+      </div>
+      <div class="mt-12 grid gap-6 md:grid-cols-3">
+        {
+          parts.map((p) => (
+            <a
+              href={p.href}
+              class="group flex flex-col rounded-2xl border border-slate-100 bg-white p-7 shadow-card transition-all duration-200 hover:-translate-y-1 hover:border-brand-200 hover:shadow-card-hover"
+            >
+              <span class="text-3xl" aria-hidden="true">{p.icon}</span>
+              <h3 class="mt-4 text-xl font-bold text-ink-800 group-hover:text-brand-700">{p.title}</h3>
+              <p class="mt-2 flex-1 text-sm leading-relaxed text-slate-600">{p.body}</p>
+              <span class="mt-4 text-sm font-semibold text-brand-600">Explore →</span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Pillars -->
+  <section class="container-page py-20">
+    <div class="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+      <div>
+        <p class="eyebrow mb-3">Philosophical foundation</p>
+        <h2 class="text-3xl font-bold text-ink-800 sm:text-4xl">
+          The Four Pillars of Understanding
+        </h2>
+        <p class="mt-4 text-slate-600">
+          The system treats these as practical tools, not abstract values. Together they
+          help people build shared language, check assumptions, and move from reaction
+          into clarity.
+        </p>
+        <a href="/system" class="btn-secondary mt-6">Read the foundations</a>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        {
+          pillars.map((pillar) => (
+            <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
+              <span class="text-2xl" aria-hidden="true">{pillar.icon}</span>
+              <h3 class="mt-3 text-lg font-bold text-ink-800">{pillar.name}</h3>
+              <p class="mt-1.5 text-sm leading-relaxed text-slate-600">{pillar.description}</p>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Principles preview -->
+  <section class="border-t border-slate-100 bg-slate-50/60">
+    <div class="container-page py-20">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="max-w-2xl">
+          <p class="eyebrow mb-3">The source code</p>
+          <h2 class="text-3xl font-bold text-ink-800 sm:text-4xl">12 Wisdom Principles</h2>
+          <p class="mt-4 text-slate-600">
+            Each one is teachable, practicable, and documented in a consistent format so
+            it's easy to learn and apply.
+          </p>
+        </div>
+        <a href="/principles" class="btn-secondary shrink-0">See all 12 →</a>
+      </div>
+      <div class="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          principles.slice(0, 6).map((p) => (
+            <PrincipleCard
+              order={p.data.order}
+              title={p.data.title}
+              tagline={p.data.tagline}
+              icon={p.data.icon}
+              href={`/principles/${p.id}`}
+            />
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Closing CTA -->
+  <section class="container-page py-20">
+    <div class="overflow-hidden rounded-3xl bg-ink-800 px-8 py-14 text-center sm:px-16">
+      <blockquote class="mx-auto max-w-3xl text-xl font-medium leading-relaxed text-white sm:text-2xl">
+        "Communication and collaboration are some of the most important and hardest
+        things we can do as humans. They're also the root of love, friendship,
+        community, and everything good we can experience here on earth with one another."
+      </blockquote>
+      <p class="mt-5 text-sm font-semibold uppercase tracking-wide text-brand-200">
+        David &amp; Shannon Baxter
+      </p>
+      <div class="mt-8 flex flex-wrap justify-center gap-3">
+        <a href="/protocol" class="btn bg-white text-ink-800 hover:bg-brand-50">Start with the protocol</a>
+        <a href="/practice" class="btn border border-white/30 text-white hover:bg-white/10">Practice it now</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

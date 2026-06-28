@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand: #5271ff;
+    --ink: #16276b;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-white text-slate-700 font-sans antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-heading text-ink-800;
+    text-wrap: balance;
+  }
+
+  /* Anchor offset so in-page links aren't hidden under the sticky header. */
+  :target {
+    scroll-margin-top: 6rem;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-6xl px-5 sm:px-8;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-400 focus-visible:ring-offset-2;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-500 text-white shadow-card hover:bg-brand-600 hover:shadow-card-hover;
+  }
+
+  .btn-secondary {
+    @apply btn border border-brand-200 bg-white text-brand-700 hover:border-brand-300 hover:bg-brand-50;
+  }
+
+  .btn-ghost {
+    @apply btn text-ink-800 hover:bg-slate-100;
+  }
+
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-brand-600;
+  }
+
+  /* Long-form teaching content rendered from Markdown. */
+  .prose-sss {
+    @apply max-w-none leading-relaxed text-slate-700;
+  }
+  .prose-sss > * + * {
+    @apply mt-4;
+  }
+  .prose-sss h2 {
+    @apply mt-10 text-2xl font-bold;
+  }
+  .prose-sss h3 {
+    @apply mt-8 text-xl font-semibold;
+  }
+  .prose-sss p {
+    @apply leading-relaxed;
+  }
+  .prose-sss ul {
+    @apply ml-1 space-y-2;
+  }
+  .prose-sss ul > li {
+    @apply relative pl-6;
+  }
+  .prose-sss ul > li::before {
+    content: '';
+    @apply absolute left-0 top-[0.6em] h-2 w-2 -translate-y-1/2 rounded-full bg-brand-400;
+  }
+  .prose-sss ol {
+    @apply ml-5 list-decimal space-y-2 marker:font-semibold marker:text-brand-600;
+  }
+  .prose-sss strong {
+    @apply font-semibold text-ink-800;
+  }
+  .prose-sss blockquote {
+    @apply border-l-4 border-brand-300 bg-brand-50/60 py-2 pl-5 pr-4 italic text-ink-700;
+  }
+  .prose-sss a {
+    @apply font-medium text-brand-600 underline decoration-brand-200 underline-offset-2 hover:text-brand-700;
+  }
+}

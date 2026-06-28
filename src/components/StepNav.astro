@@ -1,0 +1,32 @@
+---
+interface NavItem {
+  title: string;
+  href: string;
+}
+interface Props {
+  prev?: NavItem;
+  next?: NavItem;
+}
+const { prev, next } = Astro.props;
+---
+
+<nav class="mt-14 grid gap-4 border-t border-slate-100 pt-8 sm:grid-cols-2" aria-label="Step navigation">
+  {
+    prev ? (
+      <a href={prev.href} class="group flex flex-col rounded-xl border border-slate-100 p-4 transition-colors hover:border-brand-200 hover:bg-brand-50/50">
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-400">Previous</span>
+        <span class="mt-1 font-semibold text-ink-800 group-hover:text-brand-700">← {prev.title}</span>
+      </a>
+    ) : (
+      <span />
+    )
+  }
+  {
+    next && (
+      <a href={next.href} class="group flex flex-col rounded-xl border border-slate-100 p-4 text-right transition-colors hover:border-brand-200 hover:bg-brand-50/50 sm:col-start-2">
+        <span class="text-xs font-semibold uppercase tracking-wide text-slate-400">Next</span>
+        <span class="mt-1 font-semibold text-ink-800 group-hover:text-brand-700">{next.title} →</span>
+      </a>
+    )
+  }
+</nav>

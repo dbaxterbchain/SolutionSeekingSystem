@@ -1,0 +1,69 @@
+title: Understanding
+order: 1
+icon: "🤝"
+tagline: >-
+  The act of perceiving another person's perspective as clearly as possible while fully grasping your own.
+whatItIs: >-
+  Understanding is the act of perceiving another person's perspective, needs, and
+  intentions as clearly as possible while also fully grasping your own. It is not
+  mere agreement; it is a mutual recognition of where each party is coming from,
+  even when perspectives differ.
+howUsed: >-
+  Understanding is the foundation of the entire system. It is the bridge between
+  introspection and action: only when both parties feel seen, heard, and accurately
+  represented can solutions be co-created effectively. The Communication Protocol's
+  second step, Mutual Understanding, exists to operationalize this principle.
+bestPractices:
+  - >-
+    Listen without preparing your rebuttal; focus on their meaning before your response.
+  - >-
+    Approach every interaction with curiosity rather than assumption.
+  - >-
+    Use clarifying questions to ensure you're hearing what the other person actually means.
+  - >-
+    Summarize what you've heard and invite corrections: "What I'm hearing is ____. Did I get that right?"
+  - >-
+    Recognize that you cannot know their perspective without asking.
+  - >-
+    Accept that understanding can exist without agreement; the goal is clarity, not consensus.
+goals:
+  - >-
+    Build a shared language and an accurate mental model of the other person's experience.
+  - Reduce misinterpretation and assumption-based conflict.
+  - Create emotional safety so both parties feel their perspective matters.
+  - >-
+    Enable solution-seeking to focus on the actual problem rather than misperceptions.
+antigoals:
+  - Forcing agreement before understanding.
+  - >-
+    Using "understanding" as a tactic to win an argument rather than genuinely connecting.
+  - Pretending to understand to avoid discomfort.
+  - Over-analyzing to the point where the conversation never moves to solutions.
+practices:
+  - title: Active Listening Exercise
+    body: >-
+      Partner with someone and share a short personal story. The listener must repeat
+      the story back in their own words until the speaker confirms accuracy.
+  - title: Assumption Check
+    body: >-
+      Before responding, list two alternative explanations for the other person's behavior.
+  - title: Language Swap
+    body: >-
+      Rephrase emotionally charged statements in neutral, curiosity-driven language.
+faq:
+  - q: What if I think I already understand them?
+    a: >-
+      Confirm anyway. Your internal picture might not match their lived experience.
+  - q: What if they refuse to explain their perspective?
+    a: >-
+      Use patience and gentle invitations. You may need to model vulnerability by
+      sharing your own perspective first.
+  - q: What if I understand but still think they're wrong?
+    a: >-
+      That's fine; understanding is not agreement. Continue to solution-seeking with
+      respect for their viewpoint.
+example: >-
+  Two coworkers argue over scheduling. One believes the other is avoiding weekend
+  shifts. Through the Understanding step, they discover the person has been caring
+  for an ill family member on weekends. With this clarity, they collaborate on a
+  temporary coverage plan instead of harboring resentment.

@@ -1,0 +1,43 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHero from '../../components/PageHero.astro';
+import PrincipleCard from '../../components/PrincipleCard.astro';
+
+const principles = (await getCollection('principles')).sort(
+  (a, b) => a.data.order - b.data.order
+);
+---
+
+<BaseLayout
+  title="Wisdom Principles"
+  description="The 12 Wisdom Principles — the ethical and behavioral foundations that make the Communication Protocol work."
+>
+  <PageHero
+    eyebrow="Wisdom Principles"
+    title="The source code of the system"
+    intro="The Wisdom Principles are the ethical and behavioral foundations of the system. They are not rules to follow blindly — they are tools for thinking, reflecting, and interacting with others in ways that foster trust, understanding, and progress. Every principle shares the same format, so each one is easy to learn and apply."
+  />
+
+  <div class="container-page py-16">
+    <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {
+        principles.map((p) => (
+          <PrincipleCard
+            order={p.data.order}
+            title={p.data.title}
+            tagline={p.data.tagline}
+            icon={p.data.icon}
+            href={`/principles/${p.id}`}
+          />
+        ))
+      }
+    </div>
+
+    <p class="mx-auto mt-14 max-w-2xl text-center text-slate-600">
+      The Wisdom Principles are designed to work together. No single principle is
+      sufficient on its own; each supports the others in creating a balanced approach to
+      conflict resolution and collaboration.
+    </p>
+  </div>
+</BaseLayout>

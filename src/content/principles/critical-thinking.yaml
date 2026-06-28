@@ -1,0 +1,56 @@
+title: Critical Thinking
+order: 12
+icon: "🔍"
+tagline: >-
+  Questioning assumptions and weighing evidence before forming a conclusion or acting.
+whatItIs: >-
+  Critical Thinking is the disciplined process of analyzing information from many
+  perspectives, questioning assumptions, and evaluating evidence before forming a
+  conclusion or taking action. It combines curiosity with logic to avoid bias,
+  emotional distortion, or groupthink.
+howUsed: >-
+  Critical Thinking ensures that solutions are not just emotionally satisfying but
+  also practical, evidence-based, and sustainable. In Introspection, it helps you
+  separate feelings from facts. In Mutual Understanding, it helps you evaluate the
+  accuracy and completeness of what you've heard. In Solution Seeking, it filters
+  potential solutions to identify those most likely to work in real-world conditions.
+bestPractices:
+  - Verify facts before acting on them.
+  - Identify and challenge your own assumptions.
+  - Seek out multiple perspectives, especially those you disagree with.
+  - Consider long-term consequences, not just immediate relief.
+  - >-
+    Use both qualitative (stories, experiences) and quantitative (data, metrics)
+    information when evaluating options.
+goals:
+  - Produce solutions that are effective, realistic, and equitable.
+  - Reduce the risk of decisions based solely on impulse or incomplete information.
+  - Encourage open, evidence-based dialogue.
+  - Strengthen the system's ability to adapt through informed evaluation.
+antigoals:
+  - Using "logic" to dismiss emotions as irrelevant — feelings often contain important data.
+  - Overanalyzing to the point of paralysis ("analysis paralysis").
+  - Using critical thinking as a tool to "win" rather than to learn.
+  - Ignoring context in favor of purely theoretical reasoning.
+practices:
+  - title: Evidence First
+    body: List what you know vs. what you assume.
+  - title: Devil's Advocate Drill
+    body: Intentionally argue the opposite of your belief to test its strength.
+  - title: Outcome Projection
+    body: >-
+      For each possible solution, predict best, worst, and most likely outcomes.
+faq:
+  - q: How do I use critical thinking without coming across as combative?
+    a: >-
+      Frame questions as curiosity-driven ("Help me understand how...") rather than
+      challenge-driven ("That doesn't make sense").
+  - q: Can critical thinking slow down decision-making?
+    a: >-
+      Yes, but that's often beneficial. Build in enough time to think without allowing
+      the process to stall.
+example: >-
+  A team is considering switching scheduling software after a vendor pitch. Instead of
+  jumping on the new tool, they compare feature lists, test a trial version, and gather
+  feedback from staff. They discover the existing system already supports the needed
+  features, saving the team money and transition time.

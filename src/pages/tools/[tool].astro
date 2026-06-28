@@ -1,0 +1,73 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import StepNav from '../../components/StepNav.astro';
+
+export async function getStaticPaths() {
+  const tools = (await getCollection('tools')).sort((a, b) => a.data.order - b.data.order);
+  return tools.map((entry, i) => ({
+    params: { tool: entry.id },
+    props: { entry, prev: tools[i - 1], next: tools[i + 1] },
+  }));
+}
+
+const { entry, prev, next } = Astro.props;
+const { Content } = await render(entry);
+const t = entry.data;
+---
+
+<BaseLayout title={t.title} description={t.summary}>
+  <section class="border-b border-slate-100 bg-gradient-to-b from-brand-50/70 to-white">
+    <div class="container-page py-12 sm:py-16">
+      <a href="/tools" class="text-sm font-semibold text-brand-600 hover:text-brand-700">
+        ← Leadership Tools
+      </a>
+      <p class="eyebrow mt-4">Leadership Tool {String(t.order).padStart(2, '0')}</p>
+      <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-ink-800 sm:text-5xl">{t.title}</h1>
+      <p class="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">{t.summary}</p>
+    </div>
+  </section>
+
+  <div class="container-page py-14">
+    <div class="grid gap-12 lg:grid-cols-[1fr_280px]">
+      <article class="prose-sss order-2 lg:order-1">
+        <Content />
+        <StepNav
+          prev={prev ? { title: prev.data.title, href: `/tools/${prev.id}` } : undefined}
+          next={next ? { title: next.data.title, href: `/tools/${next.id}` } : undefined}
+        />
+      </article>
+
+      <aside class="order-1 space-y-5 lg:order-2">
+        <div class="sticky top-24 space-y-5">
+          <div class="rounded-2xl border border-slate-100 bg-emerald-50/50 p-6">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+              Desired outcomes
+            </h2>
+            <ul class="mt-3 space-y-2 text-sm text-slate-700">
+              {t.outcomes.map((o) => (
+                <li class="relative pl-5">
+                  <span class="absolute left-0 top-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                  {o}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-6">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-600">
+              When to use it
+            </h2>
+            <ul class="mt-3 space-y-2 text-sm text-slate-700">
+              {t.triggers.map((tr) => (
+                <li class="relative pl-5">
+                  <span class="absolute left-0 top-1.5 h-1.5 w-1.5 rounded-full bg-brand-400"></span>
+                  {tr}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</BaseLayout>

@@ -1,0 +1,73 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHero from '../../components/PageHero.astro';
+
+const steps = (await getCollection('protocol')).sort((a, b) => a.data.step - b.data.step);
+
+const usage = [
+  { when: 'Before a conversation', what: 'Read the Introspection step. Answer the guiding questions and check your intentions before engaging.' },
+  { when: 'During a conversation', what: 'Use Mutual Understanding as your compass — stay focused on clarity, compassion, and curiosity.' },
+  { when: 'When moving to action', what: 'Follow Solution Seeking to shape ideas into clear, measurable, and fair solutions.' },
+  { when: 'After the conversation', what: 'Review the outcome together and adjust as needed to ensure the solution is working.' },
+];
+---
+
+<BaseLayout
+  title="The Communication Protocol"
+  description="The three-step core of the Solution Seeking System: Introspection, Mutual Understanding, and Solution Seeking."
+>
+  <PageHero
+    eyebrow="The Communication Protocol"
+    title="The core of the system, in three steps"
+    intro="A framework for resolving disagreements, improving relationships, and generating sustainable solutions in any setting. It replaces reactive, adversarial conversations with a structured, respectful approach. The goal is not to win — it's to understand, be understood, and co-create solutions."
+  />
+
+  <div class="container-page py-16">
+    <!-- Steps -->
+    <ol class="space-y-5">
+      {
+        steps.map((s) => (
+          <li>
+            <a
+              href={`/protocol/${s.id}`}
+              class="group flex flex-col gap-4 rounded-2xl border border-slate-100 bg-white p-6 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-card-hover sm:flex-row sm:items-center sm:gap-6 sm:p-8"
+            >
+              <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand-500 font-display text-2xl text-white">
+                {s.data.step}
+              </span>
+              <div class="flex-1">
+                <h2 class="text-xl font-bold text-ink-800 group-hover:text-brand-700">{s.data.title}</h2>
+                <p class="mt-1 font-medium text-brand-600">{s.data.oneLine}</p>
+                <p class="mt-2 text-sm leading-relaxed text-slate-600">{s.data.summary}</p>
+              </div>
+              <span class="hidden shrink-0 text-brand-400 group-hover:text-brand-600 sm:block" aria-hidden="true">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </span>
+            </a>
+          </li>
+        ))
+      }
+    </ol>
+
+    <!-- How to use -->
+    <section class="mt-20">
+      <div class="max-w-2xl">
+        <p class="eyebrow mb-3">How to use this protocol</p>
+        <h2 class="text-3xl font-bold text-ink-800">A tool for every stage of a conversation</h2>
+      </div>
+      <div class="mt-10 grid gap-5 sm:grid-cols-2">
+        {
+          usage.map((u) => (
+            <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-6">
+              <h3 class="font-bold text-ink-800">{u.when}</h3>
+              <p class="mt-2 text-sm leading-relaxed text-slate-600">{u.what}</p>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+  </div>
+</BaseLayout>

@@ -1,0 +1,52 @@
+title: Fairness
+order: 9
+icon: "⚖️"
+tagline: >-
+  Ensuring decisions and outcomes are just, impartial, and considerate of everyone's needs.
+whatItIs: >-
+  Fairness is the practice of ensuring that decisions, actions, and outcomes are just,
+  impartial, and considerate of everyone's needs and contributions. It means applying
+  rules consistently while also taking into account individual circumstances.
+howUsed: >-
+  Fairness is critical in the Solution Seeking stage, where final agreements must be
+  equitable for all participants. It also fosters mutual understanding by ensuring
+  that each person has an equal opportunity to speak, be heard, and influence the
+  outcome. Fairness ensures that solutions do not privilege one person or group at the
+  expense of another unless clearly justified and agreed upon.
+bestPractices:
+  - Apply standards consistently to similar situations.
+  - Actively seek input from all affected parties before deciding.
+  - Be transparent about the reasoning behind decisions.
+  - Consider both equality (same treatment) and equity (adjusted treatment to meet needs).
+  - Revisit decisions if new information shows they were not fair in practice.
+goals:
+  - Build trust through consistent and transparent decision-making.
+  - Prevent favoritism, discrimination, or bias from influencing solutions.
+  - Create solutions that all parties see as reasonable and just.
+  - Support a culture where fairness is expected and upheld.
+antigoals:
+  - Confusing fairness with always making everyone happy.
+  - Enforcing rules so rigidly that individual needs are ignored.
+  - Allowing personal bias to influence decisions.
+  - Using "fairness" as an excuse to avoid taking necessary action.
+practices:
+  - title: Fairness Audit
+    body: 'Before finalizing a decision, ask: "If I were in each person''s position, would I still see this as fair?"'
+  - title: Equal Voice Round
+    body: Ensure each person has the same uninterrupted speaking time in meetings.
+  - title: Impact Check
+    body: >-
+      After implementing a decision, assess whether it had unintended unequal effects.
+faq:
+  - q: What if fairness means some people get more than others?
+    a: >-
+      Fairness is not always sameness; equity sometimes requires different resources or
+      support to create equal opportunity.
+  - q: How do I handle accusations of unfairness?
+    a: >-
+      Listen openly, review the facts, and explain your reasoning. If you discover bias
+      or oversight, adjust accordingly.
+example: >-
+  A manager creates a new shift policy to rotate weekends evenly. One employee objects
+  due to childcare needs. Instead of rigidly enforcing equal rotation, the team works
+  together to find a scheduling solution that works for everyone.

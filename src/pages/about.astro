@@ -1,0 +1,82 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHero from '../components/PageHero.astro';
+---
+
+<BaseLayout
+  title="About"
+  description="Why we built the Solution Seeking System — a Beanchain Coffee process by David and Shannon Baxter."
+>
+  <PageHero eyebrow="About" title="Why we built this" />
+
+  <div class="container-page py-16">
+    <div class="grid gap-12 lg:grid-cols-[1fr_300px]">
+      <div class="prose-sss">
+        <p>
+          The Solution Seeking System was developed at <a href="https://www.bchain.coffee" rel="noopener">Beanchain Coffee</a>,
+          a worker-directed café committed to cooperative principles, as a way to foster
+          understanding, accountability, and trust without relying on traditional
+          hierarchical discipline systems.
+        </p>
+        <p>
+          We built this system because we know that communication and collaboration are
+          some of the most important and hardest things we can do as humans. They're also
+          the root of love, friendship, community, and everything good we can experience
+          here on earth with one another.
+        </p>
+        <p>
+          We want to see an end to poverty because it's affected us so immensely, and
+          providing a simple way to help people be great communicators and leaders is a
+          step on the path toward that goal. With this, we can help create stronger
+          cooperatives and other kinds of community-centric, people-centric organizations.
+        </p>
+        <blockquote>
+          Maybe within our lifetime, we can see all people in America and beyond
+          flourishing in systems that provide enough for everyone they are claiming to
+          serve. We all deserve a better future. Let's build it.
+        </blockquote>
+        <p class="text-sm text-slate-500">— David &amp; Shannon Baxter</p>
+
+        <h2>Built to be shared</h2>
+        <p>
+          This system is meant to work in concert with whatever management or conflict
+          resolution tools you already use. It's a philosophy that can be applied in
+          tandem with others, in a wide range of settings — workplaces, relationships, and
+          community groups. We hope it helps you.
+        </p>
+      </div>
+
+      <aside class="lg:pt-2">
+        <div class="sticky top-24 space-y-5">
+          <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-6">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-600">Resources</h2>
+            <ul class="mt-4 space-y-3 text-sm">
+              <li>
+                <a href="/solution-seeking-complete-guide.pdf" class="font-medium text-brand-600 hover:text-brand-700">
+                  Download the complete guide (PDF) →
+                </a>
+              </li>
+              <li>
+                <a href="https://www.bchain.coffee" rel="noopener" class="font-medium text-brand-600 hover:text-brand-700">
+                  Beanchain Coffee →
+                </a>
+              </li>
+              <li>
+                <a href="/practice" class="font-medium text-brand-600 hover:text-brand-700">
+                  Guide &amp; Mentor assistants →
+                </a>
+              </li>
+            </ul>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
+            <p class="text-xs leading-relaxed text-slate-500">
+              The Solution Seeking System&trade; and all associated content are the
+              intellectual property of Beanchain Coffee LLC. Limited permission is granted
+              to quote brief excerpts (up to 200 words) with proper attribution.
+            </p>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</BaseLayout>
