@@ -1,0 +1,39 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import SolutionBuilder from '../../components/react/SolutionBuilder.tsx';
+---
+
+<BaseLayout
+  title="Solution Builder"
+  description="Check a drafted solution against the four marks of a good solution — Actionable, Testable, Effective, and Time-bound — plus an equity check."
+>
+  <section class="border-b border-slate-100 bg-gradient-to-b from-brand-50/70 to-white">
+    <div class="container-page py-12 sm:py-16">
+      <a href="/practice" class="text-sm font-semibold text-brand-600 hover:text-brand-700">
+        ← Practice
+      </a>
+      <p class="eyebrow mt-4">Communication Protocol · Step 3</p>
+      <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-ink-800 sm:text-5xl">
+        Solution Builder
+      </h1>
+      <p class="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
+        A good solution is actionable, testable, effective, and time-bound — and fair to
+        everyone. Draft yours and check it against each mark, with live feedback.
+        Everything stays private in your browser.
+      </p>
+    </div>
+  </section>
+
+  <div class="container-page py-12">
+    <div class="mx-auto max-w-3xl">
+      <SolutionBuilder client:load />
+
+      <p class="mt-6 text-center text-sm text-slate-500">
+        Want the full picture?
+        <a href="/protocol/solution-seeking" class="font-medium text-brand-600 hover:text-brand-700">
+          Read about Solution Seeking →
+        </a>
+      </p>
+    </div>
+  </div>
+</BaseLayout>

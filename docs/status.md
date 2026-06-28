@@ -6,7 +6,7 @@ _Last updated: 2026-06-28_
 
 | | |
 |---|---|
-| **Current phase** | Phase 1 complete · hosted · Phase 2 not started |
+| **Current phase** | Phase 2 complete (interactive tools) · hosted · Phase 3 not started |
 | **Live URL** | https://solution-seeking-system.netlify.app |
 | **Custom domain** | www.solutionseeking.com — _not yet pointed_ |
 | **Build health** | `npm run build` ✅ · `npm run check` ✅ (0 errors) |
@@ -34,10 +34,12 @@ _Last updated: 2026-06-28_
 - [ ] Point **www.solutionseeking.com** at the Netlify site.
 - [ ] Confirm real brand fonts (currently using close free stand-ins: Anton/Poppins/Inter).
 
-### Phase 2 — Interactive practice tools
-- [ ] Guided Introspection worksheet (React island, localStorage, prep summary)
-- [ ] Conversation planner (Mutual Understanding checklist + question bank)
-- [ ] Solution builder (checks against Actionable/Testable/Effective/Time-bound)
+### Phase 2 — Interactive practice tools ✅ _(done)_
+- [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)
+- [x] Conversation Planner — `/practice/conversation-planner` (stage checklist, goals, question bank, listening reminders)
+- [x] Solution Builder — `/practice/solution-builder` (live scoring vs. Actionable/Testable/Effective/Time-bound + equity check)
+
+All three are React islands (`src/components/react/*.tsx`) hydrated with `client:load`; state persists in `localStorage` only (nothing leaves the browser).
 
 ### Phase 3 — In-site AI agents
 - [ ] Guide & Mentor agents via Astro server endpoints (Netlify Functions → Anthropic API)

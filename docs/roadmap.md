@@ -12,22 +12,23 @@ shows it off.
 - Showcase-quality Home page and brand-accurate design system.
 - Static, fast, SEO-friendly. Hosted on Netlify.
 
-## Phase 2 — Interactive practice tools _(next)_
+## Phase 2 — Interactive practice tools ✅ _(complete)_
 
 Move from "read about it" to "do it." Built as **React islands** so only the interactive
-widgets ship JavaScript; the rest of the site stays static.
+widgets ship JavaScript; the rest of the site stays static. All state persists in
+`localStorage` — nothing leaves the browser.
 
-- **Guided Introspection worksheet** — walks a user through the 7-step introspection
-  process with prompts, saves answers in-browser (localStorage), and produces a "prep
-  summary" they can bring to a conversation.
-- **Conversation planner** — a Mutual Understanding checklist plus a question bank for
-  preparing a difficult conversation.
-- **Solution builder** — checks a drafted solution against the four marks of a good
-  solution (Actionable / Testable / Effective / Time-bound).
-- Light interactivity site-wide (progress, cross-links, expandable examples).
+- **Guided Introspection worksheet** (`/practice/introspection`) — a 7-step stepper that
+  walks a user through Introspection with prompts and an emotion picker, then compiles a
+  copyable / downloadable "prep summary" for their conversation.
+- **Conversation Planner** (`/practice/conversation-planner`) — a Mutual Understanding
+  setup checklist, goals, opening lines, a selectable question bank, and listening
+  reminders, assembled into a copyable plan.
+- **Solution Builder** (`/practice/solution-builder`) — checks a drafted solution against
+  the four marks (Actionable / Testable / Effective / Time-bound) with live scoring, plus
+  an equity check.
 
-These live under `/practice`, which currently links out to the ChatGPT Guide/Mentor as
-an interim.
+They live under `/practice`, alongside links to the ChatGPT Guide/Mentor.
 
 ## Phase 3 — In-site AI agents
 

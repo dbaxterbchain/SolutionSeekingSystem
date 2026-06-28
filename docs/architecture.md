@@ -40,6 +40,7 @@ src/
     nav.ts                # primary navigation links
   components/             # Header, Footer, Logo, PageHero, PrincipleCard,
                           # ProtocolDiagram, StepNav
+    react/               # interactive React islands (Phase 2 practice tools)
   layouts/
     BaseLayout.astro      # <head>, fonts, header/footer, skip-link
   pages/                  # file-based routes (see below)
@@ -63,7 +64,10 @@ astro.config.mjs · tailwind.config.mjs · tsconfig.json · netlify.toml
 | `/principles/:slug` | `pages/principles/[slug].astro` | Renders the 6-part format |
 | `/tools` | `pages/tools/index.astro` | Tools overview + "build your own" |
 | `/tools/:tool` | `pages/tools/[tool].astro` | One per leadership tool |
-| `/practice` | `pages/practice.astro` | Assistants + Phase 2 teaser |
+| `/practice` | `pages/practice.astro` | Assistants + interactive tools index |
+| `/practice/introspection` | `pages/practice/introspection.astro` | Introspection worksheet (React island) |
+| `/practice/conversation-planner` | `pages/practice/conversation-planner.astro` | Conversation planner (React island) |
+| `/practice/solution-builder` | `pages/practice/solution-builder.astro` | Solution builder (React island) |
 | `/about` | `pages/about.astro` | Story + resources |
 | `404` | `pages/404.astro` | Not-found |
 
