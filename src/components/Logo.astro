@@ -10,10 +10,14 @@ const subColor = variant === 'light' ? 'text-brand-200' : 'text-brand-500';
 ---
 
 <a href="/" class={`group inline-flex items-center gap-2.5 ${className}`} aria-label="Solution Seeking System — home">
-  <svg viewBox="0 0 100 100" class="h-9 w-9 shrink-0 transition-transform duration-200 group-hover:scale-105" aria-hidden="true">
-    <rect width="100" height="100" rx="22" fill="#5271FF"></rect>
-    <path d="M34 24 L62 24 L46 50 L62 50 L34 76 L44 56 L30 56 Z" fill="#fff" opacity="0.95"></path>
-  </svg>
+  <img
+    src="/brand/logo-mark.svg"
+    alt=""
+    width="36"
+    height="36"
+    class="h-9 w-9 shrink-0 transition-transform duration-200 group-hover:scale-105"
+    aria-hidden="true"
+  />
   <span class="flex flex-col leading-none">
     <span class={`font-heading text-lg font-bold tracking-tight ${wordColor}`}>Solution Seeking</span>
     <span class={`text-[0.62rem] font-semibold uppercase tracking-[0.22em] ${subColor}`}>System</span>
