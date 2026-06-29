@@ -14,7 +14,7 @@ const {
 } = Astro.props;
 
 const fullTitle =
-  title === 'Solution Seeking System' ? title : `${title} — Solution Seeking System`;
+  title === 'Solution Seeking System' ? title : `${title} | Solution Seeking System`;
 const canonical = new URL(Astro.url.pathname, Astro.site ?? Astro.url.origin).href;
 ---
 

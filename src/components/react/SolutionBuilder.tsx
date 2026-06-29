@@ -86,23 +86,23 @@ export default function SolutionBuilder() {
     if (!(values.solution || '').trim()) return 'Describe your solution to begin.';
     if (metCount === CRITERIA.length)
       return equity
-        ? 'Strong solution — actionable, measurable, and fair to everyone. Ready to try.'
+        ? 'Strong solution: actionable, measurable, and fair to everyone. Ready to try.'
         : 'Specific and measurable. Confirm it feels fair to everyone before committing.';
-    if (metCount >= 2) return 'Getting there — fill in the remaining marks to strengthen it.';
-    return 'Early draft — work through each mark below.';
+    if (metCount >= 2) return 'Getting there. Fill in the remaining marks to strengthen it.';
+    return 'Early draft. Work through each mark below.';
   }, [values, metCount, equity]);
 
   const summaryText = useMemo(() => {
     const lines = [
-      'SOLUTION SEEKING — SOLUTION CHECK',
+      'SOLUTION SEEKING: SOLUTION CHECK',
       '=================================',
       '',
       'THE SOLUTION',
-      (values.solution || '').trim() || '—',
+      (values.solution || '').trim() || '(none)',
       '',
       ...CRITERIA.flatMap((c) => [
-        `${c.name.toUpperCase()} — ${c.prompt}`,
-        (values[c.id] || '').trim() || '—',
+        `${c.name.toUpperCase()}: ${c.prompt}`,
+        (values[c.id] || '').trim() || '(none)',
         '',
       ]),
       `EQUITABLE FOR ALL PARTIES? ${equity ? 'Yes' : 'Not yet confirmed'}`,
@@ -201,7 +201,7 @@ export default function SolutionBuilder() {
         />
         <span className="text-sm text-slate-600">
           <span className="font-semibold text-ink-800">This feels fair to everyone involved.</span>{' '}
-          If it only benefits one party, it isn’t finished yet — some discomfort can be
+          If it only benefits one party, it isn’t finished yet. Some discomfort can be
           part of growth, but a solution should feel fair to all.
         </span>
       </label>

@@ -13,7 +13,7 @@ export const glossary: Term[] = [
   {
     term: 'Living System',
     definition:
-      'A system that is actively built and improved using Solutions generated through the Communication Protocol — actively changing to better serve the people who are part of it.',
+      'A system that is actively built and improved using Solutions generated through the Communication Protocol, actively changing to better serve the people who are part of it.',
   },
   {
     term: 'Solution',
@@ -23,7 +23,7 @@ export const glossary: Term[] = [
   {
     term: 'Leader (Servant)',
     definition:
-      'A person who takes responsibility for the health of the System and its people — not for control, but to help it thrive and grow.',
+      'A person who takes responsibility for the health of the System and its people, not for control, but to help it thrive and grow.',
   },
   {
     term: 'Leadership Tools',
@@ -86,7 +86,7 @@ export const protocolSteps: ProtocolStepMeta[] = [
     step: 1,
     title: 'Introspection',
     slug: 'introspection',
-    oneLine: 'Understand yourself first — your feelings, needs, and goals.',
+    oneLine: 'Understand yourself first: your feelings, needs, and goals.',
     icon: '🧭',
   },
   {

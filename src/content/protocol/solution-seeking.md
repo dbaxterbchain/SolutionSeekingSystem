@@ -4,7 +4,7 @@ step: 3
 oneLine: Collaboratively develop and agree on specific, measurable solutions.
 summary: >-
   Now that you understand each other, what can you do together? Transform shared
-  understanding into concrete, actionable, equitable solutions — then implement,
+  understanding into concrete, actionable, equitable solutions, then implement,
   follow up, and iterate until they truly work for everyone.
 requires:
   - name: Humility
@@ -28,19 +28,19 @@ ideas into concrete, actionable solutions with clear accountability.
 3. **Refining solutions.** Shape ideas against the four marks of a good solution (below).
 4. **Implementation.** Put the agreed-upon solution into action within the designated timeframe, maintaining accountability throughout.
 5. **Follow-up.** After the timeframe elapses, check on the results in a meeting planned in advance, and gather feedback from all parties.
-6. **Evaluation and iteration.** Assess how everyone feels and whether the solution is equitable. If it only benefits one party, it's not perfect yet. If it isn't working, iterate or develop a new solution — patience and persistence are key.
+6. **Evaluation and iteration.** Assess how everyone feels and whether the solution is equitable. If it only benefits one party, it's not perfect yet. If it isn't working, iterate or develop a new solution; patience and persistence are key.
 
 ## What makes a good solution
 
 A good solution should be:
 
-- **Actionable** — involves specific steps that can be taken.
-- **Testable** — includes measurable metrics to assess effectiveness.
-- **Effective** — designed to produce tangible effects that directly address the problem.
-- **Time-bound** — contains a clear timeframe for implementation and evaluation.
+- **Actionable:** involves specific steps that can be taken.
+- **Testable:** includes measurable metrics to assess effectiveness.
+- **Effective:** designed to produce tangible effects that directly address the problem.
+- **Time-bound:** contains a clear timeframe for implementation and evaluation.
 
 > **Example:** After discussing scheduling issues, the team agrees to add a shared
-> calendar and do 5-minute shift check-ins — then meets again in two weeks to see
+> calendar and do 5-minute shift check-ins, then meets again in two weeks to see
 > whether it's working.
 
 ## On equity

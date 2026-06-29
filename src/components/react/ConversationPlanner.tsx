@@ -11,7 +11,7 @@ const STORAGE_KEY = 'sss-planner-v1';
 const STAGE = [
   'Pick a private space, free from interruptions',
   'Agree on a specific time that works for you both',
-  'Keep it one-on-one — don’t bring others',
+  'Keep it one-on-one, don’t bring others',
   'Allow cooling-off time if tensions are high',
   'Consider offering food or drink',
 ];
@@ -100,26 +100,26 @@ export default function ConversationPlanner() {
       .map((l) => l.trim())
       .filter(Boolean);
     const lines = [
-      'SOLUTION SEEKING — CONVERSATION PLAN',
+      'SOLUTION SEEKING: CONVERSATION PLAN',
       '====================================',
       '',
       'SETTING THE STAGE',
-      ...(state.stage.length ? state.stage.map((s) => `• ${s}`) : ['—']),
+      ...(state.stage.length ? state.stage.map((s) => `• ${s}`) : ['(none)']),
       '',
       'MY GOALS',
-      ...(state.goals.length ? state.goals.map((g) => `• ${g}`) : ['—']),
+      ...(state.goals.length ? state.goals.map((g) => `• ${g}`) : ['(none)']),
       '',
       'HOW I’LL OPEN',
-      `Gratitude: ${state.gratitude.trim() || '—'}`,
-      `Intent: ${state.intent.trim() || '—'}`,
+      `Gratitude: ${state.gratitude.trim() || '(none)'}`,
+      `Intent: ${state.intent.trim() || '(none)'}`,
       '',
       'QUESTIONS TO ASK',
       ...([...state.questions, ...own].length
         ? [...state.questions, ...own].map((q) => `• ${q}`)
-        : ['—']),
+        : ['(none)']),
       '',
       'WHILE I LISTEN',
-      ...(state.listening.length ? state.listening.map((l) => `• ${l}`) : ['—']),
+      ...(state.listening.length ? state.listening.map((l) => `• ${l}`) : ['(none)']),
     ];
     return lines.join('\n');
   }, [state]);
@@ -212,7 +212,7 @@ export default function ConversationPlanner() {
       <section className="rounded-3xl border border-slate-100 bg-white p-6 shadow-card sm:p-8">
         <h2 className="font-heading text-xl font-bold text-ink-800">Questions to ask</h2>
         <p className="mt-1 text-sm text-slate-600">
-          Tap any to add them to your plan — the goal is to understand, not to win.
+          Tap any to add them to your plan. The goal is to understand, not to win.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           {QUESTION_BANK.map((q) => {

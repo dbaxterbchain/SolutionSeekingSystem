@@ -1,10 +1,10 @@
 ---
 title: Mutual Understanding
 step: 2
-oneLine: Fully understand the other person's perspective — and ensure they understand yours.
+oneLine: Fully understand the other person's perspective, and ensure they understand yours.
 summary: >-
   The other person's perspective is unknowable until you ask them. Through patient,
-  vulnerable, two-way dialogue you build a shared, accurate picture of what happened —
+  vulnerable, two-way dialogue you build a shared, accurate picture of what happened,
   the only foundation a lasting solution can be built on.
 requires:
   - name: Bravery
@@ -35,17 +35,17 @@ decisions that lead to more misunderstandings and frustration.
 ## Setting the stage
 
 - **Coordinate timing** so both of you can make real time for the talk.
-- **Create privacy** — a space free from external pressures and interruptions.
+- **Create privacy,** a space free from external pressures and interruptions.
 - **Ensure comfort**, and consider offering food or drink. Showing you're thinking about them encourages good faith.
 - **Keep it one-on-one.** Bringing others can make a person feel ganged up on or defensive.
-- **Allow cooling-off time** if tensions are high — but not so long that the events aren't clear.
+- **Allow cooling-off time** if tensions are high, but not so long that the events aren't clear.
 - **Set a specific time**, rather than leaving it indefinite.
 
 ## Starting the conversation
 
 **Express gratitude:** *"Hey Brian! Thank you for agreeing to talk to me."*
 
-**Clarity is kindness — be upfront about your intentions:** *"I wanted to talk about a
+**Clarity is kindness. Be upfront about your intentions:** *"I wanted to talk about a
 communication issue I think we had and find a good way to fix it for us."* State your
 goals explicitly: to be understood and to understand, to help (not hurt), and to fix
 the issue.
@@ -56,7 +56,7 @@ Ask permission: *"Do you mind if I give you a breakdown of the issue from my
 perspective?"* Getting buy-in makes it a collaborative process. Then define the problem
 clearly, stay calm, and keep it conversational.
 
-If they won't talk, you can't make them — communication is a two-player game. Reassure
+If they won't talk, you can't make them. Communication is a two-player game. Reassure
 them you don't want to win or be right, only to understand and be understood. If they
 still decline, let them know you're always open to talking when they are.
 
@@ -68,7 +68,7 @@ space** and listen.
 
 **Active listening principles**
 
-- Be patient — let them say everything they want to.
+- Be patient, and let them say everything they want to.
 - Reserve judgment; don't lead with emotions.
 - Trust their honesty.
 - If you feel frustrated, set those emotions aside, listen for context, and filter what they say through empathy.
@@ -78,7 +78,7 @@ that way because of...?" · "Do you think that may be rooted in a fear that some
 see you as...?" · "Sounds like you felt that way because of..."* (summarize for
 clarity).
 
-> This is the hard part — they haven't had the opportunity to process their feelings as
+> This is the hard part. They haven't had the opportunity to process their feelings as
 > you have. Be careful and patient. If they feel you're hostile or unkind, they'll shut
 > down.
 

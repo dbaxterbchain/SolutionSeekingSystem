@@ -45,7 +45,7 @@ const STEPS: Step[] = [
     eyebrow: 'Step 1',
     title: 'Your perspective',
     intro:
-      'Recount what happened as you currently see it. Don’t worry about being fair yet — just capture your honest, first-person view of the situation.',
+      'Recount what happened as you currently see it. Don’t worry about being fair yet, just capture your honest, first-person view of the situation.',
     fields: [
       {
         id: 'situation',
@@ -59,13 +59,13 @@ const STEPS: Step[] = [
     eyebrow: 'Step 2',
     title: 'Your first impression',
     intro:
-      'What is the clearest emotion you’re feeling right now? Emotions are notifications, not the problem itself — name them so you can look past them.',
+      'What is the clearest emotion you’re feeling right now? Emotions are notifications, not the problem itself. Name them so you can look past them.',
     emotionPicker: true,
     fields: [
       {
         id: 'firstEmotion',
         label: 'Describe that first reaction',
-        placeholder: 'e.g. "I was angry — it felt like he was lashing out at me."',
+        placeholder: 'e.g. "I was angry; it felt like he was lashing out at me."',
       },
     ],
   },
@@ -73,7 +73,7 @@ const STEPS: Step[] = [
     eyebrow: 'Step 3',
     title: 'Dig deeper',
     intro:
-      'Now examine that first impression and figure out WHY you feel this way. This is where you use Forgiveness — allow yourself to move past the discomfort so you can understand it.',
+      'Now examine that first impression and figure out WHY you feel this way. This is where you use Forgiveness. Allow yourself to move past the discomfort so you can understand it.',
     principles: [{ label: 'Forgiveness', slug: 'forgiveness' }],
     fields: [
       {
@@ -106,14 +106,14 @@ const STEPS: Step[] = [
     principles: [{ label: 'Critical Thinking', slug: 'critical-thinking' }],
     examples: [
       'Why does that hurt?',
-      'Was it anger that I saw — and why did they feel that way?',
+      'Was it anger that I saw, and why did they feel that way?',
       'What is the tension I feel?',
       'Why does that matter to me?',
     ],
     fields: [
       {
         id: 'moreQuestions',
-        label: 'Questions you asked yourself — and what surfaced',
+        label: 'Questions you asked yourself, and what surfaced',
         placeholder: 'Write the questions and the answers you found…',
       },
     ],
@@ -143,7 +143,7 @@ const STEPS: Step[] = [
     eyebrow: 'Step 7',
     title: 'Prepare for the conversation',
     intro:
-      'Pull your introspection into a plan for the Mutual Understanding step. Clarity is kindness — the clearer you are about your feelings and intentions, the better they can understand you.',
+      'Pull your introspection into a plan for the Mutual Understanding step. Clarity is kindness. The clearer you are about your feelings and intentions, the better they can understand you.',
     principles: [{ label: 'Mutual Understanding', slug: '' }],
     fields: [
       {
@@ -176,40 +176,41 @@ type Answers = Record<string, string>;
 
 function buildSummaryText(answers: Answers, emotions: string[]): string {
   const lines: string[] = [
-    'SOLUTION SEEKING — INTROSPECTION PREP',
+    'SOLUTION SEEKING: INTROSPECTION PREP',
     '====================================',
     '',
     'THE SITUATION (my perspective)',
-    answers.situation?.trim() || '—',
+    answers.situation?.trim() || '(none)',
     '',
     'MY FIRST REACTION',
-    [emotions.join(', '), answers.firstEmotion?.trim()].filter(Boolean).join(' — ') || '—',
+    [emotions.join(', '), answers.firstEmotion?.trim()].filter(Boolean).join(' / ') || '(none)',
     '',
     'WHY I FELT THAT WAY',
-    answers.whyFeel?.trim() || '—',
+    answers.whyFeel?.trim() || '(none)',
     '',
     'WHAT WAS UNDERNEATH IT',
-    answers.underlyingFeelings?.trim() || '—',
+    answers.underlyingFeelings?.trim() || '(none)',
     '',
     'QUESTIONS I ASKED MYSELF',
-    answers.moreQuestions?.trim() || '—',
+    answers.moreQuestions?.trim() || '(none)',
     '',
     'THEIR PERSPECTIVE (with compassion)',
-    answers.theirPerspective?.trim() || '—',
+    answers.theirPerspective?.trim() || '(none)',
     '',
-    '— MY PLAN FOR THE CONVERSATION —',
+    'MY PLAN FOR THE CONVERSATION',
+    '------------------------------',
     '',
     'Questions to ask them:',
-    answers.questionsToAsk?.trim() || '—',
+    answers.questionsToAsk?.trim() || '(none)',
     '',
     'My goals:',
-    answers.goals?.trim() || '—',
+    answers.goals?.trim() || '(none)',
     '',
     'How I’ll express myself clearly:',
-    answers.clearerExpression?.trim() || '—',
+    answers.clearerExpression?.trim() || '(none)',
     '',
     'How we might avoid this in future:',
-    answers.avoidFuture?.trim() || '—',
+    answers.avoidFuture?.trim() || '(none)',
   ];
   return lines.join('\n');
 }
