@@ -3,10 +3,8 @@ interface Props {
   /** Render light text for use on dark backgrounds. */
   variant?: 'default' | 'light';
   class?: string;
-  /** Tailwind size utilities for the logo mark (defaults to h-9 w-9). */
-  iconClass?: string;
 }
-const { variant = 'default', class: className = '', iconClass = 'h-9 w-9' } = Astro.props;
+const { variant = 'default', class: className = '' } = Astro.props;
 const wordColor = variant === 'light' ? 'text-white' : 'text-ink-800';
 const subColor = variant === 'light' ? 'text-brand-200' : 'text-brand-500';
 ---
@@ -17,7 +15,7 @@ const subColor = variant === 'light' ? 'text-brand-200' : 'text-brand-500';
     alt=""
     width="36"
     height="36"
-    class={`${iconClass} shrink-0 transition-transform duration-200 group-hover:scale-105`}
+    class="h-9 w-9 shrink-0 transition-transform duration-200 group-hover:scale-105"
     aria-hidden="true"
   />
   <span class="flex flex-col leading-none">
