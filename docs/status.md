@@ -1,12 +1,12 @@
 # Project Status
 
-_Last updated: 2026-06-28_
+_Last updated: 2026-07-03_
 
 ## At a glance
 
 | | |
 |---|---|
-| **Current phase** | Phase 2 complete (interactive tools) · hosted · Phase 3 not started |
+| **Current phase** | Phase 2 complete (interactive tools) + accounts · hosted · Phase 3 not started |
 | **Live URL** | https://solution-seeking-system.netlify.app |
 | **Custom domain** | www.solutionseeking.com — _not yet pointed_ |
 | **Build health** | `npm run build` ✅ · `npm run check` ✅ (0 errors) |
@@ -39,7 +39,18 @@ _Last updated: 2026-06-28_
 - [x] Conversation Planner — `/practice/conversation-planner` (stage checklist, goals, question bank, listening reminders)
 - [x] Solution Builder — `/practice/solution-builder` (live scoring vs. Actionable/Testable/Effective/Time-bound + equity check)
 
-All three are React islands (`src/components/react/*.tsx`) hydrated with `client:load`; state persists in `localStorage` only (nothing leaves the browser).
+All three are React islands (`src/components/react/*.tsx`) hydrated with `client:load`; state persists in `localStorage` for everyone (nothing leaves the browser unless signed in and saved).
+
+### Accounts (Supabase) ✅ _(done)_
+- [x] Email/password + Google sign-in (`/account`) via `@supabase/supabase-js`, entirely client-side — the site stays static (no SSR/Functions). See [`src/lib/supabase.ts`](../src/lib/supabase.ts), [`AuthMenu.tsx`](../src/components/react/AuthMenu.tsx), [`AccountView.tsx`](../src/components/react/AccountView.tsx).
+- [x] **Nothing is gated** — the whole site and all three tools remain fully usable while logged out. Accounts exist so Phase 3 AI tools can go behind a paywall later.
+- [x] Signed-in users can **Save** an introspection/plan/solution and review them from the account library. Backed by a `saved_sessions` table with Row-Level Security ([`supabase/migrations/0001_saved_sessions.sql`](../supabase/migrations/0001_saved_sessions.sql)). Tools reopen a saved item via `?load=<id>`.
+- Env vars: `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY` (publishable key — safe in the client; RLS protects data). Set locally in `.env` and in Netlify.
+- **Supabase setup + deployment process** (apply migrations, auth providers, redirect URLs, local-stack notes) is documented in [deployment.md](deployment.md#supabase-accounts--saved-data). Remaining one-time config: apply the migration, enable Email + Google providers, and add the redirect URLs.
+
+### Tool touch-ups ✅ _(done)_
+- [x] Solution Builder now shows a text output panel (like the other two), copy is no longer gated behind completion.
+- [x] Every tool has a **Start over** reset control.
 
 ### Phase 3 — In-site AI agents
 - [ ] Guide & Mentor agents via Astro server endpoints (Netlify Functions → Anthropic API)

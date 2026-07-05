@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import SaveButton from './SaveButton';
+import { useDialog } from './Dialog';
+import { useLoadSaved } from '../../lib/useLoadSaved';
 
 /**
  * Guided Introspection Worksheet — a React island that walks a user through the
@@ -221,6 +224,8 @@ export default function IntrospectionWorksheet() {
   const [current, setCurrent] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const savedData = useLoadSaved();
+  const { confirm, dialog } = useDialog();
 
   // Load saved progress once on mount (client only).
   useEffect(() => {
@@ -239,6 +244,16 @@ export default function IntrospectionWorksheet() {
     }
     setLoaded(true);
   }, []);
+
+  // Hydrate from a saved session opened via ?load=<id>, jumping to the summary.
+  useEffect(() => {
+    if (!savedData) return;
+    if (savedData.answers && typeof savedData.answers === 'object') {
+      setAnswers(savedData.answers as Answers);
+    }
+    if (Array.isArray(savedData.emotions)) setEmotions(savedData.emotions as string[]);
+    setCurrent(SUMMARY_INDEX);
+  }, [savedData]);
 
   // Persist on change.
   useEffect(() => {
@@ -271,8 +286,14 @@ export default function IntrospectionWorksheet() {
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const startOver = () => {
-    if (!window.confirm('Clear all your answers and start over?')) return;
+  const startOver = async () => {
+    const ok = await confirm({
+      title: 'Start over?',
+      message: 'This clears every step of your introspection. This can’t be undone.',
+      confirmLabel: 'Start over',
+      tone: 'danger',
+    });
+    if (!ok) return;
     setAnswers({});
     setEmotions([]);
     setCurrent(0);
@@ -457,6 +478,13 @@ export default function IntrospectionWorksheet() {
             <button type="button" onClick={downloadSummary} className="btn-secondary">
               Download .txt
             </button>
+            <SaveButton
+              tool="introspection"
+              data={() => ({ answers, emotions })}
+              summary={summaryText}
+              defaultTitle={(answers.situation || 'Introspection').trim().slice(0, 60)}
+              className="btn-secondary"
+            />
             <button type="button" onClick={() => goTo(0)} className="btn-ghost">
               Review answers
             </button>
@@ -470,6 +498,7 @@ export default function IntrospectionWorksheet() {
           </div>
         </div>
       )}
+      {dialog}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 ---
 import Logo from './Logo.astro';
+import AuthMenu from './react/AuthMenu.tsx';
 import { navLinks } from '../data/nav';
 
 const currentPath = Astro.url.pathname;
@@ -30,7 +31,10 @@ const isActive = (href: string) =>
       }
     </nav>
 
-    <div class="flex items-center gap-3">
+    <div class="flex items-center gap-2">
+      <div class="hidden lg:block">
+        <AuthMenu client:load />
+      </div>
       <a href="/practice" class="btn-primary hidden sm:inline-flex">Talk to the Guide</a>
       <button
         type="button"
@@ -66,6 +70,9 @@ const isActive = (href: string) =>
         ))
       }
       <a href="/practice" class="btn-primary mt-2">Talk to the Guide</a>
+      <div class="mt-2 border-t border-slate-100 pt-2">
+        <AuthMenu client:load variant="mobile" />
+      </div>
     </nav>
   </div>
 </header>

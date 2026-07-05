@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import SaveButton from './SaveButton';
+import { useDialog } from './Dialog';
+import { useLoadSaved } from '../../lib/useLoadSaved';
 
 /**
  * Conversation Planner — prepares a Mutual Understanding (Step 2) conversation:
@@ -63,6 +66,8 @@ export default function ConversationPlanner() {
   const [state, setState] = useState<State>(EMPTY);
   const [loaded, setLoaded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const savedData = useLoadSaved();
+  const { confirm, dialog } = useDialog();
 
   useEffect(() => {
     try {
@@ -73,6 +78,27 @@ export default function ConversationPlanner() {
     }
     setLoaded(true);
   }, []);
+
+  // Hydrate from a saved session opened via ?load=<id> (overrides the draft).
+  useEffect(() => {
+    if (savedData) setState({ ...EMPTY, ...(savedData as Partial<State>) });
+  }, [savedData]);
+
+  const startOver = async () => {
+    const ok = await confirm({
+      title: 'Start over?',
+      message: 'This clears your whole conversation plan. This can’t be undone.',
+      confirmLabel: 'Start over',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setState(EMPTY);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
 
   useEffect(() => {
     if (!loaded) return;
@@ -270,18 +296,33 @@ export default function ConversationPlanner() {
         <pre className="mt-4 max-h-96 overflow-auto whitespace-pre-wrap rounded-2xl bg-white/10 p-5 font-sans text-sm leading-relaxed text-brand-50">
           {summaryText}
         </pre>
-        <div className="mt-5 flex flex-wrap gap-3">
+        <div className="mt-5 flex flex-wrap items-center gap-3">
           <button type="button" onClick={copy} className="btn bg-white text-ink-800 hover:bg-brand-50">
             {copied ? 'Copied ✓' : 'Copy the plan'}
           </button>
+          <SaveButton
+            tool="planner"
+            data={() => ({ ...state })}
+            summary={summaryText}
+            defaultTitle={(state.intent || 'Conversation plan').trim().slice(0, 60)}
+            className="btn border border-white/30 text-white hover:bg-white/10"
+          />
           <a
             href="/protocol/mutual-understanding"
             className="btn border border-white/30 text-white hover:bg-white/10"
           >
             About this step
           </a>
+          <button
+            type="button"
+            onClick={startOver}
+            className="btn ml-auto text-white/60 hover:text-red-300"
+          >
+            Start over
+          </button>
         </div>
       </section>
+      {dialog}
     </div>
   );
 }

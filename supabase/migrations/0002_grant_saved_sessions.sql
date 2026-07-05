@@ -1,0 +1,11 @@
+-- Fix-forward for 0001: explicitly grant the Data API roles access to saved_sessions.
+--
+-- Current Supabase does NOT auto-expose new public tables to the API roles, so on a
+-- project without the older ambient default privileges (e.g. a fresh local stack), the
+-- table returns 403 "permission denied" even for its owner. Granting to `authenticated`
+-- makes access explicit and portable across environments; Row-Level Security (from 0001)
+-- still restricts every row to its owner. `anon` deliberately gets nothing — every row is
+-- owned by a signed-in user.
+--
+-- GRANT is idempotent, so this is safe to (re)apply on a project that already has access.
+grant select, insert, update, delete on public.saved_sessions to authenticated;

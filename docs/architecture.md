@@ -8,6 +8,7 @@
 | Styling | **Tailwind CSS** (`@astrojs/tailwind`) | Fast, consistent, design tokens in `tailwind.config.mjs`. |
 | Content | **Content Collections** + **MDX** | Markdown/YAML content with **Zod-typed** schemas. |
 | Interactivity | **React islands** (`@astrojs/react`) | Hydrate only the interactive widgets (Phase 2). |
+| Accounts & data | **Supabase** (`@supabase/supabase-js`) | Auth (email/password + Google) + Postgres for saved sessions, all client-side with Row-Level Security. Keeps the site static; groundwork for the Phase 3 paywall. See [deployment.md](deployment.md#supabase-accounts--saved-data). |
 | Hosting | **Netlify** (`@astrojs/netlify`) | Already in use; adapter enables server endpoints for Phase 3. |
 
 ### Why Astro over Next.js
@@ -68,6 +69,7 @@ astro.config.mjs · tailwind.config.mjs · tsconfig.json · netlify.toml
 | `/practice/introspection` | `pages/practice/introspection.astro` | Introspection worksheet (React island) |
 | `/practice/conversation-planner` | `pages/practice/conversation-planner.astro` | Conversation planner (React island) |
 | `/practice/solution-builder` | `pages/practice/solution-builder.astro` | Solution builder (React island) |
+| `/account` | `pages/account.astro` | Sign in / register + saved-work library (React island) |
 | `/about` | `pages/about.astro` | Story + resources |
 | `404` | `pages/404.astro` | Not-found |
 

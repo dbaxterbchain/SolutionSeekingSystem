@@ -30,6 +30,15 @@ widgets ship JavaScript; the rest of the site stays static. All state persists i
 
 They live under `/practice`, alongside links to the ChatGPT Guide/Mentor.
 
+## Accounts ✅ _(complete)_
+
+Free **email/password + Google** sign-in at `/account`, powered by **Supabase** entirely
+client-side (the site stays static — no SSR). **Nothing is gated:** the full site and all
+three practice tools work while logged out, exactly as before. Signed-in users can **save**
+their introspections, plans, and solutions and revisit them from an account library
+(`saved_sessions` table, Row-Level Security). This lays the groundwork for putting the
+Phase 3 AI tools behind a paywall.
+
 ## Phase 3 — In-site AI agents
 
 Bring the **Guide** and **Mentor** into the site as native chat experiences (the goal is
