@@ -89,9 +89,14 @@ async function lookupUserByCustomer(
 }
 
 async function upsertSubscription(userId: string, sub: Stripe.Subscription) {
-  // On current Stripe API versions the billing period lives on the
-  // subscription item, not the subscription itself.
+  // Current Stripe API versions put the billing period on the subscription
+  // item; older webhook-endpoint API versions (payload snapshots) keep it on
+  // the subscription itself. Accept either shape.
   const item = sub.items.data[0];
+  const periodEnd =
+    item?.current_period_end ??
+    (sub as unknown as { current_period_end?: number }).current_period_end ??
+    null;
   const { error } = await supabaseAdmin.from('subscriptions').upsert({
     user_id: userId,
     stripe_customer_id: typeof sub.customer === 'string' ? sub.customer : sub.customer.id,
@@ -99,9 +104,7 @@ async function upsertSubscription(userId: string, sub: Stripe.Subscription) {
     status: sub.status,
     price_id: item?.price.id ?? null,
     cancel_at_period_end: sub.cancel_at_period_end,
-    current_period_end: item?.current_period_end
-      ? new Date(item.current_period_end * 1000).toISOString()
-      : null,
+    current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
   });
   if (error) {
     console.error('subscription upsert failed', error);
