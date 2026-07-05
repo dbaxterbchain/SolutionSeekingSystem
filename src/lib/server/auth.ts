@@ -7,6 +7,9 @@ export async function getUserFromRequest(request: Request): Promise<User | null>
   const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : null;
   if (!token) return null;
   const { data, error } = await supabaseAdmin.auth.getUser(token);
+  // A failure here with a real browser token usually means the server's
+  // Supabase credentials are wrong (e.g. legacy vs new-format secret key).
+  if (error) console.error('JWT verification failed:', error.message);
   return error ? null : data.user;
 }
 
