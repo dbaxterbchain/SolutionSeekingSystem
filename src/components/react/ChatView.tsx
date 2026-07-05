@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSession } from '../../lib/useSession';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { accountLink } from '../../lib/accountLink';
 import {
   createChatSession,
   getChatSession,
@@ -39,6 +40,10 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // On touch devices Enter should insert a newline; sending is the button's job.
+  const [coarsePointer] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
+  );
 
   // Grow the composer with its content (up to ~6 lines), shrink when cleared.
   useEffect(() => {
@@ -114,13 +119,22 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
     }
   };
 
-  const send = async () => {
+  const send = () => {
     const text = input.trim();
     if (!text || streaming || !session) return;
     setInput('');
-    setError(null);
+    void deliver([...messages, { role: 'user', content: text }]);
+  };
 
-    const next: ChatMessage[] = [...messages, { role: 'user', content: text }];
+  /** Re-send the transcript after a failure (the user message is already in it). */
+  const retry = () => {
+    if (streaming || messages[messages.length - 1]?.role !== 'user') return;
+    void deliver(messages);
+  };
+
+  const deliver = async (next: ChatMessage[]) => {
+    if (!session) return;
+    setError(null);
     setMessages([...next, { role: 'assistant', content: '' }]);
     setStreaming(true);
     const ctrl = new AbortController();
@@ -179,7 +193,12 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
         });
       } else {
         setMessages(next);
-        setError((err as Error).message);
+        const message = (err as Error).message;
+        setError(
+          message === 'Failed to fetch'
+            ? 'Connection problem — your message wasn’t sent. Check your internet and retry.'
+            : message || 'Something went wrong. Please retry.'
+        );
       }
     } finally {
       setStreaming(false);
@@ -236,7 +255,7 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
           Accounts are free, and your first {FREE_LIMIT} messages are on us. After that, a
           $5/month subscription unlocks unlimited conversations with both assistants.
         </p>
-        <a href="/account" className="btn-primary mt-5 inline-block">
+        <a href={accountLink()} className="btn-primary mt-5 inline-block">
           Sign in or create an account
         </a>
       </div>
@@ -280,9 +299,18 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
 
       {/* Error */}
       {error && (
-        <p className="mx-5 mb-3 rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
-          {error}
-        </p>
+        <div className="mx-5 mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          <span>{error}</span>
+          {!streaming && messages[messages.length - 1]?.role === 'user' && (
+            <button
+              type="button"
+              onClick={retry}
+              className="shrink-0 rounded-full bg-amber-100 px-3 py-1 font-semibold text-amber-900 hover:bg-amber-200"
+            >
+              Retry
+            </button>
+          )}
+        </div>
       )}
 
       {/* Paywall / composer */}
@@ -309,7 +337,7 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
           className="flex items-end gap-3 border-t border-slate-100 p-4"
           onSubmit={(e) => {
             e.preventDefault();
-            void send();
+            send();
           }}
         >
           <textarea
@@ -317,9 +345,11 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              // Desktop: Enter sends, Shift+Enter for a newline. Touch
+              // devices: Enter is always a newline; the button sends.
+              if (e.key === 'Enter' && !e.shiftKey && !coarsePointer) {
                 e.preventDefault();
-                void send();
+                send();
               }
             }}
             rows={1}

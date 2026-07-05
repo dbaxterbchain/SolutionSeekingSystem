@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSession } from '../../lib/useSession';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { saveSession, type ToolType } from '../../lib/savedSessions';
+import { accountLink } from '../../lib/accountLink';
 import { useDialog } from './Dialog';
 
 /**
@@ -32,7 +33,7 @@ export default function SaveButton({
 
   if (!user) {
     return (
-      <a href="/account" className={className}>
+      <a href={accountLink()} className={className}>
         Sign in to save
       </a>
     );

@@ -16,6 +16,7 @@ import {
   type AgentId,
   type ChatSession,
 } from '../../lib/chatSessions';
+import { safeNext } from '../../lib/accountLink';
 
 /**
  * The /account page island. Signed out → an email/password + Google auth panel.
@@ -23,6 +24,20 @@ import {
  */
 export default function AccountView() {
   const { user, loading } = useSession();
+
+  // Tools link here with ?next=<path> — once signed in, send the user back.
+  const next =
+    typeof window !== 'undefined'
+      ? safeNext(new URLSearchParams(window.location.search).get('next'))
+      : null;
+
+  useEffect(() => {
+    if (user && next) window.location.replace(next);
+  }, [user, next]);
+
+  if (user && next) {
+    return <div className="text-sm text-slate-400">Taking you back…</div>;
+  }
 
   if (!isSupabaseConfigured) {
     return (
@@ -52,8 +67,12 @@ function AuthPanel() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Preserve the query string (?next=...) so OAuth and email flows land back
+  // here and the post-sign-in redirect can complete the round trip.
   const redirectTo =
-    typeof window !== 'undefined' ? `${window.location.origin}/account` : undefined;
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/account${window.location.search}`
+      : undefined;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -285,6 +304,8 @@ function Library({ email }: { email: string }) {
 
       <SubscriptionSection />
 
+      <ToolLinks />
+
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
       <ChatHistorySection formatDate={formatDate} />
@@ -383,6 +404,40 @@ function Library({ email }: { email: string }) {
       )}
       {dialog}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Tool quick links (signed in)                                       */
+/* ------------------------------------------------------------------ */
+
+const TOOL_LINKS = [
+  { label: '🧭 Guide', href: '/practice/guide', hint: 'AI · work through a conflict' },
+  { label: '🎓 Mentor', href: '/practice/mentor', hint: 'AI · ask about the system' },
+  { label: 'Guided Introspection', href: '/practice/introspection', hint: 'worksheet' },
+  { label: 'Conversation Planner', href: '/practice/conversation-planner', hint: 'worksheet' },
+  { label: 'Solution Builder', href: '/practice/solution-builder', hint: 'worksheet' },
+];
+
+function ToolLinks() {
+  return (
+    <section className="mt-6">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Jump back in
+      </h2>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {TOOL_LINKS.map((t) => (
+          <a
+            key={t.href}
+            href={t.href}
+            title={t.hint}
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-ink-800 shadow-card transition-colors hover:border-brand-300 hover:text-brand-700"
+          >
+            {t.label}
+          </a>
+        ))}
+      </div>
+    </section>
   );
 }
 
