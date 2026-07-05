@@ -294,7 +294,7 @@ function Library({ email }: { email: string }) {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-ink-800">Your saved work</h1>
+          <h1 className="font-heading text-2xl font-bold text-ink-800">Your account</h1>
           <p className="mt-1 text-sm text-slate-600">Signed in as {email}</p>
         </div>
         <button type="button" onClick={signOut} className="btn-ghost text-slate-500 hover:text-red-600">
@@ -310,7 +310,7 @@ function Library({ email }: { email: string }) {
 
       <ChatHistorySection formatDate={formatDate} />
 
-      <h2 className="mt-10 font-heading text-xl font-bold text-ink-800">Saved practice work</h2>
+      <h2 className="mt-10 font-heading text-xl font-bold text-ink-800">Your saved work</h2>
       {loading ? (
         <p className="mt-8 text-sm text-slate-400">Loading your saved work…</p>
       ) : items.length === 0 ? (
@@ -412,8 +412,6 @@ function Library({ email }: { email: string }) {
 /* ------------------------------------------------------------------ */
 
 const TOOL_LINKS = [
-  { label: '🧭 Guide', href: '/practice/guide', hint: 'AI · work through a conflict' },
-  { label: '🎓 Mentor', href: '/practice/mentor', hint: 'AI · ask about the system' },
   { label: 'Guided Introspection', href: '/practice/introspection', hint: 'worksheet' },
   { label: 'Conversation Planner', href: '/practice/conversation-planner', hint: 'worksheet' },
   { label: 'Solution Builder', href: '/practice/solution-builder', hint: 'worksheet' },
@@ -423,7 +421,7 @@ function ToolLinks() {
   return (
     <section className="mt-6">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Jump back in
+        Free practice tools
       </h2>
       <div className="mt-3 flex flex-wrap gap-2">
         {TOOL_LINKS.map((t) => (
@@ -581,6 +579,29 @@ function SubscriptionSection() {
             )
           ))}
       </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
+        {!loading && (
+          <span className="mr-1 text-sm text-slate-600">
+            {entitled
+              ? 'Unlimited conversations, anytime:'
+              : 'Try them free — your first 10 messages are on us:'}
+          </span>
+        )}
+        <a
+          href="/practice/guide"
+          className="rounded-full border border-brand-200 bg-brand-50 px-3.5 py-1.5 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-100"
+        >
+          🧭 Talk to the Guide
+        </a>
+        <a
+          href="/practice/mentor"
+          className="rounded-full border border-brand-200 bg-brand-50 px-3.5 py-1.5 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-100"
+        >
+          🎓 Ask the Mentor
+        </a>
+      </div>
+
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
     </section>
   );
