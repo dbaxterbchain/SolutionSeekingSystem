@@ -9,6 +9,7 @@ Hosted on **Netlify** under the **Beanchain** team.
 | Admin | https://app.netlify.com/projects/solution-seeking-system |
 | Repo | https://github.com/dbaxterbchain/SolutionSeekingSystem |
 | Build settings | `netlify.toml` (command `npm run build`, publish `dist`, Node 22 — required by `@supabase/supabase-js`) |
+| IndexNow | Key file in `public/` + local build plugin (`netlify/plugins/indexnow`) auto-submits all sitemap URLs to api.indexnow.org after each successful production deploy |
 
 The first production deploy was done with the Netlify CLI. For ongoing work, connect the
 GitHub repo so every push deploys automatically.

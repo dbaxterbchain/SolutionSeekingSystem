@@ -7,3 +7,7 @@
   for = "/_astro/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# Pings IndexNow (Bing/Yandex) with all sitemap URLs after production deploys.
+[[plugins]]
+  package = "./netlify/plugins/indexnow"
