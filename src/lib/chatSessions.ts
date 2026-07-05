@@ -1,0 +1,86 @@
+import { supabase } from './supabase';
+import type { AgentId } from './server/agents';
+
+export type { AgentId };
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatSession {
+  id: string;
+  user_id: string;
+  agent: AgentId;
+  title: string;
+  messages: ChatMessage[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** Human labels + route for each assistant (used by the account page). */
+export const AGENT_META: Record<AgentId, { label: string; path: string }> = {
+  guide: { label: 'Solution Seeking Guide', path: '/practice/guide' },
+  mentor: { label: 'Solution Seeking Mentor', path: '/practice/mentor' },
+};
+
+/** List the signed-in user's conversations, most recently updated first. */
+export async function listChatSessions(): Promise<ChatSession[]> {
+  const { data, error } = await supabase
+    .from('chat_sessions')
+    .select('*')
+    .order('updated_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as ChatSession[];
+}
+
+/** Fetch one conversation by id (RLS restricts it to the owner). */
+export async function getChatSession(id: string): Promise<ChatSession | null> {
+  const { data, error } = await supabase
+    .from('chat_sessions')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as ChatSession) ?? null;
+}
+
+/** Create a conversation for the current user. */
+export async function createChatSession(input: {
+  agent: AgentId;
+  title: string;
+  messages: ChatMessage[];
+}): Promise<ChatSession> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error('You must be signed in.');
+
+  const { data, error } = await supabase
+    .from('chat_sessions')
+    .insert({
+      user_id: user.id,
+      agent: input.agent,
+      title: input.title.trim() || 'Untitled',
+      messages: input.messages,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as ChatSession;
+}
+
+/** Update a conversation's messages (and optionally title). */
+export async function updateChatSession(
+  id: string,
+  patch: { title?: string; messages: ChatMessage[] }
+): Promise<void> {
+  const { error } = await supabase.from('chat_sessions').update(patch).eq('id', id);
+  if (error) throw error;
+}
+
+/** Delete one conversation by id. */
+export async function deleteChatSession(id: string): Promise<void> {
+  const { error } = await supabase.from('chat_sessions').delete().eq('id', id);
+  if (error) throw error;
+}

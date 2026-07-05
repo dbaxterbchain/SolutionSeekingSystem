@@ -56,6 +56,16 @@ const pages: Record<string, OgPage> = {
     title: 'Solution Builder',
     description: 'Draft solutions that are actionable, testable, effective, and time-bound.',
   },
+  'practice/guide': {
+    title: 'Solution Seeking Guide',
+    description:
+      'An AI guide that walks you through the Communication Protocol for a real conflict, step by step.',
+  },
+  'practice/mentor': {
+    title: 'Solution Seeking Mentor',
+    description:
+      'An AI mentor for everything in the system: the protocol, the Wisdom Principles, and the Leadership Tools.',
+  },
   about: {
     title: 'About',
     description: 'Why Beanchain Coffee built the Solution Seeking System, and how to use it.',

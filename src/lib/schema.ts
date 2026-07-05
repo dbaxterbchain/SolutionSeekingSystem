@@ -121,7 +121,13 @@ export function glossaryTermSet(site: URL): Schema {
 
 export function webApplication(
   site: URL,
-  opts: { name: string; description: string; path: string }
+  opts: {
+    name: string;
+    description: string;
+    path: string;
+    /** Monthly subscription price; omit for free tools. */
+    offer?: { price: string };
+  }
 ): Schema {
   return {
     '@context': CONTEXT,
@@ -131,7 +137,14 @@ export function webApplication(
     url: new URL(opts.path, site).href,
     applicationCategory: 'EducationalApplication',
     operatingSystem: 'Web',
-    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    offers: opts.offer
+      ? {
+          '@type': 'Offer',
+          price: opts.offer.price,
+          priceCurrency: 'USD',
+          category: 'Subscription',
+        }
+      : { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     publisher: { '@id': orgId(site) },
   };
 }

@@ -1,12 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getCollection } from 'astro:content';
-import {
-  attributionFooter,
-  overviewToMarkdown,
-  principleToMarkdown,
-  protocolToMarkdown,
-  toolToMarkdown,
-} from '../lib/llms';
+import { attributionFooter, methodologyMarkdown } from '../lib/llms';
 
 export const prerender = true;
 
@@ -15,36 +8,8 @@ export const prerender = true;
  * assembled from the content collections in teaching order.
  */
 export const GET: APIRoute = async ({ site }) => {
-  const protocol = (await getCollection('protocol')).sort((a, b) => a.data.step - b.data.step);
-  const principles = (await getCollection('principles')).sort(
-    (a, b) => a.data.order - b.data.order
-  );
-  const tools = (await getCollection('tools')).sort((a, b) => a.data.order - b.data.order);
-
   const sections = [
-    overviewToMarkdown(),
-    [
-      '# The Communication Protocol',
-      '',
-      'The three-step communication pattern at the core of the system. Worked in order,',
-      'the steps replace reactive, adversarial conversations with a structured, respectful',
-      'path from conflict to understanding to actionable results.',
-    ].join('\n'),
-    ...protocol.map(protocolToMarkdown),
-    [
-      '# The 12 Wisdom Principles',
-      '',
-      'The "source code" of the system: ethical values that guide how the Communication',
-      'Protocol is applied. Each principle is documented in the same six-part format.',
-    ].join('\n'),
-    ...principles.map(principleToMarkdown),
-    [
-      '# The 4 Leadership Tools',
-      '',
-      'Practices that apply the Communication Protocol to real-world situations in teams,',
-      'workplaces, relationships, and communities.',
-    ].join('\n'),
-    ...tools.map(toolToMarkdown),
+    await methodologyMarkdown(),
     [
       '# Practice the system',
       '',
@@ -53,6 +18,11 @@ export const GET: APIRoute = async ({ site }) => {
       `- Guided Introspection Worksheet: ${new URL('/practice/introspection', site).href}`,
       `- Conversation Planner: ${new URL('/practice/conversation-planner', site).href}`,
       `- Solution Builder: ${new URL('/practice/solution-builder', site).href}`,
+      '',
+      'AI assistants (sign in for 10 free messages; $5/month for unlimited access):',
+      '',
+      `- Solution Seeking Guide (walks you through the protocol for a real conflict): ${new URL('/practice/guide', site).href}`,
+      `- Solution Seeking Mentor (answers anything about the system): ${new URL('/practice/mentor', site).href}`,
       '',
       `The complete source guide is a free PDF: ${new URL('/solution-seeking-complete-guide.pdf', site).href}`,
     ].join('\n'),

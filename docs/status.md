@@ -1,12 +1,12 @@
 # Project Status
 
-_Last updated: 2026-07-04_
+_Last updated: 2026-07-05_
 
 ## At a glance
 
 | | |
 |---|---|
-| **Current phase** | Phase 2 complete (interactive tools) + accounts · hosted · Phase 3 not started |
+| **Current phase** | Phase 3 complete (in-site AI Guide & Mentor + $5/mo subscription) — pending one-time Stripe/Supabase/Netlify config |
 | **Live URL** | https://solution-seeking-system.netlify.app |
 | **Custom domain** | www.solutionseeking.com — _not yet pointed_ |
 | **Build health** | `npm run build` ✅ · `npm run check` ✅ (0 errors) |
@@ -60,12 +60,18 @@ All three are React islands (`src/components/react/*.tsx`) hydrated with `client
 - [x] Canonical definition string (`systemDefinition` in [`src/data/concepts.ts`](../src/data/concepts.ts)) quoted on home + llms.txt + schema; protocol `requires` sidebars now link to their principle pages; `/account` + `/404` are `noindex`; immutable caching for `/_astro/*` in `netlify.toml`.
 - Post-domain-connect: verify in Google Search Console + Bing Webmaster (DNS TXT) and submit `/sitemap-index.xml`.
 
-### Phase 3 — In-site AI agents
-- [ ] Guide & Mentor agents via Astro server endpoints (Netlify Functions → Anthropic API)
-- [ ] Ground responses in the site's content collections
+### Phase 3 — In-site AI agents ✅ _(done 2026-07-04)_
+- [x] Guide (`/practice/guide`) & Mentor (`/practice/mentor`) as native streaming chat via Astro server endpoints (Netlify Functions → Anthropic API, `claude-sonnet-5`), replacing the external ChatGPT links.
+- [x] Responses grounded in the content collections (same serializers as `/llms-full.txt`, via [`src/lib/server/agents.ts`](../src/lib/server/agents.ts)) with Anthropic prompt caching on the ~15k-token grounding block.
+- [x] **$5/month paywall**: Stripe Checkout + Customer Portal + webhook (`/api/checkout`, `/api/billing-portal`, `/api/stripe-webhook`). Signed-in users get **10 lifetime free messages** first. Entitlements (`subscriptions`, `ai_usage`) are server-written only (service role); browser has read-only RLS access — see migrations 0003/0004.
+- [x] Conversations saved to the user-owned `chat_sessions` table (RLS), resumable via `?chat=<id>`; account page shows subscription status + chat history.
+- Env vars (server-only): `ANTHROPIC_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `SUPABASE_SERVICE_ROLE_KEY` — setup steps in [deployment.md](deployment.md#phase-3--ai-assistants--subscription).
+- ✅ One-time config done (2026-07-05): migrations 0003/0004 applied to the hosted project (and local stack), Stripe product/price/webhook/portal configured, all five env vars set in Netlify (the three sensitive ones flagged as secret values).
 
 ## Open questions / decisions
 
 - Brand fonts — buy licensed faces or keep the free stand-ins?
 - Whether to add a print stylesheet for the guide.
-- Where (if anywhere) to store AI conversation data in Phase 3.
+- ~~Where (if anywhere) to store AI conversation data in Phase 3.~~ → Decided: Supabase
+  `chat_sessions` table, user-owned with Row-Level Security; users can delete
+  conversations from the account page.

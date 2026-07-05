@@ -39,16 +39,22 @@ their introspections, plans, and solutions and revisit them from an account libr
 (`saved_sessions` table, Row-Level Security). This lays the groundwork for putting the
 Phase 3 AI tools behind a paywall.
 
-## Phase 3 — In-site AI agents
+## Phase 3 — In-site AI agents ✅ _(complete)_
 
-Bring the **Guide** and **Mentor** into the site as native chat experiences (the goal is
-our own agents, not necessarily tied to ChatGPT).
+The **Guide** (`/practice/guide`) and **Mentor** (`/practice/mentor`) are native, in-site
+chat experiences powered by **Claude** (`claude-sonnet-5`), replacing the external
+ChatGPT links. Gated behind a **$5/month Stripe subscription**, with **10 free lifetime
+messages** for signed-in users.
 
-- Astro **server endpoints** (`src/pages/api/*.ts`) deploy as **Netlify Functions** and
-  call the **Anthropic API** (Claude) with the API key kept server-side only.
-- Set `export const prerender = false` on those routes (everything else stays static).
-- Stream responses; ground them in the site's content collections so answers stay
-  faithful to the system.
-- Add `ANTHROPIC_API_KEY` as a Netlify environment variable.
+- Astro server endpoints (`src/pages/api/*.ts`, `prerender = false`) deploy as Netlify
+  Functions: `chat` (streaming), `checkout`, `billing-portal`, `stripe-webhook`.
+  Everything else stays static.
+- Responses stream token-by-token and are grounded in the site's content collections via
+  the same serializers that build `/llms-full.txt` (`src/lib/llms.ts` →
+  `src/lib/server/agents.ts`), with Anthropic prompt caching on the ~15k-token grounding.
+- Entitlements (`subscriptions`, `ai_usage`) are written only by the server (Stripe
+  webhook + chat endpoint, service-role key); the browser has read-only RLS access.
+- Conversations are saved to the user-owned `chat_sessions` table (RLS) and can be
+  resumed from the account page.
 
-See [architecture.md](architecture.md) for how the current setup already supports this.
+See [deployment.md](deployment.md) for the Stripe / Anthropic / Supabase setup.

@@ -1,0 +1,62 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ChatView from '../../components/react/ChatView.tsx';
+import { breadcrumbs, webApplication } from '../../lib/schema';
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  webApplication(site, {
+    name: 'Solution Seeking Guide',
+    description:
+      'An AI guide that walks you through the Communication Protocol for a real conflict: understand yourself, prepare the conversation, and leave with a plan.',
+    path: '/practice/guide',
+    offer: { price: '5.00' },
+  }),
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Practice', path: '/practice' },
+    { name: 'Solution Seeking Guide', path: '/practice/guide' },
+  ]),
+];
+---
+
+<BaseLayout
+  title="Solution Seeking Guide"
+  description="Chat with the Solution Seeking Guide: an AI assistant that walks you through the Communication Protocol step by step to navigate a specific conflict."
+  schemas={schemas}
+>
+  <section class="border-b border-slate-100 bg-gradient-to-b from-brand-50/70 to-white">
+    <div class="container-page py-12 sm:py-16">
+      <a href="/practice" class="text-sm font-semibold text-brand-600 hover:text-brand-700">
+        ← Practice
+      </a>
+      <p class="eyebrow mt-4">AI Assistant · 🧭</p>
+      <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-ink-800 sm:text-5xl">
+        Solution Seeking Guide
+      </h1>
+      <p class="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
+        Navigating a real conflict? The Guide walks you through the Communication Protocol
+        one step at a time — understand yourself, practice the conversation, and leave with
+        a concrete plan. Your first 10 messages are free; $5/month for unlimited access.
+      </p>
+    </div>
+  </section>
+
+  <div class="container-page py-12">
+    <div class="mx-auto max-w-3xl">
+      <ChatView
+        client:load
+        agent="guide"
+        agentName="Guide"
+        welcome="Hi — I'm the Solution Seeking Guide. I can walk you through the Communication Protocol to help with a specific interpersonal challenge. Tell me a bit about what's going on, or just say hello and we'll take it from there."
+      />
+      <p class="mt-6 text-center text-sm text-slate-500">
+        Conversations are saved to your account and only visible to you. Prefer to learn the
+        system first?
+        <a href="/protocol" class="font-medium text-brand-600 hover:text-brand-700">
+          Read the Communication Protocol →
+        </a>
+      </p>
+    </div>
+  </div>
+</BaseLayout>

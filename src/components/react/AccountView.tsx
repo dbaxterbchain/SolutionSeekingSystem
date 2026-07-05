@@ -9,6 +9,13 @@ import {
   type SavedSession,
   type ToolType,
 } from '../../lib/savedSessions';
+import {
+  deleteChatSession,
+  listChatSessions,
+  AGENT_META,
+  type AgentId,
+  type ChatSession,
+} from '../../lib/chatSessions';
 
 /**
  * The /account page island. Signed out → an email/password + Google auth panel.
@@ -276,8 +283,13 @@ function Library({ email }: { email: string }) {
         </button>
       </div>
 
+      <SubscriptionSection />
+
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
+      <ChatHistorySection formatDate={formatDate} />
+
+      <h2 className="mt-10 font-heading text-xl font-bold text-ink-800">Saved practice work</h2>
       {loading ? (
         <p className="mt-8 text-sm text-slate-400">Loading your saved work…</p>
       ) : items.length === 0 ? (
@@ -371,5 +383,235 @@ function Library({ email }: { email: string }) {
       )}
       {dialog}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Subscription (signed in)                                           */
+/* ------------------------------------------------------------------ */
+
+const ENTITLED = ['active', 'trialing', 'past_due'];
+const FREE_LIMIT = 10;
+
+interface SubRow {
+  status: string;
+  cancel_at_period_end: boolean;
+  current_period_end: string | null;
+}
+
+function SubscriptionSection() {
+  const { session } = useSession();
+  const [sub, setSub] = useState<SubRow | null>(null);
+  const [freeUsed, setFreeUsed] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [activating, setActivating] = useState(
+    typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('checkout') === 'success'
+  );
+
+  const load = async () => {
+    const [{ data: subRow }, { data: usage }] = await Promise.all([
+      supabase
+        .from('subscriptions')
+        .select('status, cancel_at_period_end, current_period_end')
+        .maybeSingle(),
+      supabase.from('ai_usage').select('free_messages_used').maybeSingle(),
+    ]);
+    setSub((subRow as SubRow) ?? null);
+    setFreeUsed(usage?.free_messages_used ?? 0);
+    setLoading(false);
+    return subRow ? ENTITLED.includes((subRow as SubRow).status) : false;
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    let tries = 0;
+    const poll = async () => {
+      const entitled = await load();
+      if (cancelled) return;
+      // After checkout, the webhook can lag a moment — refetch a few times.
+      if (activating && !entitled && tries < 5) {
+        tries += 1;
+        window.setTimeout(poll, 2000);
+      } else {
+        setActivating(false);
+      }
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const post = async (path: string) => {
+    if (!session) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(path, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.url) {
+        window.location.href = data.url;
+        return;
+      }
+      throw new Error('Something went wrong. Please try again.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setBusy(false);
+    }
+  };
+
+  const entitled = sub ? ENTITLED.includes(sub.status) : false;
+  const formatDate = (iso: string | null) =>
+    iso
+      ? new Date(iso).toLocaleDateString(undefined, {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+        })
+      : '';
+
+  return (
+    <section className="mt-8 rounded-3xl border border-slate-100 bg-white p-6 shadow-card">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-heading text-lg font-bold text-ink-800">AI assistants</h2>
+          {loading || activating ? (
+            <p className="mt-1 text-sm text-slate-500">
+              {activating ? 'Activating your subscription…' : 'Loading…'}
+            </p>
+          ) : entitled ? (
+            <p className="mt-1 text-sm text-slate-600">
+              <span className="mr-2 inline-block rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                Subscriber
+              </span>
+              {sub?.cancel_at_period_end
+                ? `Ends ${formatDate(sub.current_period_end)}`
+                : sub?.current_period_end
+                  ? `Renews ${formatDate(sub.current_period_end)}`
+                  : 'Unlimited conversations with the Guide and Mentor.'}
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-slate-600">
+              Free plan — {Math.min(freeUsed, FREE_LIMIT)} of {FREE_LIMIT} free messages used.
+            </p>
+          )}
+        </div>
+        {!loading &&
+          (entitled ? (
+            <button
+              type="button"
+              onClick={() => post('/api/billing-portal')}
+              disabled={busy}
+              className="btn-secondary disabled:opacity-60"
+            >
+              {busy ? 'Opening…' : 'Manage subscription'}
+            </button>
+          ) : (
+            !activating && (
+              <button
+                type="button"
+                onClick={() => post('/api/checkout')}
+                disabled={busy}
+                className="btn-primary disabled:opacity-60"
+              >
+                {busy ? 'Opening checkout…' : 'Subscribe — $5/month'}
+              </button>
+            )
+          ))}
+      </div>
+      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Chat history (signed in)                                           */
+/* ------------------------------------------------------------------ */
+
+const AGENT_ORDER: AgentId[] = ['guide', 'mentor'];
+
+function ChatHistorySection({ formatDate }: { formatDate: (iso: string) => string }) {
+  const [chats, setChats] = useState<ChatSession[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { confirm, dialog } = useDialog();
+
+  useEffect(() => {
+    listChatSessions()
+      .then(setChats)
+      .catch(() => setError('Could not load your conversations.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const remove = async (chat: ChatSession) => {
+    const ok = await confirm({
+      title: 'Delete this conversation?',
+      message: `“${chat.title}” will be permanently removed. This can’t be undone.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return;
+    try {
+      await deleteChatSession(chat.id);
+      setChats((prev) => prev.filter((c) => c.id !== chat.id));
+    } catch {
+      setError('Could not delete that conversation.');
+    }
+  };
+
+  if (loading || (chats.length === 0 && !error)) return null;
+
+  return (
+    <section className="mt-10">
+      <h2 className="font-heading text-xl font-bold text-ink-800">AI conversations</h2>
+      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      <div className="mt-3 space-y-6">
+        {AGENT_ORDER.filter((a) => chats.some((c) => c.agent === a)).map((agent) => (
+          <div key={agent}>
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              {AGENT_META[agent].label}
+            </h3>
+            <ul className="mt-2 space-y-2.5">
+              {chats
+                .filter((c) => c.agent === agent)
+                .map((chat) => (
+                  <li
+                    key={chat.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-card"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-ink-800">{chat.title}</p>
+                      <p className="text-xs text-slate-400">{formatDate(chat.updated_at)}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <a
+                        href={`${AGENT_META[agent].path}?chat=${chat.id}`}
+                        className="rounded-full px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50"
+                      >
+                        Open
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => remove(chat)}
+                        className="rounded-full px-3 py-1.5 text-sm font-medium text-slate-400 hover:bg-red-50 hover:text-red-600"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      {dialog}
+    </section>
   );
 }

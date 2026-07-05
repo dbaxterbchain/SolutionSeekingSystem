@@ -1,4 +1,4 @@
-import type { CollectionEntry } from 'astro:content';
+import { getCollection, type CollectionEntry } from 'astro:content';
 import { glossary, pillars, systemDefinition } from '../data/concepts';
 
 /**
@@ -93,6 +93,46 @@ export function toolToMarkdown(entry: CollectionEntry<'tools'>): string {
     '',
     (entry.body ?? '').trim(),
   ].join('\n');
+}
+
+/**
+ * The entire methodology as one coherent markdown document, in teaching order.
+ * Shared by /llms-full.txt and the AI assistants' grounding context.
+ */
+export async function methodologyMarkdown(): Promise<string> {
+  const protocol = (await getCollection('protocol')).sort((a, b) => a.data.step - b.data.step);
+  const principles = (await getCollection('principles')).sort(
+    (a, b) => a.data.order - b.data.order
+  );
+  const tools = (await getCollection('tools')).sort((a, b) => a.data.order - b.data.order);
+
+  const sections = [
+    overviewToMarkdown(),
+    [
+      '# The Communication Protocol',
+      '',
+      'The three-step communication pattern at the core of the system. Worked in order,',
+      'the steps replace reactive, adversarial conversations with a structured, respectful',
+      'path from conflict to understanding to actionable results.',
+    ].join('\n'),
+    ...protocol.map(protocolToMarkdown),
+    [
+      '# The 12 Wisdom Principles',
+      '',
+      'The "source code" of the system: ethical values that guide how the Communication',
+      'Protocol is applied. Each principle is documented in the same six-part format.',
+    ].join('\n'),
+    ...principles.map(principleToMarkdown),
+    [
+      '# The 4 Leadership Tools',
+      '',
+      'Practices that apply the Communication Protocol to real-world situations in teams,',
+      'workplaces, relationships, and communities.',
+    ].join('\n'),
+    ...tools.map(toolToMarkdown),
+  ];
+
+  return sections.join('\n\n---\n\n');
 }
 
 export function overviewToMarkdown(): string {

@@ -181,9 +181,54 @@ dev defaults — never use them anywhere real.
 > `net start winnat` in an **admin** PowerShell to release the reservation, then restart
 > Docker.
 
-## Phase 3 note (AI agents)
+## Phase 3 — AI assistants + subscription
 
-When the Guide/Mentor endpoints land, add the API key as a Netlify environment variable
-(**Site configuration → Environment variables**), e.g. `ANTHROPIC_API_KEY`. It stays
-server-side; the Astro server endpoints run as Netlify Functions. No other config changes
-are required — the adapter is already installed.
+The Guide/Mentor chat runs on four Astro server endpoints (`src/pages/api/{chat,
+checkout, billing-portal, stripe-webhook}.ts`, `prerender = false`) that deploy as
+Netlify Functions automatically — no config changes; the adapter handles bundling and
+the endpoints support streaming responses.
+
+**Five server-only env vars** (set in `.env` locally and in Netlify → Site configuration
+→ Environment variables; no `PUBLIC_` prefix — they must never reach the browser):
+
+| Var | Where it comes from |
+|---|---|
+| `ANTHROPIC_API_KEY` | console.anthropic.com → API keys |
+| `STRIPE_SECRET_KEY` | Stripe dashboard → prefer a **restricted key** (`rk_...`) with: Checkout Sessions (write), Billing Portal (write), Customers (write), Subscriptions (read) |
+| `STRIPE_WEBHOOK_SECRET` | The webhook endpoint's signing secret (below); locally, the `whsec_` printed by `stripe listen` |
+| `STRIPE_PRICE_ID` | The $5/month recurring price (below) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API keys → secret key. Bypasses RLS — server only |
+
+### Database
+
+Apply `supabase/migrations/0003_ai_phase3.sql` **and** `0004_grant_ai_phase3.sql` (SQL
+editor or `supabase db push`). They add `subscriptions` + `ai_usage` (client read-only;
+written only by the server) and `chat_sessions` (user-owned conversations, full CRUD
+under RLS), plus the `increment_free_messages` function (service-role only — 0003
+revokes the default PUBLIC execute grant).
+
+### Stripe setup (test mode first, then repeat in live mode)
+
+1. **Product/price:** Product catalog → Add product — "Solution Seeking AI Assistants",
+   recurring **$5.00/month USD** → copy the `price_...` id → `STRIPE_PRICE_ID`.
+2. **Restricted key:** Developers → API keys → Create restricted key (permissions above)
+   → `STRIPE_SECRET_KEY`.
+3. **Webhook:** Developers → Webhooks → Add endpoint
+   `https://www.solutionseeking.com/api/stripe-webhook`, events:
+   `checkout.session.completed`, `customer.subscription.created`,
+   `customer.subscription.updated`, `customer.subscription.deleted` → copy the signing
+   secret → `STRIPE_WEBHOOK_SECRET`.
+4. **Customer portal:** Settings → Billing → Customer portal → allow customers to cancel
+   subscriptions (cancel at period end). The account page's "Manage subscription" button
+   opens this portal.
+5. **Local testing:** `stripe listen --forward-to localhost:4321/api/stripe-webhook`
+   (use the CLI-printed `whsec_` as the local `STRIPE_WEBHOOK_SECRET`), then subscribe
+   with test card `4242 4242 4242 4242`. `stripe trigger checkout.session.completed`
+   exercises the webhook directly.
+
+### How gating works
+
+Signed-in users get **10 lifetime free messages** (`ai_usage`, incremented server-side),
+then a $5/month subscription (status `active`/`trialing`/`past_due` in `subscriptions`)
+is required. The Stripe webhook is the only writer of subscription state. A portal
+cancel sets `cancel_at_period_end` while access continues until the period ends.

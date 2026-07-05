@@ -7,7 +7,7 @@ const assistants = [
     name: 'Solution Seeking Guide',
     blurb:
       'Walks you through the system to navigate a specific conflict and find a great solution: resolving conflicts, understanding yourself, and planning productive communication, step by step.',
-    href: 'https://chatgpt.com/g/g-68981adb38108191a91907d44138505d-solution-seeking-guide',
+    href: '/practice/guide',
     cta: 'Open the Guide',
     icon: '🧭',
   },
@@ -15,7 +15,7 @@ const assistants = [
     name: 'Solution Seeking Mentor',
     blurb:
       'Helps you with anything related to the system: explaining the framework, the 3-step protocol, the Wisdom Principles, and the Leadership Tools (or building your own).',
-    href: 'https://chatgpt.com/g/g-6897eb5ac1d48191af7e78fefef86909-solution-seeking-mentor',
+    href: '/practice/mentor',
     cta: 'Open the Mentor',
     icon: '🎓',
   },
@@ -53,7 +53,7 @@ const tools = [
   <PageHero
     eyebrow="Practice"
     title="Use the system for yourself"
-    intro="Reading is a start, but the system works when you practice it. Use our assistants for hands-on, step-by-step help right now, with interactive in-browser tools on the way."
+    intro="Reading is a start, but the system works when you practice it. Chat with our AI Guide and Mentor for hands-on, step-by-step help right here on the site, or use the free interactive tools below."
   />
 
   <div class="container-page py-16">
@@ -65,13 +65,16 @@ const tools = [
             <span class="text-3xl" aria-hidden="true">{a.icon}</span>
             <h2 class="mt-4 text-xl font-bold text-ink-800">{a.name}</h2>
             <p class="mt-2 flex-1 text-sm leading-relaxed text-slate-600">{a.blurb}</p>
-            <a href={a.href} rel="noopener" target="_blank" class="btn-primary mt-5 self-start">
+            <a href={a.href} class="btn-primary mt-5 self-start">
               {a.cta}
             </a>
           </div>
         ))
       }
     </div>
+    <p class="mt-4 text-sm text-slate-500">
+      Sign in for 10 free messages · $5/month for unlimited conversations with both assistants.
+    </p>
 
     <!-- Interactive tools -->
     <section class="mt-20">

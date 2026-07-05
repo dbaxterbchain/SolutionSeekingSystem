@@ -1,0 +1,61 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ChatView from '../../components/react/ChatView.tsx';
+import { breadcrumbs, webApplication } from '../../lib/schema';
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  webApplication(site, {
+    name: 'Solution Seeking Mentor',
+    description:
+      'An AI mentor for everything in the Solution Seeking System: the framework, the 3-step protocol, the Wisdom Principles, and the Leadership Tools.',
+    path: '/practice/mentor',
+    offer: { price: '5.00' },
+  }),
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Practice', path: '/practice' },
+    { name: 'Solution Seeking Mentor', path: '/practice/mentor' },
+  ]),
+];
+---
+
+<BaseLayout
+  title="Solution Seeking Mentor"
+  description="Chat with the Solution Seeking Mentor: an AI expert on the whole system — the framework, the protocol, the Wisdom Principles, and the Leadership Tools."
+  schemas={schemas}
+>
+  <section class="border-b border-slate-100 bg-gradient-to-b from-brand-50/70 to-white">
+    <div class="container-page py-12 sm:py-16">
+      <a href="/practice" class="text-sm font-semibold text-brand-600 hover:text-brand-700">
+        ← Practice
+      </a>
+      <p class="eyebrow mt-4">AI Assistant · 🎓</p>
+      <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-ink-800 sm:text-5xl">
+        Solution Seeking Mentor
+      </h1>
+      <p class="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
+        Ask anything about the system: the framework and its philosophy, the 3-step
+        protocol, the Wisdom Principles, or adapting the Leadership Tools to your team.
+        Your first 10 messages are free; $5/month for unlimited access.
+      </p>
+    </div>
+  </section>
+
+  <div class="container-page py-12">
+    <div class="mx-auto max-w-3xl">
+      <ChatView
+        client:load
+        agent="mentor"
+        agentName="Mentor"
+        welcome="Hi — I'm the Solution Seeking Mentor. Ask me anything about the system: how the protocol works, what a principle means in practice, or how to adapt the tools to your team."
+      />
+      <p class="mt-6 text-center text-sm text-slate-500">
+        Working through a specific conflict right now? The
+        <a href="/practice/guide" class="font-medium text-brand-600 hover:text-brand-700">
+          Guide walks you through it step by step →
+        </a>
+      </p>
+    </div>
+  </div>
+</BaseLayout>
