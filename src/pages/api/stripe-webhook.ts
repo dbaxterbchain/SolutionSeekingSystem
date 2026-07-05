@@ -23,32 +23,53 @@ export const POST: APIRoute = async ({ request }) => {
       signature ?? '',
       serverEnv('STRIPE_WEBHOOK_SECRET')
     );
-  } catch {
+  } catch (err) {
+    // Almost always means STRIPE_WEBHOOK_SECRET doesn't match this endpoint's
+    // signing secret (dashboard endpoint vs `stripe listen`, test vs live).
+    console.error(
+      'stripe-webhook signature verification failed:',
+      err instanceof Error ? err.message : err
+    );
     return new Response('invalid signature', { status: 400 });
   }
 
-  switch (event.type) {
-    case 'checkout.session.completed': {
-      const session = event.data.object;
-      const userId = session.client_reference_id ?? session.metadata?.user_id;
-      if (userId && session.subscription) {
+  console.log('stripe-webhook received:', event.type);
+
+  try {
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        const userId = session.client_reference_id ?? session.metadata?.user_id;
+        if (!userId || !session.subscription) {
+          console.warn('checkout.session.completed missing user_id or subscription', session.id);
+          break;
+        }
         const sub = await getStripe().subscriptions.retrieve(
           typeof session.subscription === 'string'
             ? session.subscription
             : session.subscription.id
         );
         await upsertSubscription(userId, sub);
+        break;
       }
-      break;
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object;
+        const userId = sub.metadata?.user_id ?? (await lookupUserByCustomer(sub.customer));
+        if (!userId) {
+          console.warn('could not resolve a user for subscription event', sub.id);
+          break;
+        }
+        await upsertSubscription(userId, sub);
+        break;
+      }
     }
-    case 'customer.subscription.created':
-    case 'customer.subscription.updated':
-    case 'customer.subscription.deleted': {
-      const sub = event.data.object;
-      const userId = sub.metadata?.user_id ?? (await lookupUserByCustomer(sub.customer));
-      if (userId) await upsertSubscription(userId, sub);
-      break;
-    }
+  } catch (err) {
+    // e.g. the restricted key lacking Subscriptions read, or a Supabase
+    // outage. 500 makes Stripe retry the delivery instead of dropping it.
+    console.error(`stripe-webhook failed handling ${event.type}:`, err);
+    return new Response('handler error', { status: 500 });
   }
 
   // Always 200 so Stripe doesn't retry event types we deliberately ignore.
@@ -82,5 +103,9 @@ async function upsertSubscription(userId: string, sub: Stripe.Subscription) {
       ? new Date(item.current_period_end * 1000).toISOString()
       : null,
   });
-  if (error) console.error('subscription upsert failed', error);
+  if (error) {
+    console.error('subscription upsert failed', error);
+    throw new Error(`subscription upsert failed: ${error.message}`);
+  }
+  console.log(`subscription upserted for ${userId}: ${sub.status}`);
 }
