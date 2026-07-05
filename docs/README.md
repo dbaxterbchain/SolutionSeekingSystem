@@ -13,8 +13,7 @@ Project documentation for the **Solution Seeking System** website.
 
 ## Quick links
 
-- **Live site:** https://solution-seeking-system.netlify.app
-- **Target domain:** https://www.solutionseeking.com
+- **Live site:** https://solutionseeking.com
 - **Repo:** https://github.com/dbaxterbchain/SolutionSeekingSystem
 - **Netlify admin:** https://app.netlify.com/projects/solution-seeking-system
 

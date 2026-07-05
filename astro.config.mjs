@@ -8,7 +8,7 @@ import sitemap from '@astrojs/sitemap';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://www.solutionseeking.com',
+  site: 'https://solutionseeking.com',
   // Static by default (fast, SEO-friendly). The Netlify adapter is wired up now
   // so Phase 3 AI endpoints can opt into on-demand rendering with
   // `export const prerender = false` without reconfiguring the project.

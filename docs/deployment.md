@@ -44,17 +44,15 @@ netlify open              # open the admin dashboard
 The local folder is linked via `.netlify/state.json` (gitignored). If a fresh clone needs
 linking: `netlify link --name solution-seeking-system`.
 
-## Custom domain — www.solutionseeking.com
+## Custom domain — solutionseeking.com ✅ _(connected)_
 
-In the dashboard → **Domain management → Add a domain** → enter `solutionseeking.com`,
-then either:
-
-- **Use Netlify DNS** (point the registrar's nameservers at Netlify), or
-- **Keep your DNS** and add records Netlify shows you (a `CNAME` for `www` → the
-  `.netlify.app` host, plus an apex/ALIAS record).
-
-Netlify provisions HTTPS automatically once DNS resolves. Set the primary domain to
-`www.solutionseeking.com` (or apex — your preference) and Netlify will redirect the other.
+The site is live at **https://solutionseeking.com** — the apex is the primary domain;
+`www.solutionseeking.com` and `solution-seeking-system.netlify.app` both 301 to it.
+The apex URL is also the canonical identity in code (`site` in `astro.config.mjs`,
+which feeds canonicals, the sitemap, OG tags, llms.txt, and the IndexNow plugin) —
+if the primary domain ever changes, change `astro.config.mjs` and
+`netlify/plugins/indexnow/index.js` to match, and update the Stripe webhook URL
+(Stripe does not follow redirects).
 
 ## Supabase (accounts & saved data)
 
@@ -136,7 +134,7 @@ origin and add every origin the app signs in from under **Redirect URLs** (the a
 
 - `http://localhost:4321` (local dev)
 - `https://solution-seeking-system.netlify.app` (and any deploy-preview pattern you use)
-- `https://www.solutionseeking.com` (once the custom domain is live)
+- `https://solutionseeking.com` (the live domain — required for sign-in/OAuth on production)
 
 Missing entries here are the usual cause of a sign-in that bounces back signed-out.
 
@@ -214,7 +212,8 @@ revokes the default PUBLIC execute grant).
 2. **Restricted key:** Developers → API keys → Create restricted key (permissions above)
    → `STRIPE_SECRET_KEY`.
 3. **Webhook:** Developers → Webhooks → Add endpoint
-   `https://www.solutionseeking.com/api/stripe-webhook`, events:
+   `https://solutionseeking.com/api/stripe-webhook` (apex — the primary domain; Stripe
+   does not follow the www→apex redirect), events:
    `checkout.session.completed`, `customer.subscription.created`,
    `customer.subscription.updated`, `customer.subscription.deleted` → copy the signing
    secret → `STRIPE_WEBHOOK_SECRET`.

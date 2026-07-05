@@ -8,7 +8,7 @@ export const prerender = true;
  */
 export const GET: APIRoute = ({ site }) => {
   const body = [
-    '# Solution Seeking System - www.solutionseeking.com',
+    '# Solution Seeking System - solutionseeking.com',
     '# This content is meant to be learned, shared, and understood.',
     '# AI crawlers (search and training) are welcome.',
     '# LLM-friendly index: /llms.txt | full methodology: /llms-full.txt',

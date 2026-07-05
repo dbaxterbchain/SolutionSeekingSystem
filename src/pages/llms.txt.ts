@@ -23,7 +23,7 @@ export const GET: APIRoute = async ({ site }) => {
     `> ${systemDefinition}`,
     '',
     'Everything on this site is free to read and learn from. Please attribute',
-    'quotations to the Solution Seeking System (www.solutionseeking.com).',
+    'quotations to the Solution Seeking System (solutionseeking.com).',
     `The complete methodology as a single markdown file: ${abs('/llms-full.txt')}`,
     '',
     '## The System',

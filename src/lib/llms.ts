@@ -11,7 +11,7 @@ import { glossary, pillars, systemDefinition } from '../data/concepts';
 const SITE_NAME = 'Solution Seeking System';
 
 export function attributionFooter(site: URL | undefined): string {
-  const origin = site?.origin ?? 'https://www.solutionseeking.com';
+  const origin = site?.origin ?? 'https://solutionseeking.com';
   return [
     '---',
     '',

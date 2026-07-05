@@ -7,8 +7,7 @@ _Last updated: 2026-07-05_
 | | |
 |---|---|
 | **Current phase** | Phase 3 complete (in-site AI Guide & Mentor + $5/mo subscription) — pending one-time Stripe/Supabase/Netlify config |
-| **Live URL** | https://solution-seeking-system.netlify.app |
-| **Custom domain** | www.solutionseeking.com — _not yet pointed_ |
+| **Live URL** | https://solutionseeking.com (apex is primary; www and the netlify.app subdomain 301 to it) |
 | **Build health** | `npm run build` ✅ · `npm run check` ✅ (0 errors) |
 | **Hosting** | Netlify (Beanchain team), site `solution-seeking-system` |
 
@@ -30,9 +29,10 @@ _Last updated: 2026-07-05_
 ## Next up
 
 ### Immediate
-- [ ] Link the GitHub repo to Netlify for continuous deploys (see [deployment.md](deployment.md)).
-- [ ] Point **www.solutionseeking.com** at the Netlify site.
+- [x] Link the GitHub repo to Netlify for continuous deploys (see [deployment.md](deployment.md)).
+- [x] Point the custom domain at the Netlify site — live at **solutionseeking.com** (apex primary).
 - [ ] Confirm real brand fonts (currently using close free stand-ins: Anton/Poppins/Inter).
+- [ ] Verify in Google Search Console + Bing Webmaster (DNS TXT) and submit `/sitemap-index.xml`.
 
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)

@@ -8,7 +8,7 @@ import { join } from 'node:path';
  */
 
 const KEY = 'e75a2aa1ea8b473e96f4789568cff858';
-const HOST = 'www.solutionseeking.com';
+const HOST = 'solutionseeking.com';
 
 export const onSuccess = async ({ constants, utils }) => {
   if (process.env.CONTEXT !== 'production') {

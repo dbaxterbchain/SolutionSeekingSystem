@@ -3,7 +3,7 @@
 The teaching & showcase website for the **Solution Seeking System (SSS)**, a Beanchain
 Coffee framework for democratic problem solving, leadership, and communication.
 
-**Live:** https://solution-seeking-system.netlify.app · **Target domain:** [solutionseeking.com](https://www.solutionseeking.com)
+**Live:** [solutionseeking.com](https://solutionseeking.com)
 
 📚 Full documentation lives in **[`docs/`](docs/README.md)** — start with [docs/status.md](docs/status.md).
 
