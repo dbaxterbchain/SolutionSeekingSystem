@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import IntrospectionWorksheet from '../../components/react/IntrospectionWorksheet.tsx';
+import SavedForTool from '../../components/react/SavedForTool.tsx';
 import { breadcrumbs, webApplication } from '../../lib/schema';
 
 const site = Astro.site ?? Astro.url;
@@ -44,6 +45,8 @@ const schemas = [
   <div class="container-page py-12">
     <div class="mx-auto max-w-3xl">
       <IntrospectionWorksheet client:load />
+
+      <SavedForTool client:load tool="introspection" />
 
       <p class="mt-6 text-center text-sm text-slate-500">
         Your answers are saved only on this device. Want the full picture?

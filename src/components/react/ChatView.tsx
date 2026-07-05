@@ -5,9 +5,11 @@ import { accountLink } from '../../lib/accountLink';
 import {
   createChatSession,
   getChatSession,
+  listChatSessions,
   updateChatSession,
   type AgentId,
   type ChatMessage,
+  type ChatSession,
 } from '../../lib/chatSessions';
 
 const FREE_LIMIT = 10;
@@ -37,6 +39,8 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<ChatSession[] | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -231,8 +235,31 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
     setMessages([]);
     setChatId(null);
     setError(null);
+    setShowHistory(false);
     const url = new URL(window.location.href);
     url.searchParams.delete('chat');
+    window.history.replaceState(null, '', url);
+  };
+
+  const toggleHistory = () => {
+    if (showHistory) {
+      setShowHistory(false);
+      return;
+    }
+    setShowHistory(true);
+    listChatSessions()
+      .then((all) => setHistory(all.filter((c) => c.agent === agent)))
+      .catch(() => setHistory([]));
+  };
+
+  const openSaved = (saved: ChatSession) => {
+    if (streaming) return;
+    setChatId(saved.id);
+    setMessages(saved.messages);
+    setError(null);
+    setShowHistory(false);
+    const url = new URL(window.location.href);
+    url.searchParams.set('chat', saved.id);
     window.history.replaceState(null, '', url);
   };
 
@@ -273,6 +300,9 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
               {gate.remaining} of {FREE_LIMIT} free messages left
             </span>
           )}
+          <button type="button" onClick={toggleHistory} className="btn-ghost text-xs">
+            {showHistory ? 'Close history' : 'History'}
+          </button>
           {messages.length > 0 && (
             <button type="button" onClick={newConversation} className="btn-ghost text-xs">
               New conversation
@@ -280,6 +310,45 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
           )}
         </div>
       </div>
+
+      {/* Past conversations */}
+      {showHistory && (
+        <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Past conversations
+          </p>
+          {history === null ? (
+            <p className="mt-2 text-sm text-slate-400">Loading…</p>
+          ) : history.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-500">
+              Nothing here yet — your conversations save automatically as you chat.
+            </p>
+          ) : (
+            <ul className="mt-2 max-h-48 space-y-0.5 overflow-y-auto">
+              {history.map((c) => (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={() => openSaved(c)}
+                    className="flex w-full items-baseline justify-between gap-3 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white"
+                  >
+                    <span className="truncate font-medium text-ink-800">{c.title}</span>
+                    <span className="shrink-0 text-xs text-slate-400">
+                      {new Date(c.updated_at).toLocaleDateString()}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <a
+            href="/account"
+            className="mt-2 inline-block text-xs font-semibold text-brand-600 hover:text-brand-700"
+          >
+            Manage all conversations in your account →
+          </a>
+        </div>
+      )}
 
       {/* Transcript */}
       <div className="max-h-[32rem] space-y-4 overflow-y-auto px-5 py-6">

@@ -22,6 +22,10 @@ import { safeNext } from '../../lib/accountLink';
  * The /account page island. Signed out → an email/password + Google auth panel.
  * Signed in → the user's saved-session library (view, open in the tool, delete).
  */
+const checkoutSuccessParam = () =>
+  typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).get('checkout') === 'success';
+
 export default function AccountView() {
   const { user, loading } = useSession();
 
@@ -31,12 +35,37 @@ export default function AccountView() {
       ? safeNext(new URLSearchParams(window.location.search).get('next'))
       : null;
 
+  // Returning from Stripe Checkout, the persisted session can take a moment
+  // to rehydrate — hold a neutral screen instead of flashing the sign-in
+  // form, with a grace window before giving up.
+  const [fromCheckout] = useState(checkoutSuccessParam);
+  const [graceOver, setGraceOver] = useState(false);
+  useEffect(() => {
+    if (!fromCheckout) return;
+    const t = window.setTimeout(() => setGraceOver(true), 6000);
+    return () => window.clearTimeout(t);
+  }, [fromCheckout]);
+
   useEffect(() => {
     if (user && next) window.location.replace(next);
   }, [user, next]);
 
   if (user && next) {
     return <div className="text-sm text-slate-400">Taking you back…</div>;
+  }
+
+  if (fromCheckout && !user && (loading || !graceOver)) {
+    return (
+      <div className="mx-auto max-w-md rounded-3xl border border-slate-100 bg-white p-8 text-center shadow-card">
+        <p className="text-3xl" aria-hidden="true">✨</p>
+        <h1 className="mt-3 font-heading text-xl font-bold text-ink-800">
+          Finalizing your subscription…
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-slate-600">
+          Thanks for subscribing! One moment while we confirm your payment.
+        </p>
+      </div>
+    );
   }
 
   if (!isSupabaseConfigured) {
@@ -459,10 +488,9 @@ function SubscriptionSection() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activating, setActivating] = useState(
-    typeof window !== 'undefined' &&
-      new URLSearchParams(window.location.search).get('checkout') === 'success'
-  );
+  const [activating, setActivating] = useState(checkoutSuccessParam);
+  const [celebrate, setCelebrate] = useState(false);
+  const [activationSlow, setActivationSlow] = useState(false);
 
   const load = async () => {
     const [{ data: subRow }, { data: usage }] = await Promise.all([
@@ -478,18 +506,34 @@ function SubscriptionSection() {
     return subRow ? ENTITLED.includes((subRow as SubRow).status) : false;
   };
 
+  const clearCheckoutParam = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.delete('checkout');
+    window.history.replaceState(null, '', url);
+  };
+
   useEffect(() => {
     let cancelled = false;
     let tries = 0;
+    const fromCheckout = checkoutSuccessParam();
     const poll = async () => {
       const entitled = await load();
       if (cancelled) return;
-      // After checkout, the webhook can lag a moment — refetch a few times.
-      if (activating && !entitled && tries < 5) {
+      if (!fromCheckout) return;
+      if (entitled) {
+        // Confirmed — celebrate, and clean the URL so a refresh doesn't
+        // re-trigger the activation flow.
+        setActivating(false);
+        setCelebrate(true);
+        clearCheckoutParam();
+      } else if (tries < 12) {
+        // The Stripe webhook usually lands within a second or two.
         tries += 1;
-        window.setTimeout(poll, 2000);
+        window.setTimeout(poll, 1500);
       } else {
         setActivating(false);
+        setActivationSlow(true);
+        clearCheckoutParam();
       }
     };
     void poll();
@@ -532,6 +576,18 @@ function SubscriptionSection() {
 
   return (
     <section className="mt-8 rounded-3xl border border-slate-100 bg-white p-6 shadow-card">
+      {celebrate && (
+        <p className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm leading-relaxed text-emerald-800">
+          🎉 <strong>You're subscribed!</strong> Unlimited conversations with the Guide and
+          Mentor are unlocked. Stripe will email your receipt.
+        </p>
+      )}
+      {activationSlow && (
+        <p className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-800">
+          Payment received — your subscription is taking a moment to activate. It will
+          appear here shortly; try refreshing in a minute.
+        </p>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-heading text-lg font-bold text-ink-800">AI assistants</h2>
