@@ -9,16 +9,22 @@ summary: >-
 requires:
   - name: Bravery
     why: Courage to initiate difficult conversations.
+    slug: bravery
   - name: Patience
     why: Allowing time for thoughts and feelings to be expressed.
+    slug: patience
   - name: Empathy
     why: Seeing situations from the other person's perspective.
+    slug: compassion-empathy
   - name: Compassion
     why: Caring about the other person while attempting to understand them.
+    slug: compassion-empathy
   - name: Flexibility
     why: Adapting your approach based on the conversation.
+    slug: flexibility
   - name: Good Faith
     why: Assuming positive intent from the other person.
+    slug: good-faith
 ---
 
 Creating a shared understanding is the first step to finding a lasting solution.

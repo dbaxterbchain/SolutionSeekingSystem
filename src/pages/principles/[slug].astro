@@ -2,6 +2,7 @@
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import StepNav from '../../components/StepNav.astro';
+import { breadcrumbs, faqPage, learningArticle } from '../../lib/schema';
 
 export async function getStaticPaths() {
   const principles = (await getCollection('principles')).sort(
@@ -19,9 +20,31 @@ export async function getStaticPaths() {
 
 const { entry, prev, next } = Astro.props;
 const p = entry.data;
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  learningArticle(site, {
+    headline: `${p.title} — Wisdom Principle ${p.order} of 12`,
+    description: p.tagline,
+    path: `/principles/${entry.id}`,
+    teaches: p.title,
+  }),
+  faqPage(p.faq),
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Wisdom Principles', path: '/principles' },
+    { name: p.title, path: `/principles/${entry.id}` },
+  ]),
+];
 ---
 
-<BaseLayout title={p.title} description={p.tagline}>
+<BaseLayout
+  title={p.title}
+  description={p.tagline}
+  schemas={schemas}
+  type="article"
+  markdownAlt={`/principles/${entry.id}.md`}
+>
   <section class="border-b border-slate-100 bg-gradient-to-b from-brand-50/70 to-white">
     <div class="container-page py-12 sm:py-16">
       <a href="/principles" class="text-sm font-semibold text-brand-600 hover:text-brand-700">

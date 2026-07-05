@@ -9,12 +9,16 @@ summary: >-
 requires:
   - name: Critical Thinking
     why: Examining your thoughts objectively.
+    slug: critical-thinking
   - name: Compassion
     why: For both yourself and the other person.
+    slug: compassion-empathy
   - name: Forgiveness
     why: Being willing to move past hurt.
+    slug: forgiveness
   - name: Humility
     why: Being willing to admit mistakes and learn from them.
+    slug: humility
 ---
 
 Effective conflict resolution begins with understanding ourselves before engaging

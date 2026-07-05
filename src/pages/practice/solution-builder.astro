@@ -1,11 +1,28 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import SolutionBuilder from '../../components/react/SolutionBuilder.tsx';
+import { breadcrumbs, webApplication } from '../../lib/schema';
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  webApplication(site, {
+    name: 'Solution Builder',
+    description:
+      'A free tool that checks a drafted solution against the four marks of a good solution (Actionable, Testable, Effective, and Time-bound), plus an equity check.',
+    path: '/practice/solution-builder',
+  }),
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Practice', path: '/practice' },
+    { name: 'Solution Builder', path: '/practice/solution-builder' },
+  ]),
+];
 ---
 
 <BaseLayout
   title="Solution Builder"
   description="Check a drafted solution against the four marks of a good solution (Actionable, Testable, Effective, and Time-bound), plus an equity check."
+  schemas={schemas}
 >
   <section class="border-b border-slate-100 bg-gradient-to-b from-brand-50/70 to-white">
     <div class="container-page py-12 sm:py-16">

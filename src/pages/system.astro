@@ -1,7 +1,19 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
-import { pillars, glossary } from '../data/concepts';
+import { pillars, glossary, systemDefinition } from '../data/concepts';
+import { glossaryTermSet, learningArticle } from '../lib/schema';
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  learningArticle(site, {
+    headline: 'What is the Solution Seeking System?',
+    description: systemDefinition,
+    path: '/system',
+    teaches: 'The purpose, vision, philosophical foundations, and key terminology of the Solution Seeking System',
+  }),
+  glossaryTermSet(site),
+];
 
 const aims = [
   'Help people solve communication breakdowns and interpersonal conflicts',
@@ -14,6 +26,8 @@ const aims = [
 <BaseLayout
   title="The System"
   description="What the Solution Seeking System is, why it exists, its philosophical foundations, and the key terminology that supports it."
+  schemas={schemas}
+  type="article"
 >
   <PageHero
     eyebrow="The System"

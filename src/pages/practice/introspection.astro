@@ -1,11 +1,28 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import IntrospectionWorksheet from '../../components/react/IntrospectionWorksheet.tsx';
+import { breadcrumbs, webApplication } from '../../lib/schema';
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  webApplication(site, {
+    name: 'Guided Introspection Worksheet',
+    description:
+      'A free, in-browser worksheet that walks you through the 7-step Introspection process and produces a prep summary for your conversation.',
+    path: '/practice/introspection',
+  }),
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Practice', path: '/practice' },
+    { name: 'Guided Introspection', path: '/practice/introspection' },
+  ]),
+];
 ---
 
 <BaseLayout
   title="Guided Introspection"
   description="A guided, in-browser worksheet that walks you through the 7-step Introspection process and produces a prep summary for your conversation."
+  schemas={schemas}
 >
   <section class="border-b border-slate-100 bg-gradient-to-b from-brand-50/70 to-white">
     <div class="container-page py-12 sm:py-16">

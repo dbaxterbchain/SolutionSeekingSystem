@@ -2,6 +2,7 @@
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import StepNav from '../../components/StepNav.astro';
+import { breadcrumbs, learningArticle } from '../../lib/schema';
 
 export async function getStaticPaths() {
   const steps = (await getCollection('protocol')).sort((a, b) => a.data.step - b.data.step);
@@ -17,9 +18,30 @@ export async function getStaticPaths() {
 
 const { entry, prev, next } = Astro.props;
 const { Content } = await render(entry);
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  learningArticle(site, {
+    headline: `Communication Protocol, Step ${entry.data.step} of 3: ${entry.data.title}`,
+    description: entry.data.summary,
+    path: `/protocol/${entry.id}`,
+    teaches: entry.data.title,
+  }),
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Communication Protocol', path: '/protocol' },
+    { name: entry.data.title, path: `/protocol/${entry.id}` },
+  ]),
+];
 ---
 
-<BaseLayout title={entry.data.title} description={entry.data.summary}>
+<BaseLayout
+  title={entry.data.title}
+  description={entry.data.summary}
+  schemas={schemas}
+  type="article"
+  markdownAlt={`/protocol/${entry.id}.md`}
+>
   <section class="border-b border-slate-100 bg-gradient-to-b from-brand-50/70 to-white">
     <div class="container-page py-12 sm:py-16">
       <a href="/protocol" class="text-sm font-semibold text-brand-600 hover:text-brand-700">
@@ -57,7 +79,16 @@ const { Content } = await render(entry);
             {
               entry.data.requires.map((r) => (
                 <li>
-                  <span class="block font-semibold text-ink-800">{r.name}</span>
+                  {r.slug ? (
+                    <a
+                      href={`/principles/${r.slug}`}
+                      class="block font-semibold text-ink-800 hover:text-brand-700"
+                    >
+                      {r.name}
+                    </a>
+                  ) : (
+                    <span class="block font-semibold text-ink-800">{r.name}</span>
+                  )}
                   <span class="text-sm text-slate-600">{r.why}</span>
                 </li>
               ))

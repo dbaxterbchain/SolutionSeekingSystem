@@ -1,3 +1,16 @@
+/**
+ * Canonical definition of the system — the single quotable answer to
+ * "What is the Solution Seeking System?". Reused on the homepage, /system,
+ * llms.txt, and structured data so every surface says the same thing.
+ */
+export const systemDefinition =
+  'The Solution Seeking System (SSS) is a free framework for democratic problem ' +
+  'solving, leadership, and communication, created by David and Shannon Baxter at ' +
+  'Beanchain Coffee, a worker-directed cooperative. It combines a three-step ' +
+  'Communication Protocol — Introspection, Mutual Understanding, and Solution ' +
+  'Seeking — with 12 Wisdom Principles and 4 Leadership Tools to turn conflict ' +
+  'into understanding, and understanding into actionable, measurable solutions.';
+
 export interface Term {
   term: string;
   definition: string;

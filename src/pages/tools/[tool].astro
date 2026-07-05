@@ -2,6 +2,7 @@
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import StepNav from '../../components/StepNav.astro';
+import { breadcrumbs, learningArticle } from '../../lib/schema';
 
 export async function getStaticPaths() {
   const tools = (await getCollection('tools')).sort((a, b) => a.data.order - b.data.order);
@@ -14,9 +15,30 @@ export async function getStaticPaths() {
 const { entry, prev, next } = Astro.props;
 const { Content } = await render(entry);
 const t = entry.data;
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  learningArticle(site, {
+    headline: `${t.title} — Leadership Tool ${t.order} of 4`,
+    description: t.summary,
+    path: `/tools/${entry.id}`,
+    teaches: t.title,
+  }),
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Leadership Tools', path: '/tools' },
+    { name: t.title, path: `/tools/${entry.id}` },
+  ]),
+];
 ---
 
-<BaseLayout title={t.title} description={t.summary}>
+<BaseLayout
+  title={t.title}
+  description={t.summary}
+  schemas={schemas}
+  type="article"
+  markdownAlt={`/tools/${entry.id}.md`}
+>
   <section class="border-b border-slate-100 bg-gradient-to-b from-brand-50/70 to-white">
     <div class="container-page py-12 sm:py-16">
       <a href="/tools" class="text-sm font-semibold text-brand-600 hover:text-brand-700">

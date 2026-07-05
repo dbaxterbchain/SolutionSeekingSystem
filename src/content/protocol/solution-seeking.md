@@ -9,12 +9,16 @@ summary: >-
 requires:
   - name: Humility
     why: To remain open to others' ideas.
+    slug: humility
   - name: Patience
     why: Throughout the iterative process.
+    slug: patience
   - name: Critical Thinking
     why: For evaluating potential solutions.
+    slug: critical-thinking
   - name: Flexibility
     why: To adapt as needed during implementation.
+    slug: flexibility
 ---
 
 Solution seeking is the third step. After developing a mutual understanding of the

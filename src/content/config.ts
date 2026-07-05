@@ -39,7 +39,14 @@ const protocol = defineCollection({
     step: z.number(),
     summary: z.string(),
     oneLine: z.string(),
-    requires: z.array(z.object({ name: z.string(), why: z.string() })),
+    requires: z.array(
+      z.object({
+        name: z.string(),
+        why: z.string(),
+        // Optional link target: the id of the Wisdom Principle this refers to.
+        slug: z.string().optional(),
+      })
+    ),
   }),
 });
 

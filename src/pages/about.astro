@@ -1,11 +1,15 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
+import { aboutPage, organization } from '../lib/schema';
+
+const site = Astro.site ?? Astro.url;
 ---
 
 <BaseLayout
   title="About"
   description="Why we built the Solution Seeking System, a Beanchain Coffee process by David and Shannon Baxter."
+  schemas={[aboutPage(site), organization(site)]}
 >
   <PageHero eyebrow="About" title="Why we built this" />
 
@@ -71,8 +75,9 @@ import PageHero from '../components/PageHero.astro';
           <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
             <p class="text-xs leading-relaxed text-slate-500">
               The Solution Seeking System&trade; and all associated content are the
-              intellectual property of Beanchain Coffee LLC. Limited permission is granted
-              to quote brief excerpts (up to 200 words) with proper attribution.
+              intellectual property of Beanchain Coffee LLC. This system is built to be
+              shared: you're welcome to quote, teach, and learn from it, with attribution
+              to the Solution Seeking System (solutionseeking.com).
             </p>
           </div>
         </div>

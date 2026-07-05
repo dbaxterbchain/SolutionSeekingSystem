@@ -2,7 +2,10 @@
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageHero from '../../components/PageHero.astro';
+import { protocolSteps } from '../../data/concepts';
+import { protocolHowTo } from '../../lib/schema';
 
+const site = Astro.site ?? Astro.url;
 const steps = (await getCollection('protocol')).sort((a, b) => a.data.step - b.data.step);
 
 const usage = [
@@ -16,6 +19,7 @@ const usage = [
 <BaseLayout
   title="The Communication Protocol"
   description="The three-step core of the Solution Seeking System: Introspection, Mutual Understanding, and Solution Seeking."
+  schemas={[protocolHowTo(site, protocolSteps)]}
 >
   <PageHero
     eyebrow="The Communication Protocol"

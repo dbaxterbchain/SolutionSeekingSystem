@@ -1,11 +1,28 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import ConversationPlanner from '../../components/react/ConversationPlanner.tsx';
+import { breadcrumbs, webApplication } from '../../lib/schema';
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  webApplication(site, {
+    name: 'Conversation Planner',
+    description:
+      'A free tool for preparing a Mutual Understanding conversation: a setup checklist, your goals and opening lines, a question bank, and listening reminders.',
+    path: '/practice/conversation-planner',
+  }),
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Practice', path: '/practice' },
+    { name: 'Conversation Planner', path: '/practice/conversation-planner' },
+  ]),
+];
 ---
 
 <BaseLayout
   title="Conversation Planner"
   description="Prepare for a Mutual Understanding conversation: a setup checklist, your goals and opening lines, a question bank, and listening reminders, built into a plan you can copy."
+  schemas={schemas}
 >
   <section class="border-b border-slate-100 bg-gradient-to-b from-brand-50/70 to-white">
     <div class="container-page py-12 sm:py-16">
