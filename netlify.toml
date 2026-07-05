@@ -1,5 +1,6 @@
+# @supabase/supabase-js requires Node 22+ (native WebSocket) as of v2.
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22"
 
 # Astro fingerprints everything under /_astro/, so it can be cached forever.
 [[headers]]

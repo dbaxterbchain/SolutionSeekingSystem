@@ -8,7 +8,7 @@ Hosted on **Netlify** under the **Beanchain** team.
 | Live URL | https://solution-seeking-system.netlify.app |
 | Admin | https://app.netlify.com/projects/solution-seeking-system |
 | Repo | https://github.com/dbaxterbchain/SolutionSeekingSystem |
-| Build settings | `netlify.toml` (command `npm run build`, publish `dist`, Node 20) |
+| Build settings | `netlify.toml` (command `npm run build`, publish `dist`, Node 22 — required by `@supabase/supabase-js`) |
 
 The first production deploy was done with the Netlify CLI. For ongoing work, connect the
 GitHub repo so every push deploys automatically.
