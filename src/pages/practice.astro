@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
+import PricingLine from '../components/react/PricingLine.tsx';
 
 const assistants = [
   {
@@ -73,7 +74,11 @@ const tools = [
       }
     </div>
     <p class="mt-4 text-sm text-slate-500">
-      Sign in for 10 free messages · $5/month for unlimited conversations with both assistants.
+      <PricingLine
+        client:load
+        generic="Sign in for 10 free messages · $5/month for unlimited conversations with both assistants."
+        subscriber="You're subscribed — unlimited conversations with both assistants."
+      />
     </p>
 
     <!-- Interactive tools -->

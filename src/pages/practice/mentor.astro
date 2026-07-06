@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import ChatView from '../../components/react/ChatView.tsx';
+import PricingLine from '../../components/react/PricingLine.tsx';
 import { breadcrumbs, webApplication } from '../../lib/schema';
 
 const site = Astro.site ?? Astro.url;
@@ -37,7 +38,11 @@ const schemas = [
       <p class="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
         Ask anything about the system: the framework and its philosophy, the 3-step
         protocol, the Wisdom Principles, or adapting the Leadership Tools to your team.
-        Your first 10 messages are free; $5/month for unlimited access.
+        <PricingLine
+          client:load
+          generic="Your first 10 messages are free; $5/month for unlimited access."
+          subscriber="You're subscribed — unlimited conversations, anytime."
+        />
       </p>
     </div>
   </section>

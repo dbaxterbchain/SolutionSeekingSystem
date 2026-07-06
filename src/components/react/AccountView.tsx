@@ -17,6 +17,7 @@ import {
   type ChatSession,
 } from '../../lib/chatSessions';
 import { safeNext } from '../../lib/accountLink';
+import { ENTITLED_STATUSES } from '../../lib/subscription';
 import { usePasswordRecovery } from '../../lib/usePasswordRecovery';
 import AuthPanel, { NewPasswordForm, RecoveryPanel } from './AuthPanel';
 
@@ -364,7 +365,6 @@ function ToolLinks() {
 /* Subscription (signed in)                                           */
 /* ------------------------------------------------------------------ */
 
-const ENTITLED = ['active', 'trialing', 'past_due'];
 const FREE_LIMIT = 10;
 
 interface SubRow {
@@ -395,7 +395,7 @@ function SubscriptionSection() {
     setSub((subRow as SubRow) ?? null);
     setFreeUsed(usage?.free_messages_used ?? 0);
     setLoading(false);
-    return subRow ? ENTITLED.includes((subRow as SubRow).status) : false;
+    return subRow ? ENTITLED_STATUSES.includes((subRow as SubRow).status) : false;
   };
 
   const clearCheckoutParam = () => {
@@ -456,7 +456,7 @@ function SubscriptionSection() {
     }
   };
 
-  const entitled = sub ? ENTITLED.includes(sub.status) : false;
+  const entitled = sub ? ENTITLED_STATUSES.includes(sub.status) : false;
   const formatDate = (iso: string | null) =>
     iso
       ? new Date(iso).toLocaleDateString(undefined, {

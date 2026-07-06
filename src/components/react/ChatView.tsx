@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSession } from '../../lib/useSession';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { accountLink } from '../../lib/accountLink';
+import { ENTITLED_STATUSES } from '../../lib/subscription';
 import {
   createChatSession,
   getChatSession,
@@ -71,7 +72,7 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
         supabase.from('ai_usage').select('free_messages_used').maybeSingle(),
       ]);
       if (!active) return;
-      if (sub && ['active', 'trialing', 'past_due'].includes(sub.status)) {
+      if (sub && ENTITLED_STATUSES.includes(sub.status)) {
         setGate({ kind: 'subscriber' });
       } else {
         const used = usage?.free_messages_used ?? 0;
