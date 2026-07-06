@@ -169,10 +169,9 @@ function Library({ email }: { email: string }) {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl font-bold text-ink-800">Your account</h1>
-          <p className="mt-1 text-sm text-slate-600">Signed in as {email}</p>
-        </div>
+        <p className="text-sm text-slate-600">
+          Signed in as <span className="font-semibold text-ink-800">{email}</span>
+        </p>
         <button type="button" onClick={signOut} className="btn-ghost text-slate-500 hover:text-red-600">
           Sign out
         </button>
@@ -188,7 +187,7 @@ function Library({ email }: { email: string }) {
 
       <ChatHistorySection formatDate={formatDate} />
 
-      <h2 className="mt-10 font-heading text-xl font-bold text-ink-800">Your saved work</h2>
+      <h2 className="mt-8 font-heading text-lg font-bold text-ink-800">Your saved work</h2>
       {loading ? (
         <p className="mt-8 text-sm text-slate-400">Loading your saved work…</p>
       ) : items.length === 0 ? (
@@ -299,7 +298,7 @@ function ChangePasswordSection() {
   if (!hasEmailIdentity) return null;
 
   return (
-    <section className="mt-6 rounded-3xl border border-slate-100 bg-white p-6 shadow-card">
+    <section className="mt-8 rounded-3xl border border-slate-100 bg-white p-6 shadow-card">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-heading text-lg font-bold text-ink-800">Password</h2>
@@ -343,10 +342,8 @@ const TOOL_LINKS = [
 
 function ToolLinks() {
   return (
-    <section className="mt-6">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Free practice tools
-      </h2>
+    <section className="mt-8">
+      <h2 className="font-heading text-lg font-bold text-ink-800">Free practice tools</h2>
       <div className="mt-3 flex flex-wrap gap-2">
         {TOOL_LINKS.map((t) => (
           <a
@@ -596,8 +593,8 @@ function ChatHistorySection({ formatDate }: { formatDate: (iso: string) => strin
   if (loading || (chats.length === 0 && !error)) return null;
 
   return (
-    <section className="mt-10">
-      <h2 className="font-heading text-xl font-bold text-ink-800">AI conversations</h2>
+    <section className="mt-8">
+      <h2 className="font-heading text-lg font-bold text-ink-800">AI conversations</h2>
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
       <div className="mt-3 space-y-6">
         {AGENT_ORDER.filter((a) => chats.some((c) => c.agent === a)).map((agent) => (
