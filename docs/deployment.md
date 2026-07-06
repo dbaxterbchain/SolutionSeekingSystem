@@ -118,9 +118,14 @@ When you add a new migration, name it `000N_description.sql` and apply it the sa
 
 Dashboard → **Authentication → Providers**:
 
-- **Email** — enabled by default. Email confirmation is on by default (users must click a
-  link before their first sign-in); toggle it off under **Authentication → Sign In / Up**
-  if you want frictionless signup.
+- **Email** — enabled, with **Confirm email ON** (users must click the emailed link before
+  their first sign-in) and **minimum password length 8**, matching `config.toml` and
+  `MIN_PASSWORD_LENGTH` in `src/lib/authErrors.ts`. Confirmation/reset emails are sent via
+  **custom SMTP through Resend** (Authentication → Emails → SMTP Settings: host
+  `smtp.resend.com`, port 465, user `resend`, password = a Resend API key, sender
+  `no-reply@solutionseeking.com`) — Supabase's built-in mailer is rate-limited to a few
+  emails per hour and not production-grade. Email templates (Confirm signup / Reset
+  password) can be branded under **Authentication → Emails**.
 - **Google** — create an OAuth client in the [Google Cloud Console](https://console.cloud.google.com/)
   (APIs & Services → Credentials → OAuth client ID → Web application). Set the authorized
   redirect URI to `https://soetrtogqcpmonoumcjf.supabase.co/auth/v1/callback`, then paste
@@ -165,10 +170,11 @@ PUBLIC_SUPABASE_URL=http://127.0.0.1:55321
 PUBLIC_SUPABASE_ANON_KEY=<local publishable key from `npx supabase status`>
 ```
 
-Local auth has **email confirmation off** (`config.toml` → `[auth.email] enable_confirmations`),
-so email/password signup logs you straight in. Test emails are captured in Mailpit at
-`http://127.0.0.1:55324` (nothing is actually sent). The local keys are shared, well-known
-dev defaults — never use them anywhere real.
+Local auth mirrors production: **email confirmation is ON** (`config.toml` →
+`[auth.email] enable_confirmations`) and the minimum password length is 8. Confirmation
+and reset emails are captured in Mailpit at `http://127.0.0.1:55324` (nothing is actually
+sent) — open it to click the links during local testing. The local keys are shared,
+well-known dev defaults — never use them anywhere real.
 
 > **Windows port gotcha (why the ports are remapped):** on the stock `5432x` ports,
 > `supabase start` fails with *"ports are not available … bind: An attempt was made to

@@ -17,6 +17,8 @@ import {
   type ChatSession,
 } from '../../lib/chatSessions';
 import { safeNext } from '../../lib/accountLink';
+import { usePasswordRecovery } from '../../lib/usePasswordRecovery';
+import AuthPanel, { NewPasswordForm, RecoveryPanel } from './AuthPanel';
 
 /**
  * The /account page island. Signed out → an email/password + Google auth panel.
@@ -28,6 +30,7 @@ const checkoutSuccessParam = () =>
 
 export default function AccountView() {
   const { user, loading } = useSession();
+  const { recovering, linkExpired, finishRecovery } = usePasswordRecovery();
 
   // Tools link here with ?next=<path> — once signed in, send the user back.
   const next =
@@ -47,8 +50,14 @@ export default function AccountView() {
   }, [fromCheckout]);
 
   useEffect(() => {
-    if (user && next) window.location.replace(next);
-  }, [user, next]);
+    // A recovery session is a signed-in user — don't bounce away before the
+    // set-new-password form has been shown.
+    if (user && next && !recovering) window.location.replace(next);
+  }, [user, next, recovering]);
+
+  if (user && recovering) {
+    return <RecoveryPanel onDone={finishRecovery} />;
+  }
 
   if (user && next) {
     return <div className="text-sm text-slate-400">Taking you back…</div>;
@@ -81,169 +90,7 @@ export default function AccountView() {
     return <div className="text-sm text-slate-400">Loading…</div>;
   }
 
-  return user ? <Library email={user.email ?? ''} /> : <AuthPanel />;
-}
-
-/* ------------------------------------------------------------------ */
-/* Auth panel (signed out)                                            */
-/* ------------------------------------------------------------------ */
-
-function AuthPanel() {
-  const [mode, setMode] = useState<'signin' | 'register'>('signin');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  // Preserve the query string (?next=...) so OAuth and email flows land back
-  // here and the post-sign-in redirect can complete the round trip.
-  const redirectTo =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}/account${window.location.search}`
-      : undefined;
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    setNotice(null);
-    try {
-      if (mode === 'register') {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: redirectTo },
-        });
-        if (error) throw error;
-        // When email confirmation is on, there's no active session yet.
-        if (!data.session) {
-          setNotice('Check your email to confirm your account, then sign in.');
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        // onAuthStateChange re-renders this island into the Library.
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const google = async () => {
-    setError(null);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo },
-    });
-    if (error) setError(error.message);
-  };
-
-  const forgot = async () => {
-    if (!email) {
-      setError('Enter your email above first, then tap “Forgot password”.');
-      return;
-    }
-    setError(null);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo,
-    });
-    if (error) setError(error.message);
-    else setNotice('If that email has an account, a reset link is on its way.');
-  };
-
-  return (
-    <div className="mx-auto max-w-md rounded-3xl border border-slate-100 bg-white p-6 shadow-card sm:p-8">
-      <h1 className="font-heading text-2xl font-bold text-ink-800">
-        {mode === 'signin' ? 'Sign in' : 'Create your account'}
-      </h1>
-      <p className="mt-2 text-sm text-slate-600">
-        {mode === 'signin'
-          ? 'Sign in to save your introspections, plans, and solutions.'
-          : 'Register to save and revisit your work. It’s free.'}
-      </p>
-
-      <button
-        type="button"
-        onClick={google}
-        className="btn-secondary mt-6 w-full"
-      >
-        <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
-          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z" />
-          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z" />
-          <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z" />
-          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z" />
-        </svg>
-        Continue with Google
-      </button>
-
-      <div className="my-5 flex items-center gap-3 text-xs text-slate-400">
-        <span className="h-px flex-1 bg-slate-100" />
-        or
-        <span className="h-px flex-1 bg-slate-100" />
-      </div>
-
-      <form onSubmit={submit} className="space-y-4">
-        <div>
-          <label htmlFor="email" className="mb-1.5 block text-sm font-semibold text-ink-800">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
-          />
-        </div>
-        <div>
-          <label htmlFor="password" className="mb-1.5 block text-sm font-semibold text-ink-800">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            required
-            minLength={6}
-            autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
-          />
-        </div>
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {notice && <p className="text-sm text-brand-700">{notice}</p>}
-
-        <button type="submit" disabled={busy} className="btn-primary w-full disabled:opacity-50">
-          {busy ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account'}
-        </button>
-      </form>
-
-      <div className="mt-5 flex items-center justify-between text-sm">
-        <button
-          type="button"
-          onClick={() => {
-            setMode((m) => (m === 'signin' ? 'register' : 'signin'));
-            setError(null);
-            setNotice(null);
-          }}
-          className="font-medium text-brand-600 hover:text-brand-700"
-        >
-          {mode === 'signin' ? 'Create an account' : 'I already have an account'}
-        </button>
-        {mode === 'signin' && (
-          <button type="button" onClick={forgot} className="text-slate-500 hover:text-ink-800">
-            Forgot password?
-          </button>
-        )}
-      </div>
-    </div>
-  );
+  return user ? <Library email={user.email ?? ''} /> : <AuthPanel linkExpired={linkExpired} />;
 }
 
 /* ------------------------------------------------------------------ */
@@ -332,6 +179,8 @@ function Library({ email }: { email: string }) {
       </div>
 
       <SubscriptionSection />
+
+      <ChangePasswordSection />
 
       <ToolLinks />
 
@@ -433,6 +282,52 @@ function Library({ email }: { email: string }) {
       )}
       {dialog}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Change password (signed in)                                        */
+/* ------------------------------------------------------------------ */
+
+function ChangePasswordSection() {
+  const { user } = useSession();
+  const [open, setOpen] = useState(false);
+  const [done, setDone] = useState(false);
+
+  // Google-only accounts have no password; updateUser would silently SET one.
+  const hasEmailIdentity = user?.identities?.some((i) => i.provider === 'email');
+  if (!hasEmailIdentity) return null;
+
+  return (
+    <section className="mt-6 rounded-3xl border border-slate-100 bg-white p-6 shadow-card">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-heading text-lg font-bold text-ink-800">Password</h2>
+          {done && !open && <p className="mt-1 text-sm text-brand-700">Password updated.</p>}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen((o) => !o);
+            setDone(false);
+          }}
+          className="btn-secondary"
+        >
+          {open ? 'Cancel' : 'Change password'}
+        </button>
+      </div>
+      {open && (
+        <div className="mt-5 max-w-md">
+          <NewPasswordForm
+            submitLabel="Update password"
+            onSuccess={() => {
+              setOpen(false);
+              setDone(true);
+            }}
+          />
+        </div>
+      )}
+    </section>
   );
 }
 
