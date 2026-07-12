@@ -6,7 +6,7 @@ _Last updated: 2026-07-12_
 
 | | |
 |---|---|
-| **Current phase** | Phase 4 shipped (demo library + context-seeded conversations); marketing/conversion work ongoing |
+| **Current phase** | Phase 4 shipped (demo library + context seeding + conversation Modes); marketing/conversion work ongoing |
 | **Live URL** | https://solutionseeking.com (apex is primary; www and the netlify.app subdomain 301 to it) |
 | **Build health** | `npm run build` ✅ · `npm run check` ✅ (0 errors) |
 | **Hosting** | Netlify (Beanchain team), site `solution-seeking-system` |
@@ -73,6 +73,12 @@ All three are React islands (`src/components/react/*.tsx`) hydrated with `client
 - [x] Context persists on `chat_sessions.context` (migration [`0005_chat_context.sql`](../supabase/migrations/0005_chat_context.sql), **applied to hosted project 2026-07-12**) so resumed conversations keep their orientation; ChatView shows a scenario chip and sends the id on every request (survives the 30-message trim).
 - [x] **Demo library** at `/practice/demos`: 7 hand-crafted, fictional, annotated transcripts (4 Guide, 2 Mentor, 1 safety-boundaries) as a `demos` MDX content collection, rendered with static chat-bubble components (`src/components/demo/`). Each has a Before/After transformation panel, an expected/unacceptable behavior `spec` in frontmatter (doubles as a future QA harness), and a persistent **"Use this process with my situation"** CTA into the matching seeded chat. A build-time cross-check fails the build if a demo references an unregistered context.
 - [x] Surfacing: "See it in action" section on `/practice`, links on guide/mentor pages, homepage hero link, footer link; OG cards, sitemap, and `/llms.txt` all include the demos.
+
+### Phase 4b — Conversation Modes ✅ _(done 2026-07-12)_
+- [x] **8 modes** — Parent, Teacher, Partner, Family, Friend, Manager, Co-worker, Organizer — as registry entries with `kind: 'mode'` ([`src/lib/contexts.ts`](../src/lib/contexts.ts)); each is a ~200-word seed adapting the shared persona to the relationship dynamic (vocabulary, power structure, solution shape, safety posture). No server/API/DB changes needed — the context pipeline from Phase 4 carries them.
+- [x] **Safety-aware seeds**: Partner mode routes to DV-specific resources when fear/control appears (mirrors the possible-harassment posture); Parent/Teacher modes handle minors (age first, adult owns the solution, escalate to counselors/reporting protocols on abuse/self-harm signs).
+- [x] **SEO landing pages** at `/practice/modes/<id>` (hero targeting situation intent + "when this helps" + embedded seeded ChatView + Mentor CTA + related demos), generated from [`src/data/modes.ts`](../src/data/modes.ts) with build-time registry cross-checks; hub at `/practice/modes`. Mentor gets Parent/Teacher/Manager/Organizer via `?context=`.
+- [x] Picker sections on `/practice/guide`, `/practice/mentor`, `/practice`; OG cards, sitemap, `/llms.txt` include modes; ChatView "New conversation" on a mode page now re-seeds the page's mode instead of dropping it.
 
 ## Open questions / decisions
 

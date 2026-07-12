@@ -39,6 +39,7 @@ src/
     demos/*.mdx            # 7 annotated example AI conversations (Phase 4)
   data/
     concepts.ts           # glossary, four pillars, protocol step metadata
+    modes.ts              # landing copy for the conversation Modes
     nav.ts                # primary navigation links
   lib/
     contexts.ts           # named-context registry (client-safe half)
@@ -71,7 +72,9 @@ astro.config.mjs · tailwind.config.mjs · tsconfig.json · netlify.toml
 | `/principles/:slug` | `pages/principles/[slug].astro` | Renders the 6-part format |
 | `/tools` | `pages/tools/index.astro` | Tools overview + "build your own" |
 | `/tools/:tool` | `pages/tools/[tool].astro` | One per leadership tool |
-| `/practice` | `pages/practice.astro` | Assistants + demos + interactive tools index |
+| `/practice` | `pages/practice.astro` | Assistants + modes + demos + interactive tools index |
+| `/practice/modes` | `pages/practice/modes/index.astro` | Modes hub ("Who is the conversation with?") |
+| `/practice/modes/:mode` | `pages/practice/modes/[mode].astro` | Mode landing: SEO hero + embedded seeded ChatView |
 | `/practice/demos` | `pages/practice/demos/index.astro` | Demo library gallery |
 | `/practice/demos/:demo` | `pages/practice/demos/[demo].astro` | Annotated demo transcript + seeded-chat CTA |
 | `/practice/guide` · `/practice/mentor` | `pages/practice/{guide,mentor}.astro` | AI chat (ChatView island); `?context=<id>` seeds, `?chat=<id>` resumes |

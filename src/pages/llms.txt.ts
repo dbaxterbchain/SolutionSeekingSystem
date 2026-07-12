@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { getCollection } from 'astro:content';
 import { protocolSteps, systemDefinition } from '../data/concepts';
+import { MODES } from '../data/modes';
 
 export const prerender = true;
 
@@ -61,6 +62,10 @@ export const GET: APIRoute = async ({ site }) => {
     '',
     `- [Solution Seeking Guide](${abs('/practice/guide')}): AI chat that walks you through the Communication Protocol for a real conflict, step by step`,
     `- [Solution Seeking Mentor](${abs('/practice/mentor')}): AI chat expert on the whole system — the framework, protocol, principles, and tools`,
+    '',
+    '## Conversation modes (the Guide adapted to a relationship)',
+    '',
+    ...MODES.map((m) => `- [${m.name} mode](${abs(`/practice/modes/${m.id}`)}): ${m.pickerBlurb}`),
     '',
     '## Example conversations (fictional, annotated demos of the AI assistants)',
     '',

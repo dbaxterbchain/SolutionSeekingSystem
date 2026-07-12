@@ -149,18 +149,48 @@ Rules that keep demos honest and working:
 
 ## Named contexts — `src/lib/contexts.ts` + `src/lib/server/contexts.ts`
 
-The context registry seeds `?context=<id>` conversations (demo CTAs today, specialized
-assistant variants later). Two halves that must stay in sync (TypeScript enforces it —
-`CONTEXT_SEEDS` is `satisfies Record<ContextId, ContextSeed>`):
+The context registry seeds `?context=<id>` conversations (demo CTAs and conversation
+Modes). Two halves that must stay in sync (TypeScript enforces it — `CONTEXT_SEEDS` is
+`satisfies Record<ContextId, ContextSeed>`):
 
-- `src/lib/contexts.ts` — the id list plus the chip label/description shown in the chat UI.
+- `src/lib/contexts.ts` — the id list plus `kind` and the chip label/description shown in
+  the chat UI. `kind: 'scenario'` (demo handoffs) labels read `Scenario: …`;
+  `kind: 'mode'` labels read `{Role} mode` (e.g. `Parent mode`). The convention lives in
+  the label strings — keep it consistent or chips will look broken.
 - `src/lib/server/contexts.ts` — the model-facing seed text (server-only; never ships to
   the browser). Seeds must be **byte-stable compile-time constants** — never interpolate
   user data — because each one is an Anthropic prompt-cache entry appended after the
-  shared grounding+persona blocks.
+  shared grounding+persona blocks. Mode seeds ADAPT the shared persona (vocabulary, power
+  dynamic, solution shape, safety posture); the `persona` override field stays reserved
+  for future full variants.
 
 Retire a context by removing its demo/links first; old saved conversations with a retired
 id degrade gracefully to plain chats. Never reuse a retired id for a different meaning.
+
+---
+
+## Modes — `src/data/modes.ts`
+
+Landing content for the conversation Modes (`/practice/modes/<id>`). Each entry pairs
+with a `kind: 'mode'` registry entry; the landing page, hub card, picker cards, OG card,
+and llms.txt line are all generated from it. Fields: `id` (registry id), `name`, `icon`,
+`heroTitle` (targets situation intent, e.g. "Prepare for a hard conversation with your
+child"), `heroIntro`, `metaDescription`, `pickerBlurb`, `exampleSituations[]`, `welcome`,
+optional `relatedDemoIds[]` and `mentorCta`.
+
+Build-time cross-checks in `src/pages/practice/modes/[mode].astro` fail the build if: the
+registry entry is missing or not `kind: 'mode'`; the mode isn't Guide-applicable;
+`mentorCta` is set on a Guide-only mode; or a `relatedDemoIds` entry doesn't exist.
+
+**Adding a mode touches exactly three files** — `src/lib/contexts.ts` (id + meta),
+`src/lib/server/contexts.ts` (seed), `src/data/modes.ts` (landing copy) — and the page
+appears automatically.
+
+**Authoring rule (load-bearing):** write the `welcome` line and the server seed
+*together*. The welcome must not promise behavior the seed doesn't produce, and should
+stay behavior-light ("in Parent mode… tell me what's going on"). For modes touching
+minors or intimate relationships, the seed carries the safety posture — mirror the
+existing `parent`/`partner` seeds.
 
 ---
 

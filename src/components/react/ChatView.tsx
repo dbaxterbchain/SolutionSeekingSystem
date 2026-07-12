@@ -258,7 +258,9 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
   const newConversation = () => {
     setMessages([]);
     setChatId(null);
-    setContextId(null);
+    // On a dedicated mode/variant page (initialContext prop) a fresh chat
+    // re-seeds with the page's context; elsewhere it resets to a plain chat.
+    setContextId(getContextMeta(initialContext, agent) ? initialContext! : null);
     setError(null);
     setShowHistory(false);
     const url = new URL(window.location.href);

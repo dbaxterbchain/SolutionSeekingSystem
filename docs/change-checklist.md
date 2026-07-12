@@ -54,6 +54,10 @@ stale docs, no orphaned pages, no broken prompt cache.
 - [ ] **Context registry sync**: an id must exist in BOTH `src/lib/contexts.ts` (UI
       metadata) and `src/lib/server/contexts.ts` (seed) — TypeScript enforces it. Demos
       referencing contexts are cross-checked at build time.
+- [ ] **New mode** = exactly three files: `src/lib/contexts.ts` (id + `kind:'mode'`
+      meta), `src/lib/server/contexts.ts` (seed), `src/data/modes.ts` (landing copy —
+      authored together with the seed). The landing page, hub card, pickers, OG card, and
+      llms.txt line generate automatically; build-time cross-checks catch mismatches.
 - [ ] **Persona/prompt edits**: re-read the demo transcripts (`src/content/demos/`) — they
       are behavior specs. If the assistant would now behave differently, update the demos
       or reconsider the edit. Each demo's frontmatter `spec` lists expected/unacceptable

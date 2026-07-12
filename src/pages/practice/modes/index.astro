@@ -1,0 +1,66 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PageHero from '../../../components/PageHero.astro';
+import { breadcrumbs } from '../../../lib/schema';
+import { MODES } from '../../../data/modes';
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Practice', path: '/practice' },
+    { name: 'Modes', path: '/practice/modes' },
+  ]),
+];
+---
+
+<BaseLayout
+  title="Who is the conversation with?"
+  description="The Solution Seeking Guide adapts to the relationship: parent, teacher, partner, family, friend, manager, co-worker, or organizer. Pick a mode to start oriented to your dynamic."
+  schemas={schemas}
+>
+  <PageHero
+    eyebrow="Practice · Modes"
+    title="Who is the conversation with?"
+    intro="Every relationship has its own dynamic — the power in the room, the history, what a good solution even looks like. Pick your role and the Guide starts already adapted to it."
+  />
+
+  <div class="container-page py-16">
+    <div class="grid gap-6 md:grid-cols-2">
+      {
+        MODES.map((mode) => (
+          <a
+            href={`/practice/modes/${mode.id}`}
+            class="group flex flex-col rounded-2xl border border-slate-100 bg-white p-7 shadow-card transition-all duration-200 hover:-translate-y-1 hover:border-brand-200 hover:shadow-card-hover"
+          >
+            <span class="text-3xl" aria-hidden="true">
+              {mode.icon}
+            </span>
+            <h2 class="mt-4 text-xl font-bold text-ink-800 group-hover:text-brand-700">
+              {mode.name} mode
+            </h2>
+            <p class="mt-2 text-sm leading-relaxed text-slate-600">{mode.pickerBlurb}</p>
+            <ul class="mt-4 flex-1 space-y-1.5 text-sm text-slate-600">
+              {mode.exampleSituations.slice(0, 2).map((s) => (
+                <li class="relative pl-5">
+                  <span class="absolute left-0 top-1.5 h-1.5 w-1.5 rounded-full bg-brand-400" />
+                  {s}
+                </li>
+              ))}
+            </ul>
+            <span class="mt-5 text-sm font-semibold text-brand-600">
+              Open {mode.name} mode →
+            </span>
+          </a>
+        ))
+      }
+    </div>
+
+    <p class="mt-10 text-sm text-slate-500">
+      Not sure what a conversation looks like?
+      <a href="/practice/demos" class="font-medium text-brand-600 hover:text-brand-700">
+        See annotated example conversations →
+      </a>
+    </p>
+  </div>
+</BaseLayout>

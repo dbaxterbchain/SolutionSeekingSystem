@@ -1,6 +1,7 @@
 import { getCollection } from 'astro:content';
 import { OGImageRoute } from 'astro-og-canvas';
 import { protocolSteps, systemDefinition } from '../../data/concepts';
+import { MODES } from '../../data/modes';
 
 /**
  * Generated 1200×630 social-share cards, one per page. Route keys mirror page
@@ -57,6 +58,11 @@ const pages: Record<string, OgPage> = {
     title: 'Solution Builder',
     description: 'Draft solutions that are actionable, testable, effective, and time-bound.',
   },
+  'practice/modes': {
+    title: 'Who is the conversation with?',
+    description:
+      'The Guide adapts to the relationship: parent, teacher, partner, family, friend, manager, co-worker, or organizer.',
+  },
   'practice/demos': {
     title: 'See it in action',
     description:
@@ -103,6 +109,12 @@ const pages: Record<string, OgPage> = {
     demos.map((d) => [
       `practice/demos/${d.id}`,
       { title: d.data.title, description: d.data.scenario },
+    ])
+  ),
+  ...Object.fromEntries(
+    MODES.map((m) => [
+      `practice/modes/${m.id}`,
+      { title: m.heroTitle, description: m.metaDescription },
     ])
   ),
 };

@@ -3,6 +3,12 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import ChatView from '../../components/react/ChatView.tsx';
 import PricingLine from '../../components/react/PricingLine.tsx';
 import { breadcrumbs, webApplication } from '../../lib/schema';
+import { CHAT_CONTEXTS } from '../../lib/contexts';
+import { MODES } from '../../data/modes';
+
+const mentorModes = MODES.filter((m) =>
+  CHAT_CONTEXTS.find((c) => c.id === m.id)?.agents.includes('mentor')
+);
 
 const site = Astro.site ?? Astro.url;
 const schemas = [
@@ -55,7 +61,46 @@ const schemas = [
         agentName="Mentor"
         welcome="Hi — I'm the Solution Seeking Mentor. Ask me anything about the system: how the protocol works, what a principle means in practice, or how to adapt the tools to your team."
       />
-      <p class="mt-6 text-center text-sm text-slate-500">
+      <section class="mt-14">
+        <p class="eyebrow mb-2">Modes</p>
+        <h2 class="text-2xl font-bold text-ink-800">Build a practice for your role</h2>
+        <p class="mt-2 text-sm text-slate-600">
+          The Mentor can adapt to your role — pick a mode to start a conversation oriented
+          to building repeatable practices for it.
+        </p>
+        <div class="mt-6 grid gap-4 sm:grid-cols-2">
+          {
+            mentorModes.map((mode) => (
+              <a
+                href={`/practice/mentor?context=${mode.id}`}
+                class="group flex items-start gap-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-card-hover"
+              >
+                <span class="text-2xl" aria-hidden="true">
+                  {mode.icon}
+                </span>
+                <span>
+                  <span class="block font-bold text-ink-800 group-hover:text-brand-700">
+                    {mode.name} mode
+                  </span>
+                  <span class="mt-0.5 block text-sm leading-relaxed text-slate-600">
+                    {mode.pickerBlurb}
+                  </span>
+                </span>
+              </a>
+            ))
+          }
+        </div>
+        <p class="mt-4">
+          <a
+            href="/practice/modes"
+            class="text-sm font-semibold text-brand-600 hover:text-brand-700"
+          >
+            Browse all modes →
+          </a>
+        </p>
+      </section>
+
+      <p class="mt-8 text-center text-sm text-slate-500">
         Curious what the Mentor can build with you?
         <a href="/practice/demos" class="font-medium text-brand-600 hover:text-brand-700">
           See annotated examples →

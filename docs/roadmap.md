@@ -69,9 +69,15 @@ anyone to sign up.
   stage markers, commentary, and an honest safety-boundaries demo. Free, ungated, indexed.
 - **Named context registry** — every demo ends with "Use this process with my situation,"
   which opens the real assistant seeded with that scenario (`?context=<id>`). The registry
-  (`src/lib/contexts.ts` + `src/lib/server/contexts.ts`) is also the mechanism for future
-  **specialized assistant variants** (manager, teacher, parent, couples): a variant is a
-  registry entry with a persona override plus a static landing page.
+  (`src/lib/contexts.ts` + `src/lib/server/contexts.ts`) is also the mechanism for
+  specialized assistant variants.
+- **Conversation Modes** _(shipped 2026-07-12)_ — the variants, v1: eight modes (Parent,
+  Teacher, Partner, Family, Friend, Manager, Co-worker, Organizer) adapt the Guide (and
+  for four of them the Mentor) to a relationship dynamic. Implemented as **seed
+  adaptations** (a third system block layered on the shared persona); the registry's
+  `persona` override field stays reserved for future full-persona variants. Each mode has
+  an SEO landing page at `/practice/modes/<id>` with an embedded seeded chat, plus picker
+  sections on the assistant pages.
 
 Candidate next steps (from the marketing plan, not yet built): outcome-based free
 experience ("complete one Conversation Plan free" instead of a raw message count),
