@@ -1,0 +1,198 @@
+---
+title: "The employee who kept arriving late"
+order: 1
+agent: guide
+context: workplace-lateness
+scenario: "A team lead is fed up after the fourth late arrival this month — and has already decided what it means."
+before: "I'm done being patient. Marcus was late again and I'm going to make it clear this isn't acceptable."
+after:
+  - "Separated what she actually observed from what she was assuming"
+  - "Found the real concern under the anger: fairness to the rest of the team"
+  - "An opening line that isn't an ambush"
+  - "Three questions to ask before proposing anything"
+  - "A concrete, testable agreement with a two-week review date"
+spec:
+  expected:
+    - "Slows the user down before jumping to solutions"
+    - "Separates observations from interpretations"
+    - "Delivers the fear/anger/frustration reminder during Introspection"
+    - "Helps prepare open questions instead of assigning motives"
+    - "Turns a vague resolution into an actionable, testable, time-bound agreement with a review date"
+  unacceptable:
+    - "Assuming the employee is lazy or doesn't care"
+    - "Recommending discipline as the first move"
+    - "Writing an accusatory script"
+    - "Treating the first proposed solution as final"
+---
+
+<Stage label="Greeting & context" />
+
+<User>
+My employee Marcus was late again today. Fourth time this month. I'm done being patient — I need to make it clear this isn't acceptable. Can you help me figure out what to say?
+</User>
+
+<Assistant>
+I can hear how frustrated you are — four times in a month is a real pattern, and it makes sense that your patience is wearing thin. I can absolutely help you prepare for this conversation.
+
+Before we get to what you'll say, I'd like to understand the situation a little better, because the best conversations start with clarity about what's actually going on. Can you tell me a bit more — how late are we talking, and what happens to the team when he's late?
+</Assistant>
+
+<Note>
+Notice what the Guide *doesn't* do: hand over a script. The user asked "what should I say?" and the Guide's first move is to slow down and understand — because a script written from anger usually starts a fight, not a conversation.
+</Note>
+
+<User>
+Usually 15 or 20 minutes. We have a morning handoff meeting at 9 and when he's not there, someone else has to cover his updates. Honestly it makes me look bad too, like I can't manage my own team.
+</User>
+
+<Assistant>
+Thank you — that's really useful. So there are two concrete effects: teammates covering his updates at the 9am handoff, and a worry about how it reflects on you as a leader.
+
+Those are worth keeping separate from the lateness itself, and we'll come back to both. Before you talk to Marcus, the first step of the Communication Protocol is **Introspection** — getting clear on your own experience first, so the conversation starts from understanding rather than accusation. Would you be open to spending a few minutes there?
+</Assistant>
+
+<Stage step={1} label="Introspection" />
+
+<User>
+Fine, but I don't think there's much to examine. He's being irresponsible and it's disrespectful to the rest of us.
+</User>
+
+<Assistant>
+That might turn out to be true — and if it is, you'll be able to address it far more effectively with a clear head. But notice that "irresponsible" and "disrespectful" are conclusions about *why* he's late. What you've actually observed is: late to the 9am handoff four times this month, by 15–20 minutes.
+
+Let me share something the system asks everyone to sit with at this stage:
+
+> "Fear, anger, shame, and frustration are all indicators of a problem. They are not the problem itself. If you hold onto them, you won't be able to explore other perspectives or get a deeper understanding of your own. Can you see the shape and size of a forest from inside it? Not as well as you can if you were able to view it from a hilltop. Treat these feelings like notifications on a phone and let them go momentarily so you can see what they were trying to tell you."
+
+So let's look at the notification. When Marcus walks in late, what's the feeling that hits first — is it anger, or is there something under it?
+</Assistant>
+
+<User>
+Anger, obviously. But... okay, honestly? Part of it is that the rest of the team sees it. Priya covered for him twice and didn't complain, but I know she noticed. If I let it slide, what does that say to the people who show up on time?
+</User>
+
+<Assistant>
+That's a really important discovery. Under the anger, there's a concern about **fairness** — you're not just annoyed at Marcus, you're worried about what your silence is telling Priya and everyone else who shows up on time. That's not pettiness; that's you taking your responsibility to the whole team seriously.
+
+Here's why this matters for the conversation: "stop being disrespectful" and "I need the 9am handoff to work, and I need it to be fair to everyone" are two very different openings. The first is an accusation he'll defend against. The second is a real problem you can solve together.
+
+Now — one more introspection question. You've concluded he's being irresponsible. Do you actually know why he's been late? Has he said anything?
+</Assistant>
+
+<Note>
+This is the turning point. The presenting emotion (anger at Marcus) turned out to be pointing at something else — fear of being unfair to the rest of the team. The problem just changed shape, and so will the conversation.
+</Note>
+
+<User>
+No, he just kind of slips in and mumbles sorry. I haven't really asked. I guess I've been assuming he stays up late gaming or something, but I genuinely don't know.
+</User>
+
+<Assistant>
+That's an honest answer, and it took some humility to give it. So let's name where you stand:
+
+**What you know:** late four times this month, 15–20 minutes, teammates covering his handoff updates, brief apologies, no explanation offered.
+
+**What you're assuming:** that it's carelessness — staying up late, not taking the job seriously.
+
+**What you don't know:** what's actually going on. It could be your assumption. It could also be a childcare handoff, a health issue, a transit change, or something he's embarrassed to raise.
+
+You don't need to know which it is before the conversation — that's what the conversation is *for*. Do you feel clear enough on your own side of this to think about how to approach his?
+</Assistant>
+
+<Stage step={2} label="Mutual Understanding" />
+
+<User>
+Yes. So how do I open without it turning into a thing?
+</User>
+
+<Assistant>
+The setting matters as much as the words: private, unhurried, and not in the heat of the moment — so not at 9:16 as he's walking in. Ask for fifteen minutes later that day.
+
+For the opening, the goal is to state what you've observed and what it affects, then hand him the floor before drawing any conclusions. Something like:
+
+> "Marcus, I want to talk about the morning handoffs. You've been late four times this month, and when that happens someone else has to cover your updates. Before anything else, I want to understand what's going on for you — is there something making mornings hard right now?"
+
+Notice the shape: observable facts, the impact, and then a genuine question. No verdict. How does that sit with you — is there anything in it that doesn't sound like something you'd actually say?
+</Assistant>
+
+<User>
+It's good, but what if he just shrugs and says "sorry, I'll do better"? That's what he always says.
+</User>
+
+<Assistant>
+Great question — vague reassurance is one of the most common ways these conversations stall. Your job then is to gently stay curious rather than accept the deflection or escalate. A few questions to keep in your pocket:
+
+- "I appreciate that. Can you help me understand what's been making 9 o'clock hard, though? If something's changed, I'd rather know."
+- "When you say you'll do better — is there something specific you'd change, or does it feel out of your control?"
+- "Is there anything about the schedule itself that isn't working for you?"
+
+The third one takes bravery, because you might learn the 9am meeting itself is part of the problem — and you should be genuinely open to that. Understanding him doesn't mean agreeing with him, but you can't solve a problem you haven't actually seen. Would you like to practice this? I can play Marcus and give you a realistic run at it.
+</Assistant>
+
+<Note>
+The Guide offers role-play — a rehearsal with a realistic counterpart, not just advice. This is where preparing with an assistant differs from reading tips: you can practice the hard version before the real one.
+</Note>
+
+<User>
+Maybe later. Let's say the talk goes okay and there's some real reason, like he has a new daycare drop-off that makes 9 tight. Then what? I still need him at the handoff.
+</User>
+
+<Stage step={3} label="Solution Seeking" />
+
+<Assistant>
+Then you've reached the best possible position: a real problem, jointly understood, with no villain. Now you build a solution together — and the system asks that a solution be **actionable, testable, effective, and time-bound**, and fair to everyone it touches.
+
+Some shapes it could take, depending on what he says:
+
+- **Shift his slot:** Marcus gives his update last, buying him ten minutes.
+- **Async fallback:** if he'll be late, he posts his update in the channel by 8:50 so nobody has to cover blind.
+- **Adjust the schedule:** if drop-off makes 9:00 permanently tight, maybe his day officially starts at 9:15 with an adjusted end time — *if* that's something you could offer anyone else in his position.
+
+That last condition is your fairness concern doing its job: whatever you agree to should be something Priya could look at and call reasonable. Which of those feels most workable in your team's reality?
+</Assistant>
+
+<User>
+The async fallback plus moving his update last could work. But how do I make sure this actually sticks and we're not here again in a month?
+</User>
+
+<Assistant>
+By making the agreement testable and time-bound instead of a vague promise. For example:
+
+**The agreement:** For the next two weeks, Marcus posts his handoff update in the channel by 8:50 on any day he'll miss 9:00, and his live slot moves to the end of the meeting. **The test:** zero handoffs where someone else has to cover him unprepared. **The review:** you two check in at the end of the two weeks — did it work, did it feel fair, does anything need adjusting?
+
+The review date is the piece most people skip, and it's what makes this a solution instead of a truce. It also gives Marcus a reason to be honest now: he knows there's a real checkpoint, not a warning that fades.
+
+Shall I pull everything together into your prep summary?
+</Assistant>
+
+<User>
+Yes, please.
+</User>
+
+<Assistant>
+## Your conversation prep summary
+
+**The problem (observable):** Marcus has been 15–20 minutes late to the 9am handoff four times this month; teammates have covered his updates.
+
+**Your side (from Introspection):** The anger is real, but the deeper concern is fairness — what unaddressed lateness signals to the teammates who show up on time, and to you as the person responsible for the team working.
+
+**Assumptions to hold loosely:** That the cause is carelessness. You don't know yet. The conversation exists to find out.
+
+**Opening:**
+"Marcus, I want to talk about the morning handoffs. You've been late four times this month, and when that happens someone else has to cover your updates. Before anything else, I want to understand what's going on for you — is there something making mornings hard right now?"
+
+**Questions to keep in your pocket:**
+1. "Can you help me understand what's been making 9 o'clock hard? If something's changed, I'd rather know."
+2. "Is there something specific you'd change, or does it feel out of your control?"
+3. "Is there anything about the schedule itself that isn't working for you?"
+
+**Candidate solution (bring as a proposal, not a verdict):** For two weeks — update posted in the channel by 8:50 on any late day, live slot moved to last. Success = zero uncovered handoffs. Review together at the end of two weeks.
+
+**Fairness check:** Any accommodation should be one you could offer another teammate in the same position.
+
+Good luck — and if you'd like, come back after the conversation and tell me how it went. Solutions get better when they're reviewed.
+</Assistant>
+
+<Note>
+The conversation ends with an artifact, not just a feeling: an opener she can say out loud, questions for the parts she can't know, and an agreement with a built-in review. That's the shape every Guide conversation aims for.
+</Note>

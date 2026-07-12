@@ -1,0 +1,65 @@
+---
+/**
+ * An assistant turn in a demo transcript. Mirrors the live ChatView assistant
+ * bubble; the inner markdown styles cover the same subset the real chat
+ * renders (paragraphs, headings, lists, bold, quotes) — keep demo content
+ * within it so demos never show formatting the product can't reproduce.
+ */
+---
+
+<div class="flex justify-start">
+  <div
+    class="demo-bubble max-w-[92%] rounded-2xl rounded-bl-md bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700"
+  >
+    <slot />
+  </div>
+</div>
+
+<style>
+  .demo-bubble :global(p) {
+    margin: 0;
+  }
+  .demo-bubble :global(p + p),
+  .demo-bubble :global(ul + p),
+  .demo-bubble :global(ol + p),
+  .demo-bubble :global(blockquote + p) {
+    margin-top: 0.6rem;
+  }
+  .demo-bubble :global(h2),
+  .demo-bubble :global(h3) {
+    margin: 0.85rem 0 0.35rem;
+    font-weight: 700;
+    color: theme('colors.ink.800');
+  }
+  .demo-bubble :global(h2) {
+    font-size: 1rem;
+  }
+  .demo-bubble :global(h3) {
+    font-size: 0.9rem;
+  }
+  .demo-bubble :global(ul),
+  .demo-bubble :global(ol) {
+    margin: 0.5rem 0 0;
+    padding-left: 1.25rem;
+  }
+  .demo-bubble :global(ul) {
+    list-style: disc;
+  }
+  .demo-bubble :global(ol) {
+    list-style: decimal;
+  }
+  .demo-bubble :global(li + li) {
+    margin-top: 0.25rem;
+  }
+  .demo-bubble :global(blockquote) {
+    margin: 0.6rem 0 0;
+    border-left: 3px solid theme('colors.brand.200');
+    padding-left: 0.75rem;
+    color: theme('colors.slate.600');
+    font-style: italic;
+  }
+  .demo-bubble :global(strong) {
+    font-weight: 600;
+    color: theme('colors.ink.800');
+  }
+</style>

@@ -1,0 +1,22 @@
+---
+/**
+ * Stage divider between phases of a demo transcript, e.g.
+ * <Stage step={1} label="Introspection" /> or <Stage label="Turning point" />.
+ */
+interface Props {
+  label: string;
+  step?: number;
+}
+
+const { label, step } = Astro.props;
+---
+
+<div class="my-8 flex items-center gap-4" role="separator" aria-label={label}>
+  <span class="h-px flex-1 bg-slate-200"></span>
+  <span
+    class="rounded-full border border-brand-100 bg-brand-50 px-3.5 py-1 text-xs font-semibold uppercase tracking-wide text-brand-700"
+  >
+    {step !== undefined ? `Step ${step} · ${label}` : label}
+  </span>
+  <span class="h-px flex-1 bg-slate-200"></span>
+</div>

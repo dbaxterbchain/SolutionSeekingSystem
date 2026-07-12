@@ -1,0 +1,24 @@
+---
+/**
+ * Annotation callout in a demo transcript — commentary about what the
+ * assistant just did, visually distinct from both chat bubbles.
+ */
+---
+
+<aside class="demo-note my-4 ml-4 rounded-r-xl border-l-2 border-brand-300 bg-brand-50/50 px-4 py-3 sm:ml-8">
+  <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-600">
+    What's happening here
+  </p>
+  <div class="mt-1 text-sm leading-relaxed text-slate-600">
+    <slot />
+  </div>
+</aside>
+
+<style>
+  .demo-note :global(p) {
+    margin: 0;
+  }
+  .demo-note :global(p + p) {
+    margin-top: 0.5rem;
+  }
+</style>

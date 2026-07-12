@@ -1,7 +1,12 @@
 ---
+import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
 import PricingLine from '../components/react/PricingLine.tsx';
+
+const allDemos = (await getCollection('demos')).sort((a, b) => a.data.order - b.data.order);
+const featuredDemos = allDemos.slice(0, 3);
+const DEMO_BADGE = { guide: '🧭 Guide', mentor: '🎓 Mentor' } as const;
 
 const assistants = [
   {
@@ -80,6 +85,54 @@ const tools = [
         subscriber="You're subscribed — unlimited conversations with both assistants."
       />
     </p>
+
+    <!-- Demos -->
+    <section class="mt-20">
+      <div class="max-w-2xl">
+        <p class="eyebrow mb-3">See it in action</p>
+        <h2 class="text-3xl font-bold text-ink-800">What a conversation actually produces</h2>
+        <p class="mt-3 text-slate-600">
+          Annotated example conversations — fictional, but true to how the assistants work —
+          showing what someone walks away with. When one looks like your situation, you can
+          start your own conversation from it.
+        </p>
+      </div>
+      <div class="mt-10 grid gap-5 sm:grid-cols-3">
+        {
+          featuredDemos.map((demo) => (
+            <a
+              href={`/practice/demos/${demo.id}`}
+              class="group flex flex-col rounded-2xl border border-slate-100 bg-white p-6 shadow-card transition-all duration-200 hover:-translate-y-1 hover:border-brand-200 hover:shadow-card-hover"
+            >
+              <span class="inline-flex w-fit items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                {DEMO_BADGE[demo.data.agent]} demo
+              </span>
+              <h3 class="mt-3 font-bold text-ink-800 group-hover:text-brand-700">
+                {demo.data.title}
+              </h3>
+              <p class="mt-2 flex-1 text-sm leading-relaxed text-slate-600">
+                {demo.data.scenario}
+              </p>
+              <span class="mt-4 text-sm font-semibold text-brand-600">
+                Read the conversation →
+              </span>
+            </a>
+          ))
+        }
+      </div>
+      {
+        allDemos.length > featuredDemos.length && (
+          <p class="mt-6">
+            <a
+              href="/practice/demos"
+              class="text-sm font-semibold text-brand-600 hover:text-brand-700"
+            >
+              Browse all {allDemos.length} demos →
+            </a>
+          </p>
+        )
+      }
+    </section>
 
     <!-- Interactive tools -->
     <section class="mt-20">

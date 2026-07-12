@@ -1,0 +1,23 @@
+---
+/**
+ * A user turn in a demo transcript. Mirrors the live ChatView user bubble so
+ * demos look exactly like the real product.
+ */
+---
+
+<div class="flex justify-end">
+  <div
+    class="demo-bubble max-w-[85%] rounded-2xl rounded-br-md bg-brand-500 px-4 py-2.5 text-sm leading-relaxed text-white"
+  >
+    <slot />
+  </div>
+</div>
+
+<style>
+  .demo-bubble :global(p) {
+    margin: 0;
+  }
+  .demo-bubble :global(p + p) {
+    margin-top: 0.5rem;
+  }
+</style>

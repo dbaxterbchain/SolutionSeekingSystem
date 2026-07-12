@@ -1,0 +1,217 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import DemoStage from '../../../components/demo/DemoStage.astro';
+import DemoUser from '../../../components/demo/DemoUser.astro';
+import DemoAssistant from '../../../components/demo/DemoAssistant.astro';
+import DemoNote from '../../../components/demo/DemoNote.astro';
+import DemoDisclaimer from '../../../components/demo/DemoDisclaimer.astro';
+import { breadcrumbs, learningArticle } from '../../../lib/schema';
+import { CHAT_CONTEXTS } from '../../../lib/contexts';
+
+export async function getStaticPaths() {
+  const demos = (await getCollection('demos')).sort((a, b) => a.data.order - b.data.order);
+
+  // Every demo's CTA must point at a registered context for its agent —
+  // fail the build instead of shipping a dead "use this yourself" link.
+  for (const demo of demos) {
+    const ctx = CHAT_CONTEXTS.find((c) => c.id === demo.data.context);
+    if (!ctx) {
+      throw new Error(
+        `Demo "${demo.id}" references unknown context "${demo.data.context}" — add it to src/lib/contexts.ts`
+      );
+    }
+    if (!ctx.agents.includes(demo.data.agent)) {
+      throw new Error(
+        `Demo "${demo.id}" uses agent "${demo.data.agent}" but context "${ctx.id}" only allows: ${ctx.agents.join(', ')}`
+      );
+    }
+  }
+
+  return demos.map((entry, i) => ({
+    params: { demo: entry.id },
+    props: { entry, prev: demos[i - 1], next: demos[i + 1] },
+  }));
+}
+
+const { entry, prev, next } = Astro.props;
+const { Content } = await render(entry);
+const d = entry.data;
+
+const AGENT_LABEL = { guide: 'Guide', mentor: 'Mentor' } as const;
+const agentLabel = AGENT_LABEL[d.agent];
+const ctaHref = `/practice/${d.agent}?context=${d.context}`;
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  learningArticle(site, {
+    headline: d.title,
+    description: d.scenario,
+    path: `/practice/demos/${entry.id}`,
+    teaches: 'The Solution Seeking System Communication Protocol',
+  }),
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Practice', path: '/practice' },
+    { name: 'Demos', path: '/practice/demos' },
+    { name: d.title, path: `/practice/demos/${entry.id}` },
+  ]),
+];
+---
+
+<BaseLayout title={d.title} description={d.scenario} schemas={schemas} type="article">
+  <section class="border-b border-slate-100 bg-gradient-to-b from-brand-50/70 to-white">
+    <div class="container-page py-12 sm:py-16">
+      <a href="/practice/demos" class="text-sm font-semibold text-brand-600 hover:text-brand-700">
+        ← All demos
+      </a>
+      <p class="eyebrow mt-4">Demo · {agentLabel}</p>
+      <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-ink-800 sm:text-5xl">
+        {d.title}
+      </h1>
+      <p class="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">{d.scenario}</p>
+      <div class="mt-6">
+        <DemoDisclaimer />
+      </div>
+    </div>
+  </section>
+
+  <div class="container-page py-14">
+    <div class="grid gap-12 lg:grid-cols-[1fr_300px]">
+      <div class="order-2 min-w-0 lg:order-1">
+        <!-- The transformation, up front -->
+        <div class="grid gap-5 sm:grid-cols-2">
+          <div class="rounded-2xl border border-slate-100 bg-slate-50/70 p-6">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              Where it starts
+            </h2>
+            <p class="mt-3 text-sm italic leading-relaxed text-slate-600">“{d.before}”</p>
+          </div>
+          <div class="rounded-2xl border border-slate-100 bg-emerald-50/50 p-6">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-emerald-700">
+              Where it ends
+            </h2>
+            <ul class="mt-3 space-y-2 text-sm text-slate-700">
+              {
+                d.after.map((item) => (
+                  <li class="relative pl-5">
+                    <span class="absolute left-0 top-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    {item}
+                  </li>
+                ))
+              }
+            </ul>
+          </div>
+        </div>
+
+        <!-- Annotated transcript -->
+        <div class="mt-12 space-y-4">
+          <Content
+            components={{
+              Stage: DemoStage,
+              User: DemoUser,
+              Assistant: DemoAssistant,
+              Note: DemoNote,
+            }}
+          />
+        </div>
+
+        <!-- Mobile / end-of-transcript CTA -->
+        <div class="mt-12 rounded-2xl border border-brand-100 bg-brand-50/60 p-7 text-center">
+          <h2 class="font-heading text-xl font-bold text-ink-800">
+            Facing something like this?
+          </h2>
+          <p class="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600">
+            Start your own private conversation with the {agentLabel}, already oriented to this
+            kind of situation. It will ask about your actual specifics — not the fictional ones
+            above.
+          </p>
+          <a href={ctaHref} class="btn-primary mt-5 inline-block">
+            Use this process with my situation
+          </a>
+          <p class="mt-3 text-xs text-slate-500">
+            Sign in for 10 free messages · $5/month for unlimited conversations.
+          </p>
+        </div>
+
+        {
+          (prev || next) && (
+            <nav class="mt-10 flex justify-between gap-4 text-sm font-semibold">
+              {prev ? (
+                <a href={`/practice/demos/${prev.id}`} class="text-brand-600 hover:text-brand-700">
+                  ← {prev.data.title}
+                </a>
+              ) : (
+                <span />
+              )}
+              {next && (
+                <a
+                  href={`/practice/demos/${next.id}`}
+                  class="text-right text-brand-600 hover:text-brand-700"
+                >
+                  {next.data.title} →
+                </a>
+              )}
+            </nav>
+          )
+        }
+      </div>
+
+      <aside class="order-1 lg:order-2">
+        <div class="sticky top-24 space-y-5">
+          <div class="rounded-2xl border border-brand-100 bg-white p-6 shadow-card">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-600">
+              Try it yourself
+            </h2>
+            <p class="mt-2 text-sm leading-relaxed text-slate-600">
+              Start a private {agentLabel} conversation oriented to this kind of situation.
+            </p>
+            <a href={ctaHref} class="btn-primary mt-4 block text-center">
+              Use this with my situation
+            </a>
+            <p class="mt-3 text-xs leading-relaxed text-slate-500">
+              Sign in for 10 free messages · $5/month for unlimited conversations with both
+              assistants.
+            </p>
+          </div>
+
+          <details class="rounded-2xl border border-slate-100 bg-slate-50/70 p-6">
+            <summary
+              class="cursor-pointer text-sm font-semibold uppercase tracking-wide text-slate-500"
+            >
+              What to expect
+            </summary>
+            <div class="mt-3 space-y-4 text-sm text-slate-700">
+              <div>
+                <p class="font-semibold text-emerald-700">The {agentLabel} will:</p>
+                <ul class="mt-1.5 space-y-1.5">
+                  {
+                    d.spec.expected.map((item) => (
+                      <li class="relative pl-5">
+                        <span class="absolute left-0 top-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        {item}
+                      </li>
+                    ))
+                  }
+                </ul>
+              </div>
+              <div>
+                <p class="font-semibold text-slate-500">It won't:</p>
+                <ul class="mt-1.5 space-y-1.5">
+                  {
+                    d.spec.unacceptable.map((item) => (
+                      <li class="relative pl-5">
+                        <span class="absolute left-0 top-1.5 h-1.5 w-1.5 rounded-full bg-slate-400" />
+                        {item}
+                      </li>
+                    ))
+                  }
+                </ul>
+              </div>
+            </div>
+          </details>
+        </div>
+      </aside>
+    </div>
+  </div>
+</BaseLayout>

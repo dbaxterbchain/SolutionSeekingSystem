@@ -16,6 +16,7 @@ const principles = (await getCollection('principles')).sort(
   (a, b) => a.data.order - b.data.order
 );
 const tools = (await getCollection('tools')).sort((a, b) => a.data.order - b.data.order);
+const demos = (await getCollection('demos')).sort((a, b) => a.data.order - b.data.order);
 
 const pages: Record<string, OgPage> = {
   index: {
@@ -56,6 +57,11 @@ const pages: Record<string, OgPage> = {
     title: 'Solution Builder',
     description: 'Draft solutions that are actionable, testable, effective, and time-bound.',
   },
+  'practice/demos': {
+    title: 'See it in action',
+    description:
+      'Annotated example conversations showing what people walk away with after using the Guide and Mentor.',
+  },
   'practice/guide': {
     title: 'Solution Seeking Guide',
     description:
@@ -92,6 +98,12 @@ const pages: Record<string, OgPage> = {
   ),
   ...Object.fromEntries(
     tools.map((t) => [`tools/${t.id}`, { title: t.data.title, description: t.data.summary }])
+  ),
+  ...Object.fromEntries(
+    demos.map((d) => [
+      `practice/demos/${d.id}`,
+      { title: d.data.title, description: d.data.scenario },
+    ])
   ),
 };
 

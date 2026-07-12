@@ -1,0 +1,96 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import PageHero from '../../../components/PageHero.astro';
+import DemoDisclaimer from '../../../components/demo/DemoDisclaimer.astro';
+import { breadcrumbs } from '../../../lib/schema';
+
+const demos = (await getCollection('demos')).sort((a, b) => a.data.order - b.data.order);
+
+const AGENT_BADGE = {
+  guide: { icon: '🧭', label: 'Guide' },
+  mentor: { icon: '🎓', label: 'Mentor' },
+} as const;
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Practice', path: '/practice' },
+    { name: 'Demos', path: '/practice/demos' },
+  ]),
+];
+---
+
+<BaseLayout
+  title="See it in action"
+  description="Annotated example conversations showing what people walk away with after using the Solution Seeking Guide and Mentor."
+  schemas={schemas}
+>
+  <PageHero
+    eyebrow="Practice · Demos"
+    title="See it in action"
+    intro="Every demo below is a complete, annotated conversation showing what someone walks away with: assumptions named, an opening they can actually say, and a concrete, testable plan. When one looks like your situation, you can start your own conversation from it."
+  />
+
+  <div class="container-page py-16">
+    <div class="grid gap-6 md:grid-cols-2">
+      {
+        demos.map((demo) => {
+          const badge = AGENT_BADGE[demo.data.agent];
+          const shown = demo.data.after.slice(0, 3);
+          const more = demo.data.after.length - shown.length;
+          return (
+            <a
+              href={`/practice/demos/${demo.id}`}
+              class="group flex flex-col rounded-2xl border border-slate-100 bg-white p-7 shadow-card transition-all duration-200 hover:-translate-y-1 hover:border-brand-200 hover:shadow-card-hover"
+            >
+              <span class="inline-flex w-fit items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                <span aria-hidden="true">{badge.icon}</span>
+                {badge.label} demo
+              </span>
+              <h2 class="mt-4 text-xl font-bold text-ink-800 group-hover:text-brand-700">
+                {demo.data.title}
+              </h2>
+              <p class="mt-2 text-sm leading-relaxed text-slate-600">{demo.data.scenario}</p>
+
+              <div class="mt-5 rounded-xl bg-slate-50 p-4">
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Where it starts
+                </p>
+                <p class="mt-1 text-sm italic leading-relaxed text-slate-600">
+                  “{demo.data.before}”
+                </p>
+              </div>
+
+              <div class="mt-4 flex-1">
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+                  Where it ends
+                </p>
+                <ul class="mt-2 space-y-1.5 text-sm text-slate-700">
+                  {shown.map((item) => (
+                    <li class="relative pl-5">
+                      <span class="absolute left-0 top-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+                {more > 0 && <p class="mt-1.5 pl-5 text-xs text-slate-400">+ {more} more</p>}
+              </div>
+
+              <div class="mt-5 flex items-center justify-between">
+                <span class="text-sm font-semibold text-brand-600">Read the conversation →</span>
+                <DemoDisclaimer compact />
+              </div>
+            </a>
+          );
+        })
+      }
+    </div>
+
+    <p class="mt-10 text-sm text-slate-500">
+      Every scenario here is fictional, written to demonstrate the method honestly — including one
+      where a private conversation is <em>not</em> the right answer.
+    </p>
+  </div>
+</BaseLayout>

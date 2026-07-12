@@ -62,4 +62,30 @@ const tools = defineCollection({
   }),
 });
 
-export const collections = { principles, protocol, tools };
+/**
+ * Demo library — hand-crafted, fictional, annotated Guide/Mentor conversations
+ * showing the before/after transformation. The MDX body is the transcript
+ * (rendered with the components in src/components/demo/); the `spec` block
+ * doubles as a QA behavior spec for the assistant that a future regression
+ * pass can replay against the live model.
+ */
+const demos = defineCollection({
+  loader: glob({ pattern: '**/*.mdx', base: './src/content/demos' }),
+  schema: z.object({
+    title: z.string(),
+    order: z.number(),
+    agent: z.enum(['guide', 'mentor']),
+    // Named context id (src/lib/contexts.ts) the "use this yourself" CTA links
+    // to; cross-checked against the registry at build time in the demo pages.
+    context: z.string(),
+    scenario: z.string(), // one-line setup for cards, meta descriptions, OG
+    before: z.string(), // the user's raw starting state, quoted on the card
+    after: z.array(z.string()).min(3), // concrete outcome bullets
+    spec: z.object({
+      expected: z.array(z.string()),
+      unacceptable: z.array(z.string()),
+    }),
+  }),
+});
+
+export const collections = { principles, protocol, tools, demos };
