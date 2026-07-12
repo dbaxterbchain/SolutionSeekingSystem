@@ -10,6 +10,7 @@ Project documentation for the **Solution Seeking System** website.
 | [content-guide.md](content-guide.md) | How to add or edit teaching content (principles, protocol steps, tools, glossary). |
 | [design-system.md](design-system.md) | Brand tokens, fonts, and the shared UI components. |
 | [deployment.md](deployment.md) | Hosting on Netlify, continuous deploys, and the custom domain. |
+| [change-checklist.md](change-checklist.md) | **The standard for shipping changes** — touchpoints to check per change type (pages, content, AI/prompts, database, env vars, deploys). |
 
 ## Quick links
 
@@ -31,3 +32,7 @@ npm run check    # type-check (.astro + content schemas)
 These are living documents. When you ship a change that affects scope, status, or how
 things work, update the relevant doc in the same commit. `status.md` should always
 reflect reality.
+
+Before shipping any change, walk the matching sections of
+[change-checklist.md](change-checklist.md) — it lists the touchpoints (OG images,
+llms.txt, sitemap, RLS, prompt-cache rules, docs) that are easy to silently miss.

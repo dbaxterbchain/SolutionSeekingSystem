@@ -16,6 +16,7 @@ export const GET: APIRoute = async ({ site }) => {
     (a, b) => a.data.order - b.data.order
   );
   const tools = (await getCollection('tools')).sort((a, b) => a.data.order - b.data.order);
+  const demos = (await getCollection('demos')).sort((a, b) => a.data.order - b.data.order);
 
   const body = [
     '# Solution Seeking System',
@@ -60,6 +61,10 @@ export const GET: APIRoute = async ({ site }) => {
     '',
     `- [Solution Seeking Guide](${abs('/practice/guide')}): AI chat that walks you through the Communication Protocol for a real conflict, step by step`,
     `- [Solution Seeking Mentor](${abs('/practice/mentor')}): AI chat expert on the whole system — the framework, protocol, principles, and tools`,
+    '',
+    '## Example conversations (fictional, annotated demos of the AI assistants)',
+    '',
+    ...demos.map((d) => `- [${d.data.title}](${abs(`/practice/demos/${d.id}`)}): ${d.data.scenario}`),
     '',
     '## Optional',
     '',

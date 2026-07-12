@@ -87,9 +87,10 @@ safe to ship — **Row-Level Security** (below) is what actually protects user d
 
 ### 2. Apply the database schema (migrations)
 
-The schema lives in [`supabase/migrations/`](../supabase/migrations/) — currently
-`0001_saved_sessions.sql` (the `saved_sessions` table + RLS policies). A migration file
-does nothing until it's applied to the hosted project. Two ways:
+The schema lives in [`supabase/migrations/`](../supabase/migrations/) — `0001`
+(saved sessions), `0002`, `0003`/`0004` (AI phase: subscriptions, usage, chat sessions +
+grants), `0005` (chat context column). A migration file does nothing until it's applied
+to the hosted project. Two ways:
 
 - **SQL Editor (simplest, no tooling):** Dashboard → **SQL Editor** → paste the migration
   file's contents → **Run**.
@@ -113,6 +114,12 @@ does nothing until it's applied to the hosted project. Two ways:
 > exists. RLS still restricts every row to its owner.
 
 When you add a new migration, name it `000N_description.sql` and apply it the same way.
+
+> **Gotcha — pg-delta "failed to cache migrations catalog" warning:** `supabase db push`
+> may print a scary edge-runtime error about a missing `pgdelta-target-ca.crt` *after*
+> "Applying migration…". It's a warning from a non-essential local caching step — the
+> migration still applied. Verify with `npx supabase migration list` (and, if needed,
+> `npx supabase db query --linked "<sql>"`). Deleting `supabase/.temp/` usually clears it.
 
 ### 3. Auth providers
 

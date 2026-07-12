@@ -1,12 +1,12 @@
 # Project Status
 
-_Last updated: 2026-07-05_
+_Last updated: 2026-07-12_
 
 ## At a glance
 
 | | |
 |---|---|
-| **Current phase** | Phase 3 complete (in-site AI Guide & Mentor + $5/mo subscription) — pending one-time Stripe/Supabase/Netlify config |
+| **Current phase** | Phase 4 shipped (demo library + context-seeded conversations); marketing/conversion work ongoing |
 | **Live URL** | https://solutionseeking.com (apex is primary; www and the netlify.app subdomain 301 to it) |
 | **Build health** | `npm run build` ✅ · `npm run check` ✅ (0 errors) |
 | **Hosting** | Netlify (Beanchain team), site `solution-seeking-system` |
@@ -67,6 +67,12 @@ All three are React islands (`src/components/react/*.tsx`) hydrated with `client
 - [x] Conversations saved to the user-owned `chat_sessions` table (RLS), resumable via `?chat=<id>`; account page shows subscription status + chat history.
 - Env vars (server-only): `ANTHROPIC_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `SUPABASE_SERVICE_ROLE_KEY` — setup steps in [deployment.md](deployment.md#phase-3--ai-assistants--subscription).
 - ✅ One-time config done (2026-07-05): migrations 0003/0004 applied to the hosted project (and local stack), Stripe product/price/webhook/portal configured, all five env vars set in Netlify (the three sensitive ones flagged as secret values).
+
+### Phase 4 — Demo library + context seeding ✅ _(done 2026-07-12)_
+- [x] **Named context registry**: `/practice/guide?context=<id>` (or mentor) starts a new conversation pre-oriented to a scenario. Public metadata (chip label/description) in [`src/lib/contexts.ts`](../src/lib/contexts.ts); model-facing seed text server-only in [`src/lib/server/contexts.ts`](../src/lib/server/contexts.ts), injected as a **third system block** after grounding+persona so the shared prompt-cache prefix stays intact. Unknown/mismatched ids silently degrade to a plain chat. The `persona` override field on a seed is the hook for future specialized variants (boss, teacher, parent, couples).
+- [x] Context persists on `chat_sessions.context` (migration [`0005_chat_context.sql`](../supabase/migrations/0005_chat_context.sql), **applied to hosted project 2026-07-12**) so resumed conversations keep their orientation; ChatView shows a scenario chip and sends the id on every request (survives the 30-message trim).
+- [x] **Demo library** at `/practice/demos`: 7 hand-crafted, fictional, annotated transcripts (4 Guide, 2 Mentor, 1 safety-boundaries) as a `demos` MDX content collection, rendered with static chat-bubble components (`src/components/demo/`). Each has a Before/After transformation panel, an expected/unacceptable behavior `spec` in frontmatter (doubles as a future QA harness), and a persistent **"Use this process with my situation"** CTA into the matching seeded chat. A build-time cross-check fails the build if a demo references an unregistered context.
+- [x] Surfacing: "See it in action" section on `/practice`, links on guide/mentor pages, homepage hero link, footer link; OG cards, sitemap, and `/llms.txt` all include the demos.
 
 ## Open questions / decisions
 

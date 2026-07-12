@@ -58,3 +58,22 @@ messages** for signed-in users.
   resumed from the account page.
 
 See [deployment.md](deployment.md) for the Stripe / Anthropic / Supabase setup.
+
+## Phase 4 — Demonstrating value ✅ _(shipped 2026-07-12, ongoing)_
+
+Marketing and conversion work: make the value of the assistants **visible** before asking
+anyone to sign up.
+
+- **Demo library** (`/practice/demos`) — 7 fictional, annotated example conversations
+  (a `demos` MDX collection) showing the before/after transformation of a session, with
+  stage markers, commentary, and an honest safety-boundaries demo. Free, ungated, indexed.
+- **Named context registry** — every demo ends with "Use this process with my situation,"
+  which opens the real assistant seeded with that scenario (`?context=<id>`). The registry
+  (`src/lib/contexts.ts` + `src/lib/server/contexts.ts`) is also the mechanism for future
+  **specialized assistant variants** (manager, teacher, parent, couples): a variant is a
+  registry entry with a persona override plus a static landing page.
+
+Candidate next steps (from the marketing plan, not yet built): outcome-based free
+experience ("complete one Conversation Plan free" instead of a raw message count),
+worksheet → assistant handoffs, real anonymized Beanchain case studies, situation-specific
+landing pages, post-conversation follow-up as a paid feature, and outcome metrics.

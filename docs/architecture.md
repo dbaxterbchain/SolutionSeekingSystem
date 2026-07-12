@@ -36,12 +36,18 @@ src/
     principles/*.yaml      # 12 Wisdom Principles (uniform 6-part format)
     protocol/*.md          # 3 Communication Protocol steps (Markdown body)
     tools/*.md             # 4 Leadership Tools (Markdown body)
+    demos/*.mdx            # 7 annotated example AI conversations (Phase 4)
   data/
     concepts.ts           # glossary, four pillars, protocol step metadata
     nav.ts                # primary navigation links
+  lib/
+    contexts.ts           # named-context registry (client-safe half)
+    server/               # server-only: agents.ts (prompts), contexts.ts (seed
+                          # text), entitlement, stripe, supabaseAdmin, auth
   components/             # Header, Footer, Logo, PageHero, PrincipleCard,
                           # ProtocolDiagram, StepNav
-    react/               # interactive React islands (Phase 2 practice tools)
+    react/               # interactive React islands (practice tools, ChatView)
+    demo/                # static chat-bubble components for demo transcripts
   layouts/
     BaseLayout.astro      # <head>, fonts, header/footer, skip-link
   pages/                  # file-based routes (see below)
@@ -65,7 +71,10 @@ astro.config.mjs · tailwind.config.mjs · tsconfig.json · netlify.toml
 | `/principles/:slug` | `pages/principles/[slug].astro` | Renders the 6-part format |
 | `/tools` | `pages/tools/index.astro` | Tools overview + "build your own" |
 | `/tools/:tool` | `pages/tools/[tool].astro` | One per leadership tool |
-| `/practice` | `pages/practice.astro` | Assistants + interactive tools index |
+| `/practice` | `pages/practice.astro` | Assistants + demos + interactive tools index |
+| `/practice/demos` | `pages/practice/demos/index.astro` | Demo library gallery |
+| `/practice/demos/:demo` | `pages/practice/demos/[demo].astro` | Annotated demo transcript + seeded-chat CTA |
+| `/practice/guide` · `/practice/mentor` | `pages/practice/{guide,mentor}.astro` | AI chat (ChatView island); `?context=<id>` seeds, `?chat=<id>` resumes |
 | `/practice/introspection` | `pages/practice/introspection.astro` | Introspection worksheet (React island) |
 | `/practice/conversation-planner` | `pages/practice/conversation-planner.astro` | Conversation planner (React island) |
 | `/practice/solution-builder` | `pages/practice/solution-builder.astro` | Solution builder (React island) |

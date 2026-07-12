@@ -92,6 +92,78 @@ Markdown body...
 
 ---
 
+## Demo conversations — `src/content/demos/*.mdx`
+
+One MDX file per demo — a fictional, annotated transcript of a Guide or Mentor session,
+shown at `/practice/demos/<slug>`. Frontmatter drives the gallery card, the Before/After
+panel, and the "What to expect" spec; the MDX body is the transcript.
+
+```mdx
+---
+title: "The employee who kept arriving late"
+order: 1
+agent: guide                      # guide | mentor
+context: workplace-lateness      # named-context id — see coupling note below
+scenario: >-                      # one-liner for cards, meta description, OG
+  ...
+before: >-                        # the user's raw starting state, quoted on the card
+  ...
+after:                            # 3+ concrete outcome bullets ("where it ends")
+  - ...
+spec:                             # honest behavior spec; shown in "What to expect"
+  expected:                       # and reusable later as a QA regression spec
+    - ...
+  unacceptable:
+    - ...
+---
+
+<Stage label="Greeting & context" />
+<Stage step={1} label="Introspection" />   {/* free-form labels OK, e.g. "Turning point" */}
+
+<User>
+A user turn — plain prose.
+</User>
+
+<Assistant>
+An assistant turn. Markdown allowed: paragraphs, **bold**, ## headings, lists,
+> blockquotes — keep to the subset the real ChatView renders, nothing fancier.
+</Assistant>
+
+<Note>
+Annotation commentary — rendered as a "What's happening here" callout.
+</Note>
+```
+
+Rules that keep demos honest and working:
+
+- **The `context` id must exist in the registry** for that agent
+  (`src/lib/contexts.ts` + a seed in `src/lib/server/contexts.ts`) — the build fails
+  otherwise. Adding a demo usually means adding a matching context first.
+- Demos must read like the real assistant: ground the voice in the personas in
+  `src/lib/server/agents.ts`. They double as behavior specs, so don't show the assistant
+  doing something the prompt wouldn't.
+- Keep them clearly fictional — the disclaimer components handle the labeling; never
+  present a demo as a real user conversation.
+- New demos automatically appear in the gallery, the practice-page "See it in action"
+  section (first 3 by `order`), `/llms.txt`, the sitemap, and get an OG card.
+
+## Named contexts — `src/lib/contexts.ts` + `src/lib/server/contexts.ts`
+
+The context registry seeds `?context=<id>` conversations (demo CTAs today, specialized
+assistant variants later). Two halves that must stay in sync (TypeScript enforces it —
+`CONTEXT_SEEDS` is `satisfies Record<ContextId, ContextSeed>`):
+
+- `src/lib/contexts.ts` — the id list plus the chip label/description shown in the chat UI.
+- `src/lib/server/contexts.ts` — the model-facing seed text (server-only; never ships to
+  the browser). Seeds must be **byte-stable compile-time constants** — never interpolate
+  user data — because each one is an Anthropic prompt-cache entry appended after the
+  shared grounding+persona blocks.
+
+Retire a context by removing its demo/links first; old saved conversations with a retired
+id degrade gracefully to plain chats. Never reuse a retired id for a different meaning.
+
+---
+
 ## Glossary, Pillars, Nav — `src/data/`
 
 Small, structured data that isn't a collection:
