@@ -18,6 +18,8 @@ const MAX_CHARS_PER_MESSAGE = 8_000;
 interface ChatBody {
   agent: AgentId;
   messages: { role: 'user' | 'assistant'; content: string }[];
+  /** Optional named-context id (src/lib/contexts.ts); unknown ids are ignored. */
+  context?: string;
 }
 
 /**
@@ -55,7 +57,7 @@ export const POST: APIRoute = async ({ request }) => {
     // Omitting `thinking` on Sonnet 5 runs adaptive thinking — a silent
     // pause and extra tokens we don't need for empathetic chat.
     thinking: { type: 'disabled' },
-    system: await buildSystem(body.agent),
+    system: await buildSystem(body.agent, typeof body.context === 'string' ? body.context : undefined),
     messages,
   });
 

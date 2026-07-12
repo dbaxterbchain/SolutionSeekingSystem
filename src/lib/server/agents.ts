@@ -1,4 +1,5 @@
 import { methodologyMarkdown } from '../llms';
+import { resolveContext } from './contexts';
 
 /**
  * System prompts for the two in-site AI assistants, adapted from the original
@@ -6,9 +7,11 @@ import { methodologyMarkdown } from '../llms';
  * Source/MentorAISourceDocs/details.md.
  *
  * The grounding block is byte-identical for both agents and ordered FIRST so
- * Guide and Mentor share a single Anthropic prompt-cache entry. Nothing in
- * `system` may vary per request (no timestamps, no user data) — dynamic
- * context belongs in `messages`.
+ * Guide and Mentor share a single Anthropic prompt-cache entry. System content
+ * may vary ONLY across the fixed (agent, context) registry enum (see
+ * src/lib/server/contexts.ts) — each pair is a byte-stable prefix with its own
+ * cache entry. Nothing per-request or per-user (no timestamps, no user data)
+ * may ever appear in `system`; dynamic context belongs in `messages`.
  */
 
 export type AgentId = 'guide' | 'mentor';
@@ -93,11 +96,17 @@ function getGrounding(): Promise<string> {
   ));
 }
 
-export async function buildSystem(agent: AgentId) {
+export async function buildSystem(agent: AgentId, contextId?: string) {
   const grounding = await getGrounding();
+  const context = resolveContext(contextId, agent);
+  const persona = context?.persona?.[agent] ?? PERSONAS[agent];
   return [
     // Grounding first: identical bytes for both agents → one shared cache entry.
     { type: 'text' as const, text: grounding, cache_control: { type: 'ephemeral' as const } },
-    { type: 'text' as const, text: PERSONAS[agent], cache_control: { type: 'ephemeral' as const } },
+    { type: 'text' as const, text: persona, cache_control: { type: 'ephemeral' as const } },
+    // Named-context seed last so the shared prefix above stays cache-stable.
+    ...(context
+      ? [{ type: 'text' as const, text: context.seed, cache_control: { type: 'ephemeral' as const } }]
+      : []),
   ];
 }

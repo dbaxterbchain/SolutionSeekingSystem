@@ -12,6 +12,7 @@ import {
   type ChatMessage,
   type ChatSession,
 } from '../../lib/chatSessions';
+import { getContextMeta } from '../../lib/contexts';
 
 const FREE_LIMIT = 10;
 /** Client-side truncation guard: send at most the last N messages. */
@@ -22,6 +23,11 @@ interface Props {
   agentName: string;
   /** One-line welcome shown above the empty conversation. */
   welcome: string;
+  /**
+   * Named context (src/lib/contexts.ts) to seed new conversations with, for
+   * dedicated variant pages. A ?context= URL param takes precedence.
+   */
+  initialContext?: string;
 }
 
 type Gate =
@@ -31,11 +37,21 @@ type Gate =
   | { kind: 'free'; remaining: number }
   | { kind: 'paywalled' };
 
-export default function ChatView({ agent, agentName, welcome }: Props) {
+export default function ChatView({ agent, agentName, welcome, initialContext }: Props) {
   const { session, user, loading } = useSession();
   const [gate, setGate] = useState<Gate>({ kind: 'loading' });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
+  // Named context seeding the conversation. New conversations take it from
+  // ?context= (falling back to the initialContext prop); resumed ones take it
+  // from the saved row, which is authoritative whenever ?chat= is present.
+  const [contextId, setContextId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('chat')) return null;
+    const id = params.get('context') ?? initialContext ?? null;
+    return getContextMeta(id, agent) ? id : null;
+  });
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +114,7 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
         if (saved && saved.agent === agent) {
           setChatId(saved.id);
           setMessages(saved.messages);
+          setContextId(saved.context ?? null);
         }
       })
       .catch(() => {});
@@ -113,7 +130,7 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
         await updateChatSession(chatId, { messages: next });
       } else {
         const title = next.find((m) => m.role === 'user')?.content.slice(0, 60) ?? 'Untitled';
-        const created = await createChatSession({ agent, title, messages: next });
+        const created = await createChatSession({ agent, title, messages: next, context: contextId });
         setChatId(created.id);
         const url = new URL(window.location.href);
         url.searchParams.set('chat', created.id);
@@ -153,7 +170,13 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ agent, messages: next.slice(-SENT_HISTORY_LIMIT) }),
+        body: JSON.stringify({
+          agent,
+          messages: next.slice(-SENT_HISTORY_LIMIT),
+          // Sent on every request (it's state, not a message) so the seed
+          // survives the history trim above.
+          ...(contextId ? { context: contextId } : {}),
+        }),
       });
 
       if (res.status === 401) {
@@ -235,10 +258,12 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
   const newConversation = () => {
     setMessages([]);
     setChatId(null);
+    setContextId(null);
     setError(null);
     setShowHistory(false);
     const url = new URL(window.location.href);
     url.searchParams.delete('chat');
+    url.searchParams.delete('context');
     window.history.replaceState(null, '', url);
   };
 
@@ -257,12 +282,15 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
     if (streaming) return;
     setChatId(saved.id);
     setMessages(saved.messages);
+    setContextId(saved.context ?? null);
     setError(null);
     setShowHistory(false);
     const url = new URL(window.location.href);
     url.searchParams.set('chat', saved.id);
     window.history.replaceState(null, '', url);
   };
+
+  const contextMeta = getContextMeta(contextId, agent);
 
   if (loading || (user && gate.kind === 'loading')) {
     return (
@@ -348,6 +376,16 @@ export default function ChatView({ agent, agentName, welcome }: Props) {
           >
             Manage all conversations in your account →
           </a>
+        </div>
+      )}
+
+      {/* Active named context */}
+      {contextMeta && (
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b border-slate-100 bg-brand-50/60 px-5 py-2.5">
+          <span className="rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-semibold text-brand-700">
+            {contextMeta.label}
+          </span>
+          <span className="text-xs text-slate-500">{contextMeta.description}</span>
         </div>
       )}
 
