@@ -244,3 +244,74 @@ Signed-in users get **10 lifetime free messages** (`ai_usage`, incremented serve
 then a $5/month subscription (status `active`/`trialing`/`past_due` in `subscriptions`)
 is required. The Stripe webhook is the only writer of subscription state. A portal
 cancel sets `cancel_at_period_end` while access continues until the period ends.
+
+## Analytics & conversion tracking (GA4 + GTM)
+
+Google Tag Manager (`GTM-M987NM67`) is hardcoded in
+[`BaseLayout.astro`](../src/layouts/BaseLayout.astro). GTM alone only gives you page
+views. The funnel events live in [`src/lib/analytics.ts`](../src/lib/analytics.ts) —
+one typed `track()` call per meaningful action, pushed to `window.dataLayer`.
+
+**The conversion of record is server-side.** `subscription_completed` is sent from the
+Stripe webhook via the GA4 Measurement Protocol
+([`src/lib/server/ga4.ts`](../src/lib/server/ga4.ts)), not from the browser landing on
+`/account?checkout=success`. A browser event misses closed tabs, ad blockers, and the
+iOS hand-off — and misses them *unevenly by device*, which would bias any ad bidding
+built on the number. To attribute those server-side conversions back to the session that
+caused them, the GA client/session ids are read from the `_ga` cookies, passed to
+`/api/checkout`, stored in Stripe Checkout `metadata`, and read back in the webhook.
+
+### 1. Create the GA4 property
+
+Analytics → Admin → **Create property** → add a **Web** data stream for
+`solutionseeking.com`. Then:
+- Copy the **Measurement ID** (`G-XXXXXXXXXX`).
+- Data stream → **Measurement Protocol API secrets** → create one, copy the value.
+
+### 2. Environment variables (Netlify + local `.env`)
+
+```
+PUBLIC_GA4_MEASUREMENT_ID=G-XXXXXXXXXX   # public: the client needs it to read the GA cookie
+GA4_API_SECRET=...                       # secret: mark as a secret value in Netlify
+```
+
+Netlify env changes only reach Functions after a **redeploy**.
+
+### 3. GTM container setup (one time, in the GTM UI)
+
+1. **Tag → Google Tag**, Measurement ID = your `G-...`, trigger **All Pages**.
+2. **Variables → New → Data Layer Variable**, one for each event parameter:
+   `cta_location`, `cta_label`, `destination`, `agent`, `tier`, `plan`, `mode_id`,
+   `demo_id`, `method`, `from_anon`, `message_index`, `value`, `currency`.
+3. **Trigger → Custom Event**, event name (regex enabled):
+   `^(cta_clicked|demo_viewed|mode_viewed|signup_started|signup_completed|first_message_sent|message_sent|free_limit_reached|checkout_started|checkout_abandoned|checkout_success_viewed)$`
+   One trigger for everything is far easier to maintain than one per event.
+4. **Tag → Google Analytics: GA4 Event**, Event Name = `{{Event}}`, add the variables
+   above as Event Parameters, fire on the trigger from step 3.
+5. **Publish** the container.
+
+### 4. GA4 UI setup
+
+- **Admin → Events → Mark as key event**: `subscription_completed`, `signup_completed`,
+  `checkout_started`, `free_limit_reached`, `first_message_sent`.
+- **Admin → Custom definitions → Create custom dimension** (event-scoped) for
+  `cta_location`, `tier`, `plan`, `agent`, `mode_id`, `demo_id`. Without this, the
+  parameters are collected but **cannot be reported on**.
+- **Admin → Product links → Search Console** — link it, or "which query led to a
+  subscription" stays unanswerable.
+
+### 5. Verify
+
+Use **GTM Preview** alongside **GA4 → Admin → DebugView**:
+1. Walk home → `/practice` → `/practice/guide`, send a message, exhaust the free
+   messages, click subscribe. Each event should appear in both, with its parameters.
+2. Complete a **Stripe test-mode** checkout. In DebugView, confirm
+   `subscription_completed` arrives **from the server** with `value`, a
+   `transaction_id` of `cs_test_...`, and **the same `client_id` as your browser
+   session**. This is the check that proves attribution works end to end.
+3. Cancel a checkout: you should land back on the page you started from, with the
+   "no charge was made" banner and a `checkout_abandoned` event.
+
+> **Note:** ad blockers strip GTM for a meaningful share of visitors, so top-of-funnel
+> counts will always undercount. Compare *ratios* over time, not absolutes. Revenue is
+> never undercounted, because it comes from the webhook.

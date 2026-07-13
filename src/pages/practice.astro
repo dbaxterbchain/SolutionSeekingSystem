@@ -73,7 +73,12 @@ const tools = [
             <span class="text-3xl" aria-hidden="true">{a.icon}</span>
             <h2 class="mt-4 text-xl font-bold text-ink-800">{a.name}</h2>
             <p class="mt-2 flex-1 text-sm leading-relaxed text-slate-600">{a.blurb}</p>
-            <a href={a.href} class="btn-primary mt-5 self-start">
+            <a
+              href={a.href}
+              class="btn-primary mt-5 self-start"
+              data-track-cta="practice_assistants"
+              data-track-label={a.cta}
+            >
               {a.cta}
             </a>
           </div>

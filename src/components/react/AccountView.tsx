@@ -18,6 +18,7 @@ import {
 } from '../../lib/chatSessions';
 import { safeNext } from '../../lib/accountLink';
 import { ENTITLED_STATUSES } from '../../lib/subscription';
+import { track, getGaIds, consumeSignupCompleted } from '../../lib/analytics';
 import { usePasswordRecovery } from '../../lib/usePasswordRecovery';
 import AuthPanel, { NewPasswordForm, RecoveryPanel } from './AuthPanel';
 
@@ -49,6 +50,12 @@ export default function AccountView() {
     const t = window.setTimeout(() => setGraceOver(true), 6000);
     return () => window.clearTimeout(t);
   }, [fromCheckout]);
+
+  // A session appearing here is where a signup lands, whether it came back from
+  // Google or from an email confirmation link in a fresh tab.
+  useEffect(() => {
+    if (user) consumeSignupCompleted();
+  }, [user]);
 
   useEffect(() => {
     // A recovery session is a signed-in user — don't bounce away before the
@@ -408,6 +415,9 @@ function SubscriptionSection() {
     let cancelled = false;
     let tries = 0;
     const fromCheckout = checkoutSuccessParam();
+    // A funnel step, NOT the conversion: `subscription_completed` is sent
+    // server-side from the Stripe webhook, which never misses a payment.
+    if (fromCheckout) track({ event: 'checkout_success_viewed' });
     const poll = async () => {
       const entitled = await load();
       if (cancelled) return;
@@ -439,10 +449,28 @@ function SubscriptionSection() {
     if (!session) return;
     setBusy(true);
     setError(null);
+    const isCheckout = path === '/api/checkout';
+    if (isCheckout) {
+      track({
+        event: 'checkout_started',
+        plan: 'monthly',
+        cta_location: 'account_subscription',
+        value: 5,
+        currency: 'USD',
+      });
+    }
     try {
       const res = await fetch(path, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        // Attribution ids for the server-side conversion, and where to return
+        // the user if they abandon checkout.
+        body: isCheckout
+          ? JSON.stringify({ ga: getGaIds(), returnPath: '/account' })
+          : undefined,
       });
       const data = await res.json().catch(() => null);
       if (res.ok && data?.url) {

@@ -3,6 +3,7 @@ import type Stripe from 'stripe';
 import { supabaseAdmin } from '../../lib/server/supabaseAdmin';
 import { getStripe } from '../../lib/server/stripe';
 import { serverEnv } from '../../lib/server/env';
+import { trackSubscriptionCompleted } from '../../lib/server/ga4';
 
 export const prerender = false;
 
@@ -50,6 +51,22 @@ export const POST: APIRoute = async ({ request }) => {
             : session.subscription.id
         );
         await upsertSubscription(userId, sub);
+
+        // The conversion of record. Fired here, and ONLY on this event type
+        // (the customer.subscription.* cases below also fire on renewals and
+        // status changes, which would double-count). GA4 dedupes Stripe's
+        // retries on transaction_id.
+        await trackSubscriptionCompleted({
+          // Falls back to the user id when an ad blocker stripped the _ga
+          // cookie: we lose campaign attribution for that user but never the
+          // revenue count, which is the number that decides whether ads work.
+          clientId: session.metadata?.ga_client_id || userId,
+          sessionId: session.metadata?.ga_session_id || undefined,
+          plan: session.metadata?.plan || 'monthly',
+          value: (session.amount_total ?? 0) / 100,
+          currency: (session.currency ?? 'usd').toUpperCase(),
+          transactionId: session.id,
+        });
         break;
       }
       case 'customer.subscription.created':

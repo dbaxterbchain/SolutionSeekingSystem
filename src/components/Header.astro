@@ -84,7 +84,12 @@ const idleClass = 'text-slate-600 hover:bg-slate-50 hover:text-ink-800';
       <div class="hidden lg:block">
         <AuthMenu client:load />
       </div>
-      <a href="/practice/guide" class="btn-primary hidden whitespace-nowrap sm:inline-flex">
+      <a
+        href="/practice/guide"
+        class="btn-primary hidden whitespace-nowrap sm:inline-flex"
+        data-track-cta="nav"
+        data-track-label="Talk to the Guide"
+      >
         Talk to the Guide
       </a>
       <button

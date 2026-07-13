@@ -3,6 +3,7 @@ import '../styles/global.css';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import JsonLd from '../components/JsonLd.astro';
+import CheckoutBanner from '../components/react/CheckoutBanner.tsx';
 
 interface Props {
   title?: string;
@@ -107,10 +108,18 @@ const ogImageUrl = new URL(ogImage ?? `/og${pathKey}.png`, site).href;
     >
       Skip to content
     </a>
+    <CheckoutBanner client:idle />
     <Header />
     <main id="main" class="flex-1">
       <slot />
     </main>
     <Footer />
+
+    <script>
+      // One delegated listener powers every [data-track-cta] link on the site,
+      // so static pages can be instrumented without shipping an island.
+      import { initDomTracking } from '../lib/analytics';
+      initDomTracking();
+    </script>
   </body>
 </html>

@@ -14,6 +14,7 @@ import {
 } from '../../lib/chatSessions';
 import { getContextMeta, MODE_CONTEXTS } from '../../lib/contexts';
 import { useDialog } from './Dialog';
+import { track, getGaIds, type Tier } from '../../lib/analytics';
 
 const FREE_LIMIT = 10;
 /** Client-side truncation guard: send at most the last N messages. */
@@ -164,6 +165,13 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
+    const tier: Tier = gate.kind === 'subscriber' ? 'subscriber' : 'free';
+    const userMessages = next.filter((m) => m.role === 'user').length;
+    if (userMessages === 1) {
+      track({ event: 'first_message_sent', agent, tier, mode: contextId ?? undefined });
+    }
+    track({ event: 'message_sent', agent, tier, message_index: userMessages });
+
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -187,6 +195,9 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
         return;
       }
       if (res.status === 403) {
+        // The moment the free allowance runs out: the single most important
+        // step in the funnel, and the denominator for conversion-to-paid.
+        track({ event: 'free_limit_reached', tier: 'free', agent });
         setGate({ kind: 'paywalled' });
         setMessages(next);
         return;
@@ -240,10 +251,26 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     if (!session) return;
     setCheckoutBusy(true);
     setError(null);
+    track({
+      event: 'checkout_started',
+      plan: 'monthly',
+      cta_location: 'paywall_card',
+      value: 5,
+      currency: 'USD',
+    });
     try {
       const res = await fetch('/api/checkout', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        // The GA ids let the server-side conversion be attributed back to this
+        // session; returnPath brings an abandoned checkout back to this page.
+        body: JSON.stringify({
+          ga: getGaIds(),
+          returnPath: window.location.pathname + window.location.search,
+        }),
       });
       const data = await res.json().catch(() => null);
       if (res.ok && data?.url) {

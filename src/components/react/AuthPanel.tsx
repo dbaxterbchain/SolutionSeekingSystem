@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { useSession } from '../../lib/useSession';
 import { friendlyAuthError, MIN_PASSWORD_LENGTH } from '../../lib/authErrors';
 import { PasswordInput, PasswordChecklist } from './PasswordInput';
+import { markSignupStarted } from '../../lib/analytics';
 
 /**
  * Signed-out auth panel for /account: sign in, register (with confirmation
@@ -66,6 +67,7 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
     setBusy(true);
     try {
       if (mode === 'register') {
+        markSignupStarted('email');
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -120,6 +122,9 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
 
   const google = async () => {
     setError(null);
+    // Google is both sign-in and sign-up; the flag is only consumed if a
+    // session appears, and a returning user's sign-in is harmless to mark.
+    if (mode === 'register') markSignupStarted('google');
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },

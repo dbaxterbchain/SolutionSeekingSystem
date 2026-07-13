@@ -14,6 +14,14 @@ stale docs, no orphaned pages, no broken prompt cache.
 - [ ] **New user-facing copy contains no AI tells** — above all, no em dashes (`—`) and no
       en dashes between words; see the "Voice & punctuation" section in
       [content-guide.md](content-guide.md). Quick audit: search changed files for `—`.
+- [ ] **Does this add a step to the funnel?** If a change adds a CTA, a signup path, a
+      gate, or a checkout entry point, it needs an event. Static links: add
+      `data-track-cta="<location>" data-track-label="..."` (the delegated listener in
+      BaseLayout handles the rest). React: `track({...})` from
+      [`src/lib/analytics.ts`](../src/lib/analytics.ts) — add the event to the union
+      there, never push to `dataLayer` ad hoc. New event params must also be registered
+      as GA4 custom dimensions (see [deployment.md](deployment.md#4-ga4-ui-setup)) or
+      they are collected but unreportable.
 - [ ] **Update [status.md](status.md) in the same commit** if scope/status changed; update
       [roadmap.md](roadmap.md) / [architecture.md](architecture.md) /
       [content-guide.md](content-guide.md) if the plan, structure, or authoring format

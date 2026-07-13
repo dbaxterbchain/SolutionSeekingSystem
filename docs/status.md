@@ -80,6 +80,38 @@ All three are React islands (`src/components/react/*.tsx`) hydrated with `client
 - [x] **SEO landing pages** at `/practice/modes/<id>` (hero targeting situation intent + "when this helps" + embedded seeded ChatView + Mentor CTA + related demos), generated from [`src/data/modes.ts`](../src/data/modes.ts) with build-time registry cross-checks; hub at `/practice/modes`. Mentor gets Parent/Teacher/Manager/Organizer via `?context=`.
 - [x] Picker sections on `/practice/guide`, `/practice/mentor`, `/practice`; OG cards, sitemap, `/llms.txt` include modes; ChatView "New conversation" on a mode page now re-seeds the page's mode instead of dropping it.
 
+### Phase 5 — Growth: measurement + conversion 🚧 _(in progress)_
+
+Goal: get people signed up. Paid ads are deferred: at $5/month the CAC math doesn't
+close (realistic Google Ads numbers imply a ~$2,000 cost per paying customer against a
+~$60 LTV), and until the funnel is measured, ad spend buys clicks we can't attribute.
+Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) was agreed
+2026-07-12.
+
+- [x] **P1 — Measurement layer** (done 2026-07-12). [`src/lib/analytics.ts`](../src/lib/analytics.ts):
+      one typed `track()` (a discriminated union = the taxonomy), a delegated
+      `[data-track-cta]` listener so static pages need no island, and `getGaIds()` (handles
+      both the current GS2 and legacy GS1 GA cookie formats). Events: cta_clicked,
+      demo_viewed, mode_viewed, signup_started/completed, first_message_sent, message_sent,
+      free_limit_reached, checkout_started/abandoned/success_viewed.
+      **`subscription_completed` is sent server-side** from the Stripe webhook via the GA4
+      Measurement Protocol ([`src/lib/server/ga4.ts`](../src/lib/server/ga4.ts)) — a browser
+      event would miss closed tabs and ad blockers unevenly by device and bias ad bidding.
+      GA client/session ids are stitched through Stripe metadata so those server conversions
+      are attributable. Abandoned checkouts now return to the page they left from and show a
+      recovery banner. **Requires GA4 + GTM setup** — see [deployment.md](deployment.md#analytics--conversion-tracking-ga4--gtm).
+- [ ] **P2 — Anonymous trial**: let visitors send 3 messages with no account (Supabase anon
+      sign-in keeps the same user id on conversion, so the conversation and counter survive
+      signup for free), then convert. IP rate limit + kill switch for API cost.
+- [ ] **P3 — Pricing**: single source of truth (price is currently hardcoded in ~8 files),
+      annual plan, team enquiry tier, `/pricing` page.
+- [ ] **P4 — Email capture**: no list exists today, and the PDF guide is given away with zero
+      capture. Resend + a `/guide` landing page.
+- [ ] **P5 — Polish**: social proof (there is none), a real testimonial collector, Search
+      Console + Bing verification.
+- [ ] Then: SEO/community/AEO channels, and only after that a small (~$300-500) paid test
+      aimed at email capture rather than direct subscriptions.
+
 ## Open questions / decisions
 
 - Brand fonts — buy licensed faces or keep the free stand-ins?

@@ -7,10 +7,33 @@ import { ENTITLED_STATUSES } from '../../lib/server/entitlement';
 
 export const prerender = false;
 
-/** Create a Stripe Checkout session for the $5/month subscription. */
+interface CheckoutBody {
+  /** GA4 ids, so the server-side conversion can be attributed to this session. */
+  ga?: { client_id?: string; session_id?: string };
+  /** Path to return to if the user abandons checkout. */
+  returnPath?: string;
+}
+
+/**
+ * Only same-origin paths may be used to build the Stripe return URLs — an
+ * attacker-supplied absolute URL would turn checkout into an open redirect.
+ * Same rule as safeNext() in src/lib/accountLink.ts.
+ */
+function safePath(path: unknown, fallback: string): string {
+  if (typeof path !== 'string') return fallback;
+  if (!path.startsWith('/') || path.startsWith('//')) return fallback;
+  return path;
+}
+
+const trimmed = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() !== '' ? value.slice(0, 120) : undefined;
+
+/** Create a Stripe Checkout session for the subscription. */
 export const POST: APIRoute = async ({ request }) => {
   const user = await getUserFromRequest(request);
   if (!user) return json({ error: 'unauthorized' }, 401);
+
+  const body = ((await request.json().catch(() => null)) ?? {}) as CheckoutBody;
 
   const { data: existing } = await supabaseAdmin
     .from('subscriptions')
@@ -23,6 +46,14 @@ export const POST: APIRoute = async ({ request }) => {
 
   // Works for production, deploy previews, and localhost alike.
   const origin = new URL(request.url).origin;
+  const returnPath = safePath(body.returnPath, '/practice');
+
+  // Stripe metadata values must be strings; drop the keys we don't have.
+  const gaMetadata = {
+    ...(trimmed(body.ga?.client_id) ? { ga_client_id: trimmed(body.ga?.client_id)! } : {}),
+    ...(trimmed(body.ga?.session_id) ? { ga_session_id: trimmed(body.ga?.session_id)! } : {}),
+  };
+  const metadata = { user_id: user.id, ...gaMetadata };
 
   try {
     const session = await getStripe().checkout.sessions.create({
@@ -34,11 +65,12 @@ export const POST: APIRoute = async ({ request }) => {
         ? { customer: existing.stripe_customer_id }
         : { customer_email: user.email }),
       client_reference_id: user.id,
-      metadata: { user_id: user.id },
+      metadata,
       // Copy onto the subscription so customer.subscription.* events carry it.
-      subscription_data: { metadata: { user_id: user.id } },
+      subscription_data: { metadata },
       success_url: `${origin}/account?checkout=success`,
-      cancel_url: `${origin}/practice?checkout=cancelled`,
+      // Send them back where they were, mid-conversation, not to a generic hub.
+      cancel_url: `${origin}${returnPath}${returnPath.includes('?') ? '&' : '?'}checkout=cancelled`,
     });
     return json({ url: session.url });
   } catch (err) {

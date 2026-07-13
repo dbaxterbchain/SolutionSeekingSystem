@@ -164,7 +164,12 @@ const schemas = [
             kind of situation. It will ask about your actual specifics, not the fictional ones
             above.
           </p>
-          <a href={ctaHref} class="btn-primary mt-5 inline-block">
+          <a
+            href={ctaHref}
+            class="btn-primary mt-5 inline-block"
+            data-track-cta="demo_page_end"
+            data-track-label="Use this process with my situation"
+          >
             Use this process with my situation
           </a>
           <p class="mt-3 text-xs text-slate-500">
@@ -204,7 +209,12 @@ const schemas = [
           <p class="mt-2 text-sm leading-relaxed text-slate-600">
             Start a private {agentLabel} conversation oriented to this kind of situation.
           </p>
-          <a href={ctaHref} class="btn-primary mt-4 block text-center">
+          <a
+            href={ctaHref}
+            class="btn-primary mt-4 block text-center"
+            data-track-cta="demo_page_sidebar"
+            data-track-label="Use this with my situation"
+          >
             Use this with my situation
           </a>
           <p class="mt-3 text-xs leading-relaxed text-slate-500">
@@ -215,4 +225,13 @@ const schemas = [
       </aside>
     </div>
   </div>
+
+  <!-- Raw dataLayer push (no imports), so is:inline is correct here. -->
+  <script is:inline define:vars={{ demoId: entry.id, demoAgent: d.agent }}>
+    (window.dataLayer = window.dataLayer || []).push({
+      event: 'demo_viewed',
+      demo_id: demoId,
+      agent: demoAgent,
+    });
+  </script>
 </BaseLayout>
