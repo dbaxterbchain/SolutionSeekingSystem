@@ -1,11 +1,18 @@
 ---
 import Logo from './Logo.astro';
 import AuthMenu from './react/AuthMenu.tsx';
-import { navLinks } from '../data/nav';
+import { navItems, isNavGroup, type NavItem } from '../data/nav';
 
 const currentPath = Astro.url.pathname;
 const isActive = (href: string) =>
   href === '/' ? currentPath === '/' : currentPath.startsWith(href);
+/** A group is "current" when the open page lives under one of its children. */
+const isItemActive = (item: NavItem) =>
+  isNavGroup(item) ? item.children.some((c) => isActive(c.href)) : isActive(item.href);
+
+const linkClass = 'rounded-full px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-colors';
+const activeClass = 'bg-brand-50 text-brand-700';
+const idleClass = 'text-slate-600 hover:bg-slate-50 hover:text-ink-800';
 ---
 
 <header class="sticky top-0 z-50 border-b border-slate-100 bg-white/85 backdrop-blur-md">
@@ -14,20 +21,62 @@ const isActive = (href: string) =>
 
     <nav class="hidden items-center gap-1 lg:flex" aria-label="Primary">
       {
-        navLinks.map((link) => (
-          <a
-            href={link.href}
-            aria-current={isActive(link.href) ? 'page' : undefined}
-            class:list={[
-              'rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
-              isActive(link.href)
-                ? 'bg-brand-50 text-brand-700'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-ink-800',
-            ]}
-          >
-            {link.label}
-          </a>
-        ))
+        navItems.map((item) =>
+          isNavGroup(item) ? (
+            <div class="relative" data-nav-group>
+              <button
+                type="button"
+                data-nav-trigger
+                aria-expanded="false"
+                class:list={[
+                  linkClass,
+                  'flex items-center gap-1',
+                  isItemActive(item) ? activeClass : idleClass,
+                ]}
+              >
+                {item.label}
+                <svg
+                  data-nav-chevron
+                  class="h-4 w-4 transition-transform duration-200"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              <div data-nav-panel class="absolute left-0 top-full hidden w-56 pt-2">
+                <div class="rounded-2xl border border-slate-100 bg-white p-1.5 shadow-card-hover">
+                  {item.children.map((child) => (
+                    <a
+                      href={child.href}
+                      aria-current={isActive(child.href) ? 'page' : undefined}
+                      class:list={[
+                        'block rounded-xl px-3.5 py-2.5 text-sm font-medium transition-colors',
+                        isActive(child.href)
+                          ? 'bg-brand-50 text-brand-700'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-ink-800',
+                      ]}
+                    >
+                      {child.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <a
+              href={item.href}
+              aria-current={isActive(item.href) ? 'page' : undefined}
+              class:list={[linkClass, isActive(item.href) ? activeClass : idleClass]}
+            >
+              {item.label}
+            </a>
+          )
+        )
       }
     </nav>
 
@@ -35,7 +84,9 @@ const isActive = (href: string) =>
       <div class="hidden lg:block">
         <AuthMenu client:load />
       </div>
-      <a href="/practice/guide" class="btn-primary hidden sm:inline-flex">Talk to the Guide</a>
+      <a href="/practice/guide" class="btn-primary hidden whitespace-nowrap sm:inline-flex">
+        Talk to the Guide
+      </a>
       <button
         type="button"
         id="menu-toggle"
@@ -54,20 +105,40 @@ const isActive = (href: string) =>
   <div id="mobile-menu" class="hidden border-t border-slate-100 bg-white lg:hidden">
     <nav class="container-page flex flex-col gap-1 py-4" aria-label="Mobile">
       {
-        navLinks.map((link) => (
-          <a
-            href={link.href}
-            aria-current={isActive(link.href) ? 'page' : undefined}
-            class:list={[
-              'rounded-xl px-4 py-3 text-base font-medium transition-colors',
-              isActive(link.href)
-                ? 'bg-brand-50 text-brand-700'
-                : 'text-slate-700 hover:bg-slate-50',
-            ]}
-          >
-            {link.label}
-          </a>
-        ))
+        navItems.map((item) =>
+          isNavGroup(item) ? (
+            <div class="mb-1">
+              <p class="px-4 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                {item.label}
+              </p>
+              {item.children.map((child) => (
+                <a
+                  href={child.href}
+                  aria-current={isActive(child.href) ? 'page' : undefined}
+                  class:list={[
+                    'block rounded-xl px-4 py-3 text-base font-medium transition-colors',
+                    isActive(child.href)
+                      ? 'bg-brand-50 text-brand-700'
+                      : 'text-slate-700 hover:bg-slate-50',
+                  ]}
+                >
+                  {child.label}
+                </a>
+              ))}
+            </div>
+          ) : (
+            <a
+              href={item.href}
+              aria-current={isActive(item.href) ? 'page' : undefined}
+              class:list={[
+                'rounded-xl px-4 py-3 text-base font-medium transition-colors',
+                isActive(item.href) ? 'bg-brand-50 text-brand-700' : 'text-slate-700 hover:bg-slate-50',
+              ]}
+            >
+              {item.label}
+            </a>
+          )
+        )
       }
       <a href="/practice/guide" class="btn-primary mt-2">Talk to the Guide</a>
       <div class="mt-2 border-t border-slate-100 pt-2">
@@ -78,10 +149,62 @@ const isActive = (href: string) =>
 </header>
 
 <script>
+  // Mobile menu
   const toggle = document.getElementById('menu-toggle');
   const menu = document.getElementById('mobile-menu');
   toggle?.addEventListener('click', () => {
     const open = menu?.classList.toggle('hidden') === false;
     toggle.setAttribute('aria-expanded', String(open));
   });
+
+  // Desktop nav dropdowns
+  const groups = [...document.querySelectorAll<HTMLElement>('[data-nav-group]')];
+
+  const setOpen = (group: HTMLElement, open: boolean) => {
+    const trigger = group.querySelector<HTMLButtonElement>('[data-nav-trigger]');
+    const panel = group.querySelector<HTMLElement>('[data-nav-panel]');
+    const chevron = group.querySelector<SVGElement>('[data-nav-chevron]');
+    panel?.classList.toggle('hidden', !open);
+    trigger?.setAttribute('aria-expanded', String(open));
+    chevron?.classList.toggle('rotate-180', open);
+  };
+
+  const closeAll = () => groups.forEach((g) => setOpen(g, false));
+
+  groups.forEach((group) => {
+    const trigger = group.querySelector<HTMLButtonElement>('[data-nav-trigger]');
+    let hovering = false;
+
+    // Pointer: open while the cursor is anywhere over the group (trigger + panel).
+    group.addEventListener('mouseenter', () => {
+      hovering = true;
+      setOpen(group, true);
+    });
+    group.addEventListener('mouseleave', () => {
+      hovering = false;
+      setOpen(group, false);
+    });
+
+    // Keyboard / touch: the button toggles. Ignored while hovering, or a mouse
+    // user's click would dismiss the panel hover just opened for them.
+    trigger?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (hovering) return;
+      const isOpen = trigger.getAttribute('aria-expanded') === 'true';
+      closeAll();
+      setOpen(group, !isOpen);
+    });
+
+    // Close once focus leaves the group entirely (keyboard users tabbing out).
+    group.addEventListener('focusout', (e) => {
+      if (!group.contains(e.relatedTarget as Node)) setOpen(group, false);
+    });
+  });
+
+  if (groups.length) {
+    document.addEventListener('click', closeAll);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeAll();
+    });
+  }
 </script>
