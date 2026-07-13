@@ -65,6 +65,12 @@ stale docs, no orphaned pages, no broken prompt cache.
 - [ ] **Context registry sync**: an id must exist in BOTH `src/lib/contexts.ts` (UI
       metadata) and `src/lib/server/contexts.ts` (seed) — TypeScript enforces it. Demos
       referencing contexts are cross-checked at build time.
+- [ ] **Never type a price or a free-message count.** Import from
+      [`src/data/pricing.ts`](../src/data/pricing.ts) (`PLANS`, `priceCopy`,
+      `FREE_ANON_MESSAGES`, `FREE_ACCOUNT_MESSAGES`). These appear in page copy, the chat
+      UI, JSON-LD offers, and llms.txt: a hardcoded copy means a price change silently
+      makes most of the site lie to customers and to Google. Audit with
+      `Select-String -Path src\**\* -Pattern '\$5|5\.00|= 10;'`.
 - [ ] **New mode** = exactly three files: `src/lib/contexts.ts` (id + `kind:'mode'`
       meta), `src/lib/server/contexts.ts` (seed), `src/data/modes.ts` (landing copy —
       authored together with the seed). The landing page, hub card, pickers, OG card, and

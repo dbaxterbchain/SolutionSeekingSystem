@@ -31,7 +31,9 @@ export type CtaLocation =
   | 'demo_page_sidebar'
   | 'demo_page_end'
   | 'paywall_card'
-  | 'account_subscription';
+  | 'account_subscription'
+  | 'pricing_monthly'
+  | 'pricing_annual';
 
 /** Which allowance the user is spending. */
 export type Tier = 'anon' | 'free' | 'subscriber';
@@ -51,7 +53,9 @@ export type AnalyticsEvent =
   | { event: 'free_limit_reached'; tier: Exclude<Tier, 'subscriber'>; agent: AgentId }
   | { event: 'checkout_started'; plan: PlanId; cta_location: CtaLocation; value: number; currency: 'USD' }
   | { event: 'checkout_abandoned' }
-  | { event: 'checkout_success_viewed' };
+  | { event: 'checkout_success_viewed' }
+  /** Demand signal for the team tier, which is deliberately not self-serve yet. */
+  | { event: 'team_enquiry_submitted' };
 
 declare global {
   interface Window {

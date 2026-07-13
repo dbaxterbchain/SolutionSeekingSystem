@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro';
 import { getCollection } from 'astro:content';
 import { protocolSteps, systemDefinition } from '../data/concepts';
 import { MODES } from '../data/modes';
+import { PLANS, FREE_ANON_MESSAGES, FREE_ACCOUNT_MESSAGES } from '../data/pricing';
 
 export const prerender = true;
 
@@ -58,7 +59,7 @@ export const GET: APIRoute = async ({ site }) => {
     `- [Conversation Planner](${abs('/practice/conversation-planner')}): plan a Mutual Understanding conversation with goals, openers, and question bank`,
     `- [Solution Builder](${abs('/practice/solution-builder')}): draft solutions and score them as actionable, testable, effective, and time-bound`,
     '',
-    '## AI assistants (sign in for 10 free messages; $5/month unlimited)',
+    `## AI assistants (${FREE_ANON_MESSAGES} free messages with no account, ${FREE_ACCOUNT_MESSAGES} with a free account, then ${PLANS.monthly.priceLabel}/month or ${PLANS.annual.priceLabel}/year for unlimited)`,
     '',
     `- [Solution Seeking Guide](${abs('/practice/guide')}): AI chat that walks you through the Communication Protocol for a real conflict, step by step`,
     `- [Solution Seeking Mentor](${abs('/practice/mentor')}): AI chat expert on the whole system, covering the framework, protocol, principles, and tools`,
@@ -73,6 +74,7 @@ export const GET: APIRoute = async ({ site }) => {
     '',
     '## Optional',
     '',
+    `- [Pricing](${abs('/pricing')}): what is free forever, and what the subscription costs`,
     `- [About / origin story](${abs('/about')}): why Beanchain Coffee built the system`,
     `- [Complete Guide (PDF)](${abs('/solution-seeking-complete-guide.pdf')}): the full source guide as a free download`,
     `- [Full methodology as one file](${abs('/llms-full.txt')})`,

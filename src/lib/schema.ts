@@ -1,4 +1,5 @@
 import { glossary, systemDefinition } from '../data/concepts';
+import { PLANS, SELF_SERVE_PLANS } from '../data/pricing';
 
 /**
  * schema.org JSON-LD builders. Pages compose these and pass them to
@@ -116,6 +117,41 @@ export function glossaryTermSet(site: URL): Schema {
       name: t.term,
       description: t.definition,
     })),
+  };
+}
+
+/**
+ * The subscription itself, for /pricing. Prices come from src/data/pricing.ts so
+ * structured data can never drift from the copy (or from Stripe).
+ */
+export function subscriptionProduct(site: URL): Schema {
+  return {
+    '@context': CONTEXT,
+    '@type': 'Product',
+    name: `${SITE_NAME}: Guide & Mentor`,
+    description:
+      'Unlimited conversations with the Solution Seeking Guide and Mentor: AI assistants that walk you through the Communication Protocol for a real conflict, and help you build communication practices for your team.',
+    url: new URL('/pricing', site).href,
+    brand: { '@id': orgId(site) },
+    offers: {
+      '@type': 'AggregateOffer',
+      priceCurrency: 'USD',
+      lowPrice: PLANS.monthly.priceAmount,
+      highPrice: PLANS.annual.priceAmount,
+      offerCount: SELF_SERVE_PLANS.length,
+      offers: SELF_SERVE_PLANS.map((plan) => ({
+        '@type': 'Offer',
+        name: plan.name,
+        url: new URL('/pricing', site).href,
+        availability: 'https://schema.org/InStock',
+        priceSpecification: {
+          '@type': 'UnitPriceSpecification',
+          price: plan.priceAmount,
+          priceCurrency: plan.currency,
+          billingDuration: plan.billingDuration,
+        },
+      })),
+    },
   };
 }
 

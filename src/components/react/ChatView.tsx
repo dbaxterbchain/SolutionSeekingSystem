@@ -17,7 +17,7 @@ import { getContextMeta, MODE_CONTEXTS } from '../../lib/contexts';
 import { useDialog } from './Dialog';
 import { track, getGaIds, type Tier } from '../../lib/analytics';
 import UpgradeAnonCard from './UpgradeAnonCard';
-import { FREE_ACCOUNT_MESSAGES, FREE_ANON_MESSAGES } from '../../data/pricing';
+import { FREE_ACCOUNT_MESSAGES, FREE_ANON_MESSAGES, priceCopy } from '../../data/pricing';
 import { getCaptchaToken, prewarmCaptcha } from '../../lib/turnstile';
 
 const FREE_LIMIT = FREE_ACCOUNT_MESSAGES;
@@ -354,6 +354,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
         // The GA ids let the server-side conversion be attributed back to this
         // session; returnPath brings an abandoned checkout back to this page.
         body: JSON.stringify({
+          plan: 'monthly',
           ga: getGaIds(),
           returnPath: window.location.pathname + window.location.search,
         }),
@@ -461,8 +462,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
           Sign in to talk to the {agentName}
         </h2>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600">
-          Accounts are free, and your first {FREE_LIMIT} messages are on us. After that, a
-          $5/month subscription unlocks unlimited conversations with both assistants.
+          {priceCopy.generic}
         </p>
         <a href={accountLink()} className="btn-primary mt-5 inline-block">
           Sign in or create an account
@@ -612,11 +612,10 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
       ) : gate.kind === 'paywalled' ? (
         <div className="border-t border-slate-100 p-6 text-center">
           <h3 className="font-heading text-lg font-bold text-ink-800">
-            You've used your {FREE_LIMIT} free messages
+            {priceCopy.paywallHeading}
           </h3>
           <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-slate-600">
-            Subscribe for $5/month to get unlimited conversations with both the Guide and the
-            Mentor. Cancel anytime.
+            {priceCopy.paywallBody}
           </p>
           <button
             type="button"
@@ -624,8 +623,15 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
             disabled={checkoutBusy}
             className="btn-primary mt-4 disabled:opacity-60"
           >
-            {checkoutBusy ? 'Opening checkout…' : 'Subscribe for $5/month'}
+            {checkoutBusy ? 'Opening checkout…' : priceCopy.subscribeCta}
           </button>
+          <p className="mt-3 text-xs text-slate-500">
+            Or{' '}
+            <a href="/pricing" className="font-semibold text-brand-600 hover:text-brand-700">
+              see all plans
+            </a>
+            , including annual.
+          </p>
         </div>
       ) : (
         <form

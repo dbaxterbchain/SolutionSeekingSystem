@@ -4,6 +4,7 @@ import ChatView from '../../components/react/ChatView.tsx';
 import PricingLine from '../../components/react/PricingLine.tsx';
 import { breadcrumbs, webApplication } from '../../lib/schema';
 import { CHAT_CONTEXTS } from '../../lib/contexts';
+import { PLANS, priceCopy } from '../../data/pricing';
 import { MODES } from '../../data/modes';
 
 const mentorModes = MODES.filter((m) =>
@@ -17,7 +18,7 @@ const schemas = [
     description:
       'An AI mentor for everything in the Solution Seeking System: the framework, the 3-step protocol, the Wisdom Principles, and the Leadership Tools.',
     path: '/practice/mentor',
-    offer: { price: '5.00' },
+    offer: { price: PLANS.monthly.priceAmount },
   }),
   breadcrumbs(site, [
     { name: 'Home', path: '/' },
@@ -46,7 +47,7 @@ const schemas = [
         protocol, the Wisdom Principles, or adapting the Leadership Tools to your team.
         <PricingLine
           client:load
-          generic="Your first 10 messages are free; $5/month for unlimited access."
+          generic={priceCopy.generic}
           subscriber="You're subscribed: unlimited conversations, anytime."
         />
       </p>

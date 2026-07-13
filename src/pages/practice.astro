@@ -5,6 +5,7 @@ import PageHero from '../components/PageHero.astro';
 import PricingLine from '../components/react/PricingLine.tsx';
 
 import { MODES } from '../data/modes';
+import { priceCopy } from '../data/pricing';
 
 const allDemos = (await getCollection('demos')).sort((a, b) => a.data.order - b.data.order);
 const featuredDemos = allDemos.slice(0, 3);
@@ -88,8 +89,8 @@ const tools = [
     <p class="mt-4 text-sm text-slate-500">
       <PricingLine
         client:load
-        generic="Sign in for 10 free messages · $5/month for unlimited conversations with both assistants."
-        subscriber="You're subscribed: unlimited conversations with both assistants."
+        generic={priceCopy.generic}
+        subscriber={priceCopy.subscriber}
       />
     </p>
 

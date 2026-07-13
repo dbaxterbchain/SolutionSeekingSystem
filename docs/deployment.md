@@ -245,6 +245,38 @@ then a $5/month subscription (status `active`/`trialing`/`past_due` in `subscrip
 is required. The Stripe webhook is the only writer of subscription state. A portal
 cancel sets `cancel_at_period_end` while access continues until the period ends.
 
+## Pricing & plans
+
+**One source of truth: [`src/data/pricing.ts`](../src/data/pricing.ts).** Prices, free
+allowances, and the shared copy lines all live there and are imported everywhere else
+(page copy, chat UI, JSON-LD offers, llms.txt). Never retype a price: they used to be
+hardcoded in ten places, which meant changing the Stripe price would silently leave most
+of the site lying to customers and to Google.
+
+**Stripe setup for the annual plan** (one time):
+1. Stripe dashboard → the existing product → **Add another price** → recurring, **$50 /
+   year**. Copy the `price_...` id.
+2. Netlify → environment variables → `STRIPE_PRICE_ID_ANNUAL` → redeploy.
+
+If the amounts in Stripe ever change, update the labels in `src/data/pricing.ts` to match.
+Nothing reads the price back from Stripe, so these are the two places that must agree.
+
+**Security:** the client sends a plan id (`monthly` | `annual`), never a Stripe price id.
+[`src/lib/server/plans.ts`](../src/lib/server/plans.ts) maps it to an env-var price. A
+client-supplied price id is never trusted, or someone could point checkout at a $0.01
+price created in the dashboard.
+
+**Team enquiries** (`/pricing` → the Teams card) are stored in `team_enquiries`
+(migration `0007`, server-write-only, honeypot + IP rate limit). Self-serve seats are
+deliberately not built: that is weeks of work on the entitlement path for zero validated
+demand, and this form tells you whether the demand exists. **There is no notification
+email yet** — read the table until the email phase lands:
+
+```sql
+select created_at, name, email, team_size, note from public.team_enquiries
+where not handled order by created_at desc;
+```
+
 ## Anonymous trial (chat before signing up)
 
 A visitor can send **3 messages with no account** ([`src/data/pricing.ts`](../src/data/pricing.ts)),

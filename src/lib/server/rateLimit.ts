@@ -30,10 +30,13 @@ export function clientIp(request: Request, fallback?: string): string | null {
   );
 }
 
+/** Salted hash of a client IP. The raw address is never stored anywhere. */
+export function hashIp(ip: string): string {
+  return createHash('sha256').update(`${ip}${serverEnv('IP_HASH_SALT')}`).digest('hex');
+}
+
 function bucketFor(scope: string, ip: string): string {
-  const salt = serverEnv('IP_HASH_SALT');
-  const hash = createHash('sha256').update(`${ip}${salt}`).digest('hex');
-  return `${scope}:${hash}`;
+  return `${scope}:${hashIp(ip)}`;
 }
 
 /**

@@ -6,6 +6,7 @@ import PricingLine from '../../../components/react/PricingLine.tsx';
 import { breadcrumbs, webApplication } from '../../../lib/schema';
 import { CHAT_CONTEXTS } from '../../../lib/contexts';
 import { MODES } from '../../../data/modes';
+import { priceCopy } from '../../../data/pricing';
 
 export async function getStaticPaths() {
   const demos = await getCollection('demos');
@@ -78,7 +79,7 @@ const schemas = [
         {mode.heroIntro}
         <PricingLine
           client:load
-          generic="Your first 10 messages are free; $5/month for unlimited access."
+          generic={priceCopy.generic}
           subscriber="You're subscribed: unlimited conversations, anytime."
         />
       </p>

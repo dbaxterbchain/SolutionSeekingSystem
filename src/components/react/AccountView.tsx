@@ -19,6 +19,7 @@ import {
 import { safeNext } from '../../lib/accountLink';
 import { ENTITLED_STATUSES } from '../../lib/subscription';
 import { track, getGaIds, consumeSignupCompleted } from '../../lib/analytics';
+import { FREE_ACCOUNT_MESSAGES, priceCopy } from '../../data/pricing';
 import { usePasswordRecovery } from '../../lib/usePasswordRecovery';
 import AuthPanel, { NewPasswordForm, RecoveryPanel } from './AuthPanel';
 
@@ -382,7 +383,7 @@ function ToolLinks() {
 /* Subscription (signed in)                                           */
 /* ------------------------------------------------------------------ */
 
-const FREE_LIMIT = 10;
+const FREE_LIMIT = FREE_ACCOUNT_MESSAGES;
 
 interface SubRow {
   status: string;
@@ -479,7 +480,7 @@ function SubscriptionSection() {
         // Attribution ids for the server-side conversion, and where to return
         // the user if they abandon checkout.
         body: isCheckout
-          ? JSON.stringify({ ga: getGaIds(), returnPath: '/account' })
+          ? JSON.stringify({ plan: 'monthly', ga: getGaIds(), returnPath: '/account' })
           : undefined,
       });
       const data = await res.json().catch(() => null);
@@ -554,14 +555,19 @@ function SubscriptionSection() {
             </button>
           ) : (
             !activating && (
-              <button
-                type="button"
-                onClick={() => post('/api/checkout')}
-                disabled={busy}
-                className="btn-primary disabled:opacity-60"
-              >
-                {busy ? 'Opening checkout…' : 'Subscribe for $5/month'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => post('/api/checkout')}
+                  disabled={busy}
+                  className="btn-primary disabled:opacity-60"
+                >
+                  {busy ? 'Opening checkout…' : priceCopy.subscribeCta}
+                </button>
+                <a href="/pricing" className="btn-ghost text-sm">
+                  See all plans
+                </a>
+              </>
             )
           ))}
       </div>
@@ -571,7 +577,7 @@ function SubscriptionSection() {
           <span className="mr-1 text-sm text-slate-600">
             {entitled
               ? 'Unlimited conversations, anytime:'
-              : 'Try them free. Your first 10 messages are on us:'}
+              : `Try them free. Your first ${FREE_ACCOUNT_MESSAGES} messages are on us:`}
           </span>
         )}
         <a

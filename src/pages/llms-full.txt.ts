@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { attributionFooter, methodologyMarkdown } from '../lib/llms';
+import { PLANS, FREE_ANON_MESSAGES, FREE_ACCOUNT_MESSAGES } from '../data/pricing';
 
 export const prerender = true;
 
@@ -19,7 +20,7 @@ export const GET: APIRoute = async ({ site }) => {
       `- Conversation Planner: ${new URL('/practice/conversation-planner', site).href}`,
       `- Solution Builder: ${new URL('/practice/solution-builder', site).href}`,
       '',
-      'AI assistants (sign in for 10 free messages; $5/month for unlimited access):',
+      `AI assistants (${FREE_ANON_MESSAGES} free messages with no account, ${FREE_ACCOUNT_MESSAGES} with a free account, then ${PLANS.monthly.priceLabel}/month or ${PLANS.annual.priceLabel}/year for unlimited access):`,
       '',
       `- Solution Seeking Guide (walks you through the protocol for a real conflict): ${new URL('/practice/guide', site).href}`,
       `- Solution Seeking Mentor (answers anything about the system): ${new URL('/practice/mentor', site).href}`,

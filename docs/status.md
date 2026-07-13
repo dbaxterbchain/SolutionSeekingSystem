@@ -112,8 +112,20 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       Anonymous users are blocked from checkout and the billing portal (no email = an
       unrecoverable subscription). **Requires Supabase dashboard setup** — see
       [deployment.md](deployment.md#anonymous-trial-chat-before-signing-up).
-- [ ] **P3 — Pricing**: single source of truth (price is currently hardcoded in ~8 files),
-      annual plan, team enquiry tier, `/pricing` page.
+- [x] **P3 — Pricing** (done 2026-07-13). [`src/data/pricing.ts`](../src/data/pricing.ts) is now
+      the only place a price or free-message count exists; the ~10 hardcoded copies (including
+      three JSON-LD `offer.price` values and three separate `FREE_LIMIT = 10` constants) are
+      gone, so a price change can no longer make the site lie. Adds an **annual plan ($50/yr,
+      two months free)** and a **`/pricing` page** (free-forever card, plan cards, FAQ with
+      `FAQPage` schema, `Product`/`AggregateOffer` schema, OG card, nav + footer + llms.txt).
+      Checkout takes a `plan` id resolved server-side against an allowlist
+      ([`src/lib/server/plans.ts`](../src/lib/server/plans.ts)) — **a client-supplied Stripe
+      price id is never trusted**, or anyone could subscribe for a cent. Team tier is an
+      enquiry form (migration `0007`, server-write-only, honeypot + IP rate limit); self-serve
+      seats are deliberately not built until there's demand. **Requires a $50/yr Stripe price
+      and `STRIPE_PRICE_ID_ANNUAL` in Netlify**, plus migration `0007`.
+      ⚠ Team enquiries currently land in the `team_enquiries` table with **no notification
+      email** — read them from the table until P4 adds the alert.
 - [ ] **P4 — Email capture**: no list exists today, and the PDF guide is given away with zero
       capture. Resend + a `/guide` landing page.
 - [ ] **P5 — Polish**: social proof (there is none), a real testimonial collector, Search

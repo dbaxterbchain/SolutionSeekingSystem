@@ -2,12 +2,14 @@ import type { APIRoute } from 'astro';
 import { getUserFromRequest, json } from '../../lib/server/auth';
 import { supabaseAdmin } from '../../lib/server/supabaseAdmin';
 import { getStripe } from '../../lib/server/stripe';
-import { serverEnv } from '../../lib/server/env';
 import { ENTITLED_STATUSES } from '../../lib/server/entitlement';
+import { resolvePlan } from '../../lib/server/plans';
 
 export const prerender = false;
 
 interface CheckoutBody {
+  /** 'monthly' | 'annual'. Never a Stripe price id — see resolvePlan(). */
+  plan?: string;
   /** GA4 ids, so the server-side conversion can be attributed to this session. */
   ga?: { client_id?: string; session_id?: string };
   /** Path to return to if the user abandons checkout. */
@@ -40,6 +42,9 @@ export const POST: APIRoute = async ({ request }) => {
 
   const body = ((await request.json().catch(() => null)) ?? {}) as CheckoutBody;
 
+  const selected = resolvePlan(body.plan);
+  if (!selected) return json({ error: 'bad_request' }, 400);
+
   const { data: existing } = await supabaseAdmin
     .from('subscriptions')
     .select('stripe_customer_id, status')
@@ -58,12 +63,14 @@ export const POST: APIRoute = async ({ request }) => {
     ...(trimmed(body.ga?.client_id) ? { ga_client_id: trimmed(body.ga?.client_id)! } : {}),
     ...(trimmed(body.ga?.session_id) ? { ga_session_id: trimmed(body.ga?.session_id)! } : {}),
   };
-  const metadata = { user_id: user.id, ...gaMetadata };
+  // `plan` rides along so the webhook's conversion event can report which one
+  // was bought without re-deriving it from the price id.
+  const metadata = { user_id: user.id, plan: selected.plan, ...gaMetadata };
 
   try {
     const session = await getStripe().checkout.sessions.create({
       mode: 'subscription',
-      line_items: [{ price: serverEnv('STRIPE_PRICE_ID'), quantity: 1 }],
+      line_items: [{ price: selected.priceId, quantity: 1 }],
       // Reuse the Stripe customer if we've seen this user before, so a
       // re-subscribe doesn't create duplicate customers.
       ...(existing?.stripe_customer_id

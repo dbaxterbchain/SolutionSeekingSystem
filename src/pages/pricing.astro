@@ -1,0 +1,175 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHero from '../components/PageHero.astro';
+import PricingPlans from '../components/react/PricingPlans.tsx';
+import TeamEnquiryForm from '../components/react/TeamEnquiryForm.tsx';
+import { breadcrumbs, faqPage, subscriptionProduct } from '../lib/schema';
+import { PLANS, FREE_ANON_MESSAGES, FREE_ACCOUNT_MESSAGES } from '../data/pricing';
+
+const freeForever = [
+  'The whole system: the Communication Protocol, all 12 Wisdom Principles, and the 4 Leadership Tools',
+  'The complete guide, as a free PDF',
+  'All three interactive worksheets (Introspection, Conversation Planner, Solution Builder)',
+  'All seven annotated example conversations',
+  `${FREE_ANON_MESSAGES} messages with the Guide, with no account at all`,
+  `${FREE_ACCOUNT_MESSAGES} messages once you create a free account`,
+];
+
+const faq = [
+  {
+    q: 'What do I actually pay for?',
+    a: 'The system itself is free and always will be: every page, the PDF, the worksheets, and the example conversations. You pay for unlimited conversations with the AI assistants, which apply the system to your specific situation, ask you the questions you would not think to ask yourself, and help you leave with a concrete plan.',
+  },
+  {
+    q: 'Can I try it before paying?',
+    a: `Yes, and without creating an account. You get ${FREE_ANON_MESSAGES} messages with the Guide straight away, and ${FREE_ACCOUNT_MESSAGES} in total once you register for free.`,
+  },
+  {
+    q: 'Do the free messages expire?',
+    a: 'No. They are a lifetime allowance, not a monthly one, so you can use them whenever you actually need them.',
+  },
+  {
+    q: 'What happens if I cancel?',
+    a: 'You keep access until the end of the period you have paid for, and your saved conversations stay in your account. You can cancel yourself from the account page, in two clicks, with no email to anyone.',
+  },
+  {
+    q: 'Is my conversation private?',
+    a: 'Your conversations are stored in your own account and are visible only to you. Nobody at Beanchain reads them, and they are not used to train models. You can delete any conversation, or your whole account, whenever you like.',
+  },
+  {
+    q: 'My team is smaller than five people.',
+    a: 'Then individual subscriptions are almost certainly the cheaper and simpler option. Get in touch anyway if you would like help adapting the Leadership Tools to how your team works.',
+  },
+];
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  subscriptionProduct(site),
+  faqPage(faq),
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Pricing', path: '/pricing' },
+  ]),
+];
+---
+
+<BaseLayout
+  title="Pricing"
+  description={`Most of the Solution Seeking System is free forever. Unlimited conversations with the AI Guide and Mentor are ${PLANS.monthly.priceLabel} a month, or ${PLANS.annual.priceLabel} a year.`}
+  schemas={schemas}
+>
+  <PageHero
+    eyebrow="Pricing"
+    title="Most of it is free forever"
+    intro="The system, the guide, the worksheets, and the example conversations cost nothing and always will. You only pay if you want unlimited conversations with the assistants."
+  />
+
+  <div class="container-page py-16">
+    <!-- Free forever: the honest answer to "what's the catch" -->
+    <section class="rounded-3xl border border-emerald-100 bg-emerald-50/50 p-7 sm:p-8">
+      <div class="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 class="font-heading text-2xl font-bold text-ink-800">Free forever</h2>
+        <p class="text-sm font-semibold text-emerald-700">No account required to start</p>
+      </div>
+      <ul class="mt-5 grid gap-2.5 text-sm text-slate-700 sm:grid-cols-2">
+        {
+          freeForever.map((item) => (
+            <li class="relative pl-5">
+              <span class="absolute left-0 top-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              {item}
+            </li>
+          ))
+        }
+      </ul>
+      <a
+        href="/practice/guide"
+        class="btn-secondary mt-6"
+        data-track-cta="pricing_monthly"
+        data-track-label="Try the Guide free"
+      >
+        Try the Guide free
+      </a>
+    </section>
+
+    <!-- Paid plans -->
+    <section class="mt-16">
+      <div class="max-w-2xl">
+        <p class="eyebrow mb-3">Unlimited</p>
+        <h2 class="text-3xl font-bold text-ink-800">When you want to keep going</h2>
+        <p class="mt-3 text-slate-600">
+          One subscription covers both assistants, every mode, and every conversation you
+          will ever have with them.
+        </p>
+      </div>
+      <div class="mt-8">
+        <PricingPlans client:load />
+      </div>
+    </section>
+
+    <!-- Teams -->
+    <section class="mt-16 grid gap-8 rounded-3xl border border-slate-100 bg-white p-7 shadow-card lg:grid-cols-2 sm:p-8">
+      <div>
+        <div class="flex items-center gap-2">
+          <h2 class="font-heading text-2xl font-bold text-ink-800">{PLANS.team.name}</h2>
+          <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+            {PLANS.team.note}
+          </span>
+        </div>
+        <p class="mt-4 flex items-baseline gap-1.5">
+          <span class="font-heading text-4xl font-extrabold text-ink-800">
+            {PLANS.team.priceLabel}
+          </span>
+          <span class="text-sm text-slate-500">{PLANS.team.cadence}</span>
+        </p>
+        <ul class="mt-5 space-y-2 text-sm text-slate-700">
+          {
+            PLANS.team.features.map((f) => (
+              <li class="relative pl-5">
+                <span class="absolute left-0 top-1.5 h-1.5 w-1.5 rounded-full bg-brand-400" />
+                {f}
+              </li>
+            ))
+          }
+        </ul>
+        <p class="mt-5 text-sm leading-relaxed text-slate-500">
+          Communication problems are rarely one person's. If a whole team learns the same
+          protocol, they stop relitigating how to talk and start solving what is actually
+          wrong.
+        </p>
+      </div>
+      <div>
+        <TeamEnquiryForm client:visible />
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="mt-16">
+      <div class="max-w-2xl">
+        <p class="eyebrow mb-3">Questions</p>
+        <h2 class="text-3xl font-bold text-ink-800">The things people ask</h2>
+      </div>
+      <div class="mt-8 grid gap-5 md:grid-cols-2">
+        {
+          faq.map((item) => (
+            <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
+              <h3 class="font-bold text-ink-800">{item.q}</h3>
+              <p class="mt-2 text-sm leading-relaxed text-slate-600">{item.a}</p>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <p class="mt-12 text-center text-sm text-slate-500">
+      Built by the founders of
+      <a
+        href="https://www.bchain.coffee"
+        rel="noopener"
+        class="font-medium text-brand-600 hover:text-brand-700"
+      >
+        Beanchain Coffee
+      </a>
+      to run their own worker-directed company. Not a growth-hacked app; a system we use.
+    </p>
+  </div>
+</BaseLayout>

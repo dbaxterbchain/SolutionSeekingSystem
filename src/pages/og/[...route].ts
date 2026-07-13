@@ -58,6 +58,11 @@ const pages: Record<string, OgPage> = {
     title: 'Solution Builder',
     description: 'Draft solutions that are actionable, testable, effective, and time-bound.',
   },
+  pricing: {
+    title: 'Pricing',
+    description:
+      'Most of the system is free forever. Unlimited conversations with the Guide and Mentor are $5 a month, or $50 a year.',
+  },
   'practice/modes': {
     title: 'Who is the conversation with?',
     description:

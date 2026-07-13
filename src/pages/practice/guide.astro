@@ -4,6 +4,7 @@ import ChatView from '../../components/react/ChatView.tsx';
 import PricingLine from '../../components/react/PricingLine.tsx';
 import { breadcrumbs, webApplication } from '../../lib/schema';
 import { MODES } from '../../data/modes';
+import { PLANS, priceCopy } from '../../data/pricing';
 
 const site = Astro.site ?? Astro.url;
 const schemas = [
@@ -12,7 +13,7 @@ const schemas = [
     description:
       'An AI guide that walks you through the Communication Protocol for a real conflict: understand yourself, prepare the conversation, and leave with a plan.',
     path: '/practice/guide',
-    offer: { price: '5.00' },
+    offer: { price: PLANS.monthly.priceAmount },
   }),
   breadcrumbs(site, [
     { name: 'Home', path: '/' },
@@ -42,7 +43,7 @@ const schemas = [
         a concrete plan.
         <PricingLine
           client:load
-          generic="Your first 10 messages are free; $5/month for unlimited access."
+          generic={priceCopy.generic}
           subscriber="You're subscribed: unlimited conversations, anytime."
         />
       </p>
