@@ -271,6 +271,32 @@ Never call `signOut()` during conversion, and never mint a second anonymous user
 4. **Anthropic console**: set a monthly spend limit and an email alert. This is the real
    backstop.
 
+### Captcha (Cloudflare Turnstile)
+
+Captcha is **enforced on the Supabase project**, so auth calls without a token are
+rejected. Every affected call site passes one via
+[`src/lib/turnstile.ts`](../src/lib/turnstile.ts): anonymous sign-in, sign-up, sign-in,
+password reset, and confirmation resend. (Converting an anonymous user runs through
+`updateUser`, which is not captcha-protected.)
+
+- **`PUBLIC_TURNSTILE_SITE_KEY`** must be set in Netlify, or **all auth breaks in
+  production**. The site key is public by design; the secret lives in the Supabase
+  dashboard.
+- The widget is **invisible** (`execution: 'execute'`, `appearance: 'interaction-only'`):
+  a visitor sees nothing unless Cloudflare actually wants a challenge. This matters
+  because the whole point of the anonymous trial is that you can just start typing.
+- A token is **solved in advance** on chat mount and cached (they last ~300s and are
+  single-use), so the ~1.5s challenge never lands on the critical path. Measured: click
+  Send → anonymous sign-in fires in ~10ms, `/api/chat` in ~130ms.
+- **Cloudflare dashboard → your Turnstile widget → Hostname Management**: add every
+  domain that must work. `solutionseeking.com` at minimum, plus `localhost` and/or
+  `*.netlify.app` if you want local development and deploy previews to authenticate. A
+  missing hostname fails with error **110200** ("domain not allowed").
+- **Locally, leave `PUBLIC_TURNSTILE_SITE_KEY` unset**: the local Supabase stack has
+  captcha disabled, and an unset key makes the client skip the token entirely. To test the
+  captcha path locally, use Cloudflare's always-passing test key
+  `1x00000000000000000000AA`.
+
 ### Cost control
 
 Anonymous identities are free to mint, so a per-user allowance bounds nothing on its own.

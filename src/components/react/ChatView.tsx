@@ -18,6 +18,7 @@ import { useDialog } from './Dialog';
 import { track, getGaIds, type Tier } from '../../lib/analytics';
 import UpgradeAnonCard from './UpgradeAnonCard';
 import { FREE_ACCOUNT_MESSAGES, FREE_ANON_MESSAGES } from '../../data/pricing';
+import { getCaptchaToken, prewarmCaptcha } from '../../lib/turnstile';
 
 const FREE_LIMIT = FREE_ACCOUNT_MESSAGES;
 const ANON_LIMIT = FREE_ANON_MESSAGES;
@@ -100,6 +101,9 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     // anonymous one. Nobody has to sign up to find out whether this works.
     if (!user) {
       setGate({ kind: 'anon-idle' });
+      // Load the captcha now, while they're reading and typing, so it isn't
+      // ~1.5s of dead time between hitting Send and the reply starting.
+      prewarmCaptcha();
       return;
     }
     const isAnon = user.is_anonymous === true;
@@ -182,7 +186,20 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     let active = session;
     if (!active) {
       setError(null);
-      const { data, error: anonError } = await supabase.auth.signInAnonymously();
+      // Supabase enforces captcha on anonymous sign-in. The Turnstile widget is
+      // invisible unless Cloudflare actually wants a challenge, so the "just
+      // start typing" promise holds for almost everyone.
+      let captchaToken: string | undefined;
+      try {
+        captchaToken = await getCaptchaToken();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'The captcha failed. Please try again.');
+        return;
+      }
+
+      const { data, error: anonError } = await supabase.auth.signInAnonymously({
+        options: { captchaToken },
+      });
       if (anonError || !data.session) {
         setGate({ kind: 'unavailable' });
         setError('Could not start a conversation. Please sign in and try again.');

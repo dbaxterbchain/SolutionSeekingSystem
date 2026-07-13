@@ -15,6 +15,7 @@ const MESSAGES: Record<string, string> = {
   weak_password: `Please choose a password of at least ${MIN_PASSWORD_LENGTH} characters.`,
   same_password: 'Your new password needs to be different from your current one.',
   email_address_invalid: 'That doesn’t look like a valid email address.',
+  captcha_failed: 'The captcha check didn’t pass. Please reload the page and try again.',
 };
 
 /** Map a Supabase auth error to human copy; `code` lets callers react (e.g. offer resend). */
@@ -29,6 +30,11 @@ export function friendlyAuthError(err: unknown): { code: string | null; message:
   }
   if (/email not confirmed/i.test(msg)) {
     return { code: 'email_not_confirmed', message: MESSAGES.email_not_confirmed };
+  }
+  // Supabase phrases a rejected token as "captcha protection: request disallowed",
+  // which tells a user nothing about what to do.
+  if (/captcha/i.test(msg)) {
+    return { code: 'captcha_failed', message: MESSAGES.captcha_failed };
   }
   return { code: null, message: msg };
 }

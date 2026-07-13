@@ -5,6 +5,7 @@ import { friendlyAuthError, MIN_PASSWORD_LENGTH } from '../../lib/authErrors';
 import { PasswordInput, PasswordChecklist } from './PasswordInput';
 import { markSignupStarted } from '../../lib/analytics';
 import { FREE_MESSAGES_AFTER_SIGNUP } from '../../data/pricing';
+import { getCaptchaToken } from '../../lib/turnstile';
 
 /**
  * Signed-out auth panel for /account: sign in, register (with confirmation
@@ -79,6 +80,12 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
 
     setBusy(true);
     try {
+      // Supabase rejects sign-up and sign-in without a captcha token. (An
+      // anonymous user's in-place conversion goes through updateUser, which is
+      // not captcha-protected, so it doesn't need one.)
+      const captchaToken =
+        mode === 'register' && isAnon ? undefined : await getCaptchaToken();
+
       if (mode === 'register' && isAnon) {
         // Convert the anonymous user in place. Same auth.users row, same id, so
         // their conversation, history, and free-message count all carry over.
@@ -98,7 +105,7 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: redirectTo },
+          options: { emailRedirectTo: redirectTo, captchaToken },
         });
         if (error) throw error;
         // With confirmations on, registering an already-confirmed email
@@ -116,7 +123,11 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
         // With confirmations off (e.g. local default), onAuthStateChange
         // re-renders the island into the Library.
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+          options: { captchaToken },
+        });
         if (error) throw error;
       }
     } catch (err) {
@@ -134,10 +145,17 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
   const resend = async () => {
     setError(null);
     setNotice(null);
+    let captchaToken: string | undefined;
+    try {
+      captchaToken = await getCaptchaToken();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The captcha failed. Please try again.');
+      return;
+    }
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email,
-      options: { emailRedirectTo: redirectTo },
+      options: { emailRedirectTo: redirectTo, captchaToken },
     });
     if (error) {
       setError(friendlyAuthError(error).message);
@@ -185,7 +203,17 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
       return;
     }
     setError(null);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    let captchaToken: string | undefined;
+    try {
+      captchaToken = await getCaptchaToken();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'The captcha failed. Please try again.');
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+      captchaToken,
+    });
     if (error) setError(friendlyAuthError(error).message);
     else setNotice('If that email has an account, a reset link is on its way.');
   };
