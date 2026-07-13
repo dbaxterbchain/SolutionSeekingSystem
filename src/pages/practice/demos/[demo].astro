@@ -104,22 +104,11 @@ const schemas = [
           </div>
         </div>
 
-        <!-- Annotated transcript -->
-        <div class="mt-12 space-y-4">
-          <Content
-            components={{
-              Stage: DemoStage,
-              User: DemoUser,
-              Assistant: DemoAssistant,
-              Note: DemoNote,
-            }}
-          />
-        </div>
-
-        <!-- Honest behavior spec. Lives in the reading column, not the sticky
-             sidebar: it can grow past the viewport height, and a sticky block
-             taller than the screen strands its own overflow. -->
-        <details class="mt-12 rounded-2xl border border-slate-100 bg-slate-50/70 p-6 open:pb-7">
+        <!-- Honest behavior spec: expectation-setting, so it sits before the
+             transcript, collapsed by default. In the reading column rather than
+             the sticky sidebar, where a block taller than the viewport would
+             strand its own overflow. -->
+        <details class="mt-6 rounded-2xl border border-slate-100 bg-slate-50/70 p-6 open:pb-7">
           <summary class="cursor-pointer text-sm font-semibold uppercase tracking-wide text-slate-500">
             What to expect from the {agentLabel}
           </summary>
@@ -153,8 +142,20 @@ const schemas = [
           </div>
         </details>
 
+        <!-- Annotated transcript -->
+        <div class="mt-12 space-y-4">
+          <Content
+            components={{
+              Stage: DemoStage,
+              User: DemoUser,
+              Assistant: DemoAssistant,
+              Note: DemoNote,
+            }}
+          />
+        </div>
+
         <!-- Mobile / end-of-transcript CTA -->
-        <div class="mt-8 rounded-2xl border border-brand-100 bg-brand-50/60 p-7 text-center">
+        <div class="mt-12 rounded-2xl border border-brand-100 bg-brand-50/60 p-7 text-center">
           <h2 class="font-heading text-xl font-bold text-ink-800">
             Facing something like this?
           </h2>
