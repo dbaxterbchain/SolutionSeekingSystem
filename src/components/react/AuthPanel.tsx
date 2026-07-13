@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useSession } from '../../lib/useSession';
-import { friendlyAuthError, MIN_PASSWORD_LENGTH } from '../../lib/authErrors';
+import {
+  friendlyAuthError,
+  readOAuthRedirectError,
+  MIN_PASSWORD_LENGTH,
+} from '../../lib/authErrors';
 import { PasswordInput, PasswordChecklist } from './PasswordInput';
 import { markSignupStarted } from '../../lib/analytics';
 import { FREE_MESSAGES_AFTER_SIGNUP } from '../../data/pricing';
@@ -16,6 +20,12 @@ import { getCaptchaToken } from '../../lib/turnstile';
 
 type Mode = 'signin' | 'register' | 'verify';
 
+/**
+ * The provider is telling us "this person already has an account". That is not
+ * an error they need to fix, it is a signpost: send them to Sign in.
+ */
+const ALREADY_REGISTERED = ['email_exists', 'user_already_exists', 'identity_already_exists'];
+
 const inputClass =
   'w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100';
 
@@ -25,18 +35,31 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
   // fresh: we upgrade their existing account so the conversation survives.
   const isAnon = user?.is_anonymous === true;
 
+  /*
+   * An OAuth provider reports a failure by bouncing the browser back here with
+   * the reason in the URL, not by throwing. Read it once, on mount, before
+   * anything else can rewrite the address bar.
+   */
+  const [oauthError] = useState(() => readOAuthRedirectError());
+
   // CTAs that mean "join" (the anonymous upgrade card, the paywall) link here
   // with ?mode=register, so the panel doesn't open on Sign in and cost a click.
-  const [mode, setMode] = useState<Mode>(() =>
-    typeof window !== 'undefined' &&
-    new URLSearchParams(window.location.search).get('mode') === 'register'
+  const [mode, setMode] = useState<Mode>(() => {
+    // Coming back from a failed "link Google to my trial" because that address
+    // already has an account: what they actually need is to sign in, so open on
+    // the tab that works instead of leaving them on the one that just failed.
+    if (oauthError && ALREADY_REGISTERED.includes(oauthError.code ?? '')) return 'signin';
+    return typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('mode') === 'register'
       ? 'register'
-      : 'signin'
-  );
+      : 'signin';
+  });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
+  // The OAuth redirect error gets its own banner at the top of the card, so it is
+  // deliberately NOT seeded here: it would then render twice.
   const [error, setError] = useState<string | null>(
     linkExpired ? 'That link has expired or was already used. Request a new one below.' : null
   );
@@ -48,6 +71,16 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
     const t = window.setTimeout(() => setCooldown((c) => c - 1), 1000);
     return () => window.clearTimeout(t);
   }, [cooldown]);
+
+  /**
+   * A trial user who is signing into an account they already have. Their trial
+   * conversation belongs to the anonymous user and cannot follow them, so say so
+   * before they click rather than after.
+   */
+  const abandoningTrial =
+    isAnon &&
+    mode === 'signin' &&
+    Boolean(oauthError && ALREADY_REGISTERED.includes(oauthError.code ?? ''));
 
   // Preserves ?next= so OAuth and email links land back here and the
   // post-sign-in redirect can complete the round trip.
@@ -171,22 +204,28 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
     // session appears, and a returning user's sign-in is harmless to mark.
     if (mode === 'register') markSignupStarted('google', isAnon);
 
-    // Converting an anonymous user: link the Google identity to the existing
-    // account rather than signing into a different one, or their conversation
-    // is orphaned.
-    if (isAnon) {
+    /*
+     * Link ONLY when a trial user is REGISTERING. The `mode` check is the whole
+     * fix for a nasty bug: since chatting creates an anonymous session, a
+     * returning user who came here to SIGN IN was also carrying one, so we tried
+     * to attach their Google identity to that throwaway trial user. Supabase
+     * refused (their address already has an account), bounced them back with
+     * `email_exists` in the URL, and they landed on an empty login form. Signing
+     * in looked broken to anyone who had touched the chat first.
+     *
+     * Registering is the only case where linking is right: it keeps the trial
+     * conversation and the used-message count on the same user id. Signing in
+     * means "take me to the account I already have", and signInWithOAuth simply
+     * replaces the anonymous session with the real one.
+     */
+    if (isAnon && mode === 'register') {
       const { error } = await supabase.auth.linkIdentity({
         provider: 'google',
         options: { redirectTo },
       });
-      if (!error) return;
-      if (error.message?.toLowerCase().includes('already')) {
-        setError(
-          'That Google account already has a profile here. Sign in with it to continue (this trial conversation will not carry over).'
-        );
-        return;
-      }
-      setError(error.message);
+      // Usually reported on the way back rather than here (see the redirect
+      // error handling above), but handle the synchronous case too.
+      if (error) setError(friendlyAuthError(error).message);
       return;
     }
 
@@ -194,7 +233,7 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
       provider: 'google',
       options: { redirectTo },
     });
-    if (error) setError(error.message);
+    if (error) setError(friendlyAuthError(error).message);
   };
 
   const forgot = async () => {
@@ -264,6 +303,17 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
             : 'Register to save and revisit your work. It’s free.'}
       </p>
 
+      {/* An OAuth failure arrives as a redirect, so the user lands back here with
+          no idea what happened. Say it at the TOP, above the button they are about
+          to press again, not below the form where they will never scroll. */}
+      {oauthError && (
+        <p className="mt-4 rounded-xl bg-amber-50 px-4 py-2.5 text-sm leading-relaxed text-amber-800">
+          {ALREADY_REGISTERED.includes(oauthError.code ?? '')
+            ? 'You already have an account with that Google address. Press Continue with Google again to sign in to it.'
+            : oauthError.message}
+        </p>
+      )}
+
       <button type="button" onClick={google} className="btn-secondary mt-6 w-full">
         <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true">
           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z" />
@@ -327,6 +377,15 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
         )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
+        {/* Be honest about the cost before they click, not after. Signing into an
+            account they already have replaces this trial session, so the trial
+            conversation stays with the trial user and does not come with them. */}
+        {abandoningTrial && (
+          <p className="text-xs leading-relaxed text-slate-500">
+            Signing in opens the account you already have. The conversation from this trial
+            will not carry over to it.
+          </p>
+        )}
         {notice && <p className="text-sm text-brand-700">{notice}</p>}
 
         <button type="submit" disabled={busy} className="btn-primary w-full disabled:opacity-50">

@@ -4,6 +4,7 @@ import { useSession } from '../../lib/useSession';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { accountLink } from '../../lib/accountLink';
 import { fetchEntitlement, type ClientEntitlement } from '../../lib/entitlement';
+import { readOAuthRedirectError } from '../../lib/authErrors';
 import {
   createChatSession,
   getChatSession,
@@ -142,6 +143,14 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<ChatSession[] | null>(null);
   const [feedbackDone, setFeedbackDone] = useState(false);
+  /*
+   * UpgradeAnonCard links a Google identity to the trial user and sends them
+   * back to THIS page, so when that fails (usually because the Google address
+   * already has an account of its own) the provider bounces them here with the
+   * reason in the URL. Nothing read it, so the card simply appeared to do
+   * nothing. Read it on mount and say what happened.
+   */
+  const [authNotice] = useState(() => readOAuthRedirectError());
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -692,6 +701,20 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
               Retry
             </button>
           )}
+        </div>
+      )}
+
+      {/* A Google sign-in that bounced back. Without this the upgrade card looks
+          like it silently did nothing. */}
+      {authNotice && (
+        <div className="mx-5 mb-3 rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+          <span>{authNotice.message}</span>{' '}
+          <a
+            href={accountLink()}
+            className="font-semibold text-amber-900 underline hover:text-amber-950"
+          >
+            Sign in
+          </a>
         </div>
       )}
 
