@@ -245,6 +245,52 @@ then a $5/month subscription (status `active`/`trialing`/`past_due` in `subscrip
 is required. The Stripe webhook is the only writer of subscription state. A portal
 cancel sets `cancel_at_period_end` while access continues until the period ends.
 
+## Anonymous trial (chat before signing up)
+
+A visitor can send **3 messages with no account** ([`src/data/pricing.ts`](../src/data/pricing.ts)),
+then they're asked to register (which grants the remaining 7 of the 10 free messages).
+
+**Why it works with no data migration:** Supabase anonymous sign-in creates a real
+`auth.users` row carrying `role: authenticated`, so every RLS policy and grant already
+covers it. Converting to a permanent account (`updateUser` or `linkIdentity`) **keeps the
+same user id**, so the conversation (`chat_sessions`) and the used-message counter
+(`ai_usage`) survive signup untouched. Verified against a live database, not assumed.
+Never call `signOut()` during conversion, and never mint a second anonymous user.
+
+### One-time setup
+
+1. **Supabase dashboard** (hosted project — `config.toml` only covers local):
+   - Authentication → Sign In / Providers → **enable Anonymous sign-ins**.
+   - Authentication → **enable Manual Linking** (required for `linkIdentity`, which is
+     how the one-click Google upgrade keeps the conversation).
+   - Authentication → Rate Limits → anonymous sign-ins **10/hour/IP**.
+2. **Apply migration `0006_anon_trial.sql`** before deploying (adds the `rate_limit` table
+   and the `bump_rate_limit` RPC, both service-role only).
+3. **Netlify env**: `IP_HASH_SALT` (any long random string, mark secret) and
+   `ANON_TRIAL_ENABLED=true`.
+4. **Anthropic console**: set a monthly spend limit and an email alert. This is the real
+   backstop.
+
+### Cost control
+
+Anonymous identities are free to mint, so a per-user allowance bounds nothing on its own.
+Three layers:
+
+- **3 messages** per anonymous user (not 10).
+- **25 anonymous messages per IP per day**, enforced in `/api/chat` via
+  [`rateLimit.ts`](../src/lib/server/rateLimit.ts). IPs are stored only as a salted hash.
+  It **fails open**: if the IP is unknown or the database errors, the request is allowed,
+  because blocking paying users during an infrastructure hiccup is worse than the abuse.
+- **`ANON_TRIAL_ENABLED=false`** kills the feature entirely (anonymous callers are asked
+  to register; the UI falls back to the old sign-in wall). One env var plus a redeploy.
+
+Budget roughly **$0.06 for a visitor's first message** (cold prompt cache) and ~$0.012
+after, so ~$0.09 for a visitor who uses the whole allowance.
+
+Anonymous users are blocked from `/api/checkout` and `/api/billing-portal`: they have no
+email address, so Stripe would attach a subscription to an account they could never sign
+back into.
+
 ## Analytics & conversion tracking (GA4 + GTM)
 
 Google Tag Manager (`GTM-M987NM67`) is hardcoded in

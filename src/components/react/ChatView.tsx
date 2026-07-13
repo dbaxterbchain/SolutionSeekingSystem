@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { useSession } from '../../lib/useSession';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { accountLink } from '../../lib/accountLink';
@@ -15,8 +16,11 @@ import {
 import { getContextMeta, MODE_CONTEXTS } from '../../lib/contexts';
 import { useDialog } from './Dialog';
 import { track, getGaIds, type Tier } from '../../lib/analytics';
+import UpgradeAnonCard from './UpgradeAnonCard';
+import { FREE_ACCOUNT_MESSAGES, FREE_ANON_MESSAGES } from '../../data/pricing';
 
-const FREE_LIMIT = 10;
+const FREE_LIMIT = FREE_ACCOUNT_MESSAGES;
+const ANON_LIMIT = FREE_ANON_MESSAGES;
 /** Client-side truncation guard: send at most the last N messages. */
 const SENT_HISTORY_LIMIT = 30;
 
@@ -34,10 +38,17 @@ interface Props {
 
 type Gate =
   | { kind: 'loading' }
-  | { kind: 'signed-out' }
+  /** No session yet. The composer is live: sending signs them in anonymously. */
+  | { kind: 'anon-idle' }
+  /** Anonymous trial in progress. */
+  | { kind: 'anon'; remaining: number }
+  /** Trial spent (or IP-limited): an account is the way forward, not a payment. */
+  | { kind: 'anon-exhausted'; rateLimited: boolean }
   | { kind: 'subscriber' }
   | { kind: 'free'; remaining: number }
-  | { kind: 'paywalled' };
+  | { kind: 'paywalled' }
+  /** Supabase missing, or anonymous sign-in refused: fall back to the old wall. */
+  | { kind: 'unavailable' };
 
 export default function ChatView({ agent, agentName, welcome, initialContext }: Props) {
   const { session, user, loading } = useSession();
@@ -77,35 +88,51 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
   }, [input]);
 
-  // Resolve the entitlement gate whenever auth state settles.
+  // Resolve the entitlement gate whenever auth state settles. Note the server is
+  // the authority on all of this; these queries only decide what UI to show.
   useEffect(() => {
     if (loading) return;
-    if (!user || !isSupabaseConfigured) {
-      setGate({ kind: 'signed-out' });
+    if (!isSupabaseConfigured) {
+      setGate({ kind: 'unavailable' });
       return;
     }
+    // No session: the composer stays live and the first Send creates an
+    // anonymous one. Nobody has to sign up to find out whether this works.
+    if (!user) {
+      setGate({ kind: 'anon-idle' });
+      return;
+    }
+    const isAnon = user.is_anonymous === true;
     let active = true;
     (async () => {
-      const [{ data: sub }, { data: usage }] = await Promise.all([
-        supabase.from('subscriptions').select('status').maybeSingle(),
+      // An anonymous user can never be a subscriber, so skip that query.
+      const [sub, usage] = await Promise.all([
+        isAnon
+          ? Promise.resolve({ data: null })
+          : supabase.from('subscriptions').select('status').maybeSingle(),
         supabase.from('ai_usage').select('free_messages_used').maybeSingle(),
       ]);
       if (!active) return;
-      if (sub && ENTITLED_STATUSES.includes(sub.status)) {
+      if (sub.data && ENTITLED_STATUSES.includes(sub.data.status)) {
         setGate({ kind: 'subscriber' });
-      } else {
-        const used = usage?.free_messages_used ?? 0;
+        return;
+      }
+      // One counter, two limits: an anonymous user who spent 3 messages keeps
+      // that count when they register, and lands on 7 of 10 remaining.
+      const used = usage.data?.free_messages_used ?? 0;
+      const limit = isAnon ? ANON_LIMIT : FREE_LIMIT;
+      if (used < limit) {
         setGate(
-          used < FREE_LIMIT
-            ? { kind: 'free', remaining: FREE_LIMIT - used }
-            : { kind: 'paywalled' }
+          isAnon ? { kind: 'anon', remaining: limit - used } : { kind: 'free', remaining: limit - used }
         );
+      } else {
+        setGate(isAnon ? { kind: 'anon-exhausted', rateLimited: false } : { kind: 'paywalled' });
       }
     })();
     return () => {
       active = false;
     };
-  }, [loading, user?.id]);
+  }, [loading, user?.id, user?.is_anonymous]);
 
   // Resume a conversation from ?chat=<id>.
   useEffect(() => {
@@ -144,11 +171,31 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     }
   };
 
-  const send = () => {
+  const send = async () => {
     const text = input.trim();
-    if (!text || streaming || !session) return;
+    if (!text || streaming) return;
+
+    // First message from a visitor with no account: create an anonymous session
+    // so they can try the assistant before being asked for anything. Supabase
+    // gives them a real auth.users row, so RLS, history, and the usage counter
+    // all work unchanged — and the id survives conversion to a real account.
+    let active = session;
+    if (!active) {
+      setError(null);
+      const { data, error: anonError } = await supabase.auth.signInAnonymously();
+      if (anonError || !data.session) {
+        setGate({ kind: 'unavailable' });
+        setError('Could not start a conversation. Please sign in and try again.');
+        return;
+      }
+      active = data.session;
+      track({ event: 'anon_chat_started', agent, mode: contextId ?? undefined });
+    }
+
     setInput('');
-    void deliver([...messages, { role: 'user', content: text }]);
+    // Pass the session explicitly: useSession() has not re-rendered yet, so
+    // `session` is still null on this pass.
+    void deliver([...messages, { role: 'user', content: text }], active);
   };
 
   /** Re-send the transcript after a failure (the user message is already in it). */
@@ -157,15 +204,21 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     void deliver(messages);
   };
 
-  const deliver = async (next: ChatMessage[]) => {
-    if (!session) return;
+  const deliver = async (next: ChatMessage[], sessionOverride?: Session) => {
+    const active = sessionOverride ?? session;
+    if (!active) return;
     setError(null);
     setMessages([...next, { role: 'assistant', content: '' }]);
     setStreaming(true);
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
-    const tier: Tier = gate.kind === 'subscriber' ? 'subscriber' : 'free';
+    const tier: Tier =
+      gate.kind === 'subscriber'
+        ? 'subscriber'
+        : gate.kind === 'anon' || gate.kind === 'anon-idle'
+          ? 'anon'
+          : 'free';
     const userMessages = next.filter((m) => m.role === 'user').length;
     if (userMessages === 1) {
       track({ event: 'first_message_sent', agent, tier, mode: contextId ?? undefined });
@@ -178,7 +231,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
         signal: ctrl.signal,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${active.access_token}`,
         },
         body: JSON.stringify({
           agent,
@@ -190,15 +243,26 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
       });
 
       if (res.status === 401) {
-        setGate({ kind: 'signed-out' });
+        // The anonymous JWT expired; the next send mints a fresh one.
+        setGate({ kind: 'anon-idle' });
+        setMessages(next);
+        return;
+      }
+      if (res.status === 429) {
+        // Too many anonymous messages from this network today. Convert rather
+        // than scold: an account gets them going again immediately.
+        track({ event: 'free_limit_reached', tier: 'anon', agent });
+        setGate({ kind: 'anon-exhausted', rateLimited: true });
         setMessages(next);
         return;
       }
       if (res.status === 403) {
-        // The moment the free allowance runs out: the single most important
-        // step in the funnel, and the denominator for conversion-to-paid.
-        track({ event: 'free_limit_reached', tier: 'free', agent });
-        setGate({ kind: 'paywalled' });
+        // Two different dead ends: an anonymous visitor needs an account (and
+        // still has free messages waiting); a registered user needs to pay.
+        const err = await res.json().catch(() => null);
+        const needsAccount = err?.error === 'account_required';
+        track({ event: 'free_limit_reached', tier: needsAccount ? 'anon' : 'free', agent });
+        setGate(needsAccount ? { kind: 'anon-exhausted', rateLimited: false } : { kind: 'paywalled' });
         setMessages(next);
         return;
       }
@@ -209,7 +273,12 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
 
       const remainingHeader = res.headers.get('X-Free-Messages-Remaining');
       if (remainingHeader !== null) {
-        setGate({ kind: 'free', remaining: Number(remainingHeader) });
+        const remaining = Number(remainingHeader);
+        setGate(
+          res.headers.get('X-Free-Tier') === 'anon'
+            ? { kind: 'anon', remaining }
+            : { kind: 'free', remaining }
+        );
       }
 
       const reader = res.body.getReader();
@@ -355,6 +424,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
   };
 
   const contextMeta = getContextMeta(contextId, agent);
+  const isAnonUser = user?.is_anonymous === true || gate.kind === 'anon-idle';
 
   if (loading || (user && gate.kind === 'loading')) {
     return (
@@ -364,7 +434,9 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     );
   }
 
-  if (gate.kind === 'signed-out') {
+  // Only when anonymous chat isn't possible at all (Supabase unconfigured, or
+  // the anonymous sign-in was refused). Everyone else gets a live composer.
+  if (gate.kind === 'unavailable') {
     return (
       <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center shadow-card">
         <span className="text-3xl" aria-hidden="true">🔐</span>
@@ -411,9 +483,23 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
               {gate.remaining} of {FREE_LIMIT} free messages left
             </span>
           )}
-          <button type="button" onClick={toggleHistory} className="btn-ghost text-xs">
-            {showHistory ? 'Close history' : 'History'}
-          </button>
+          {gate.kind === 'anon-idle' && (
+            <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
+              {ANON_LIMIT} free messages, no account needed
+            </span>
+          )}
+          {gate.kind === 'anon' && (
+            <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
+              {gate.remaining} of {ANON_LIMIT} free messages left
+            </span>
+          )}
+          {/* History belongs to an account; an anonymous visitor has nothing
+              to browse yet, and offering it before signup only confuses. */}
+          {!isAnonUser && (
+            <button type="button" onClick={toggleHistory} className="btn-ghost text-xs">
+              {showHistory ? 'Close history' : 'History'}
+            </button>
+          )}
           {messages.length > 0 && (
             <button type="button" onClick={newConversation} className="btn-ghost text-xs">
               New conversation
@@ -503,8 +589,10 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
         </div>
       )}
 
-      {/* Paywall / composer */}
-      {gate.kind === 'paywalled' ? (
+      {/* Account prompt / paywall / composer */}
+      {gate.kind === 'anon-exhausted' ? (
+        <UpgradeAnonCard rateLimited={gate.rateLimited} />
+      ) : gate.kind === 'paywalled' ? (
         <div className="border-t border-slate-100 p-6 text-center">
           <h3 className="font-heading text-lg font-bold text-ink-800">
             You've used your {FREE_LIMIT} free messages

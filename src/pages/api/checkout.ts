@@ -33,6 +33,11 @@ export const POST: APIRoute = async ({ request }) => {
   const user = await getUserFromRequest(request);
   if (!user) return json({ error: 'unauthorized' }, 401);
 
+  // An anonymous trial user has no email address. Stripe would happily take
+  // their money and attach the subscription to an account they can never sign
+  // back into. They have to register first.
+  if (user.is_anonymous) return json({ error: 'account_required' }, 403);
+
   const body = ((await request.json().catch(() => null)) ?? {}) as CheckoutBody;
 
   const { data: existing } = await supabaseAdmin

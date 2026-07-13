@@ -59,15 +59,18 @@ export default function AccountView() {
 
   useEffect(() => {
     // A recovery session is a signed-in user — don't bounce away before the
-    // set-new-password form has been shown.
-    if (user && next && !recovering) window.location.replace(next);
+    // set-new-password form has been shown. An anonymous user carries a session
+    // too, but bouncing them back would skip the registration they came for.
+    if (user && !user.is_anonymous && next && !recovering) window.location.replace(next);
   }, [user, next, recovering]);
 
   if (user && recovering) {
     return <RecoveryPanel onDone={finishRecovery} />;
   }
 
-  if (user && next) {
+  // Only a real account gets bounced back; an anonymous user still has to
+  // register, so they fall through to the auth panel below.
+  if (user && !user.is_anonymous && next) {
     return <div className="text-sm text-slate-400">Taking you back…</div>;
   }
 
@@ -98,7 +101,14 @@ export default function AccountView() {
     return <div className="text-sm text-slate-400">Loading…</div>;
   }
 
-  return user ? <Library email={user.email ?? ''} /> : <AuthPanel linkExpired={linkExpired} />;
+  // An anonymous trial user has a session but not an account: they came here to
+  // create one, so show the auth panel (which converts them in place) rather
+  // than a library they don't have.
+  return user && !user.is_anonymous ? (
+    <Library email={user.email ?? ''} />
+  ) : (
+    <AuthPanel linkExpired={linkExpired} />
+  );
 }
 
 /* ------------------------------------------------------------------ */

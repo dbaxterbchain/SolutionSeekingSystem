@@ -10,6 +10,10 @@ export const POST: APIRoute = async ({ request }) => {
   const user = await getUserFromRequest(request);
   if (!user) return json({ error: 'unauthorized' }, 401);
 
+  // Anonymous trial users can't subscribe (see /api/checkout), so they can
+  // never have a portal to open.
+  if (user.is_anonymous) return json({ error: 'account_required' }, 403);
+
   const { data: sub } = await supabaseAdmin
     .from('subscriptions')
     .select('stripe_customer_id')

@@ -176,10 +176,14 @@ enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 # Allow/disallow new user signups to your project.
 enable_signup = true
-# Allow/disallow anonymous sign-ins to your project.
-enable_anonymous_sign_ins = false
-# Allow/disallow testing manual linking of accounts
-enable_manual_linking = false
+# Anonymous sign-ins power the trial: a visitor can chat before creating an
+# account, and converting to a permanent account keeps the same user id, so
+# their conversation and free-message count carry over. Must ALSO be enabled in
+# the hosted project (Auth → Sign In / Providers).
+enable_anonymous_sign_ins = true
+# Required for linkIdentity(): attaches Google to the anonymous user instead of
+# signing them into a different account (which would orphan the conversation).
+enable_manual_linking = true
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
 # Mirrors the hosted project (and MIN_PASSWORD_LENGTH in src/lib/authErrors.ts).
 minimum_password_length = 8
@@ -203,7 +207,10 @@ email_sent = 2
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
-anonymous_users = 30
+# Tightened from 30: each anonymous identity can spend real money on LLM calls.
+# The message-level cap in /api/chat (see src/lib/server/rateLimit.ts) is what
+# actually bounds cost; this just limits how fast identities can be minted.
+anonymous_users = 10
 # Number of sessions that can be refreshed in a 5 minute interval per IP address.
 token_refresh = 150
 # Number of sign up and sign-in requests that can be made in a 5 minute interval per IP address (excludes anonymous users).

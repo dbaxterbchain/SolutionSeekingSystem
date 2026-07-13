@@ -44,6 +44,8 @@ export type AnalyticsEvent =
   | { event: 'mode_viewed'; mode_id: string }
   | { event: 'signup_started'; method: 'google' | 'email'; from_anon: boolean }
   | { event: 'signup_completed'; method: 'google' | 'email'; from_anon: boolean }
+  /** A visitor started chatting with no account (top of the funnel). */
+  | { event: 'anon_chat_started'; agent: AgentId; mode?: string }
   | { event: 'first_message_sent'; agent: AgentId; tier: Tier; mode?: string }
   | { event: 'message_sent'; agent: AgentId; tier: Tier; message_index: number }
   | { event: 'free_limit_reached'; tier: Exclude<Tier, 'subscriber'>; agent: AgentId }

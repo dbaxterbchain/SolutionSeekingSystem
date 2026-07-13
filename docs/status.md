@@ -100,9 +100,18 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       GA client/session ids are stitched through Stripe metadata so those server conversions
       are attributable. Abandoned checkouts now return to the page they left from and show a
       recovery banner. **Requires GA4 + GTM setup** — see [deployment.md](deployment.md#analytics--conversion-tracking-ga4--gtm).
-- [ ] **P2 — Anonymous trial**: let visitors send 3 messages with no account (Supabase anon
-      sign-in keeps the same user id on conversion, so the conversation and counter survive
-      signup for free), then convert. IP rate limit + kill switch for API cost.
+- [x] **P2 — Anonymous trial** (done 2026-07-13). A visitor can send **3 messages with no
+      account**; running out prompts registration (worth the remaining 7 of 10 free messages)
+      rather than a payment. Supabase anonymous sign-in keeps the **same user id** on
+      conversion, so the conversation and the message counter survive signup with no data
+      migration — verified against a live database, including that existing RLS already
+      covers anonymous users. One-click Google upgrade uses `linkIdentity` so the
+      conversation never leaves the screen. Cost control: 3-message allowance, 25 anonymous
+      messages/IP/day (`rate_limit` table + `bump_rate_limit` RPC, migration `0006`, IPs
+      stored only as salted hashes, fails open), and an `ANON_TRIAL_ENABLED` kill switch.
+      Anonymous users are blocked from checkout and the billing portal (no email = an
+      unrecoverable subscription). **Requires Supabase dashboard setup** — see
+      [deployment.md](deployment.md#anonymous-trial-chat-before-signing-up).
 - [ ] **P3 — Pricing**: single source of truth (price is currently hardcoded in ~8 files),
       annual plan, team enquiry tier, `/pricing` page.
 - [ ] **P4 — Email capture**: no list exists today, and the PDF guide is given away with zero

@@ -4,6 +4,7 @@ import { useSession } from '../../lib/useSession';
 import { friendlyAuthError, MIN_PASSWORD_LENGTH } from '../../lib/authErrors';
 import { PasswordInput, PasswordChecklist } from './PasswordInput';
 import { markSignupStarted } from '../../lib/analytics';
+import { FREE_MESSAGES_AFTER_SIGNUP } from '../../data/pricing';
 
 /**
  * Signed-out auth panel for /account: sign in, register (with confirmation
@@ -18,7 +19,19 @@ const inputClass =
   'w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100';
 
 export default function AuthPanel({ linkExpired = false }: { linkExpired?: boolean }) {
-  const [mode, setMode] = useState<Mode>('signin');
+  const { user } = useSession();
+  // An anonymous trial user reaching this panel is converting, not registering
+  // fresh: we upgrade their existing account so the conversation survives.
+  const isAnon = user?.is_anonymous === true;
+
+  // CTAs that mean "join" (the anonymous upgrade card, the paywall) link here
+  // with ?mode=register, so the panel doesn't open on Sign in and cost a click.
+  const [mode, setMode] = useState<Mode>(() =>
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('mode') === 'register'
+      ? 'register'
+      : 'signin'
+  );
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -66,7 +79,21 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
 
     setBusy(true);
     try {
-      if (mode === 'register') {
+      if (mode === 'register' && isAnon) {
+        // Convert the anonymous user in place. Same auth.users row, same id, so
+        // their conversation, history, and free-message count all carry over.
+        // Creating a new account here instead would silently orphan all of it.
+        markSignupStarted('email', true);
+        const { error } = await supabase.auth.updateUser(
+          { email, password },
+          { emailRedirectTo: redirectTo }
+        );
+        if (error) throw error;
+        // The address still has to be confirmed; until they click the link the
+        // user stays anonymous, which is why the copy promises their work is safe.
+        setMode('verify');
+        setCooldown(60);
+      } else if (mode === 'register') {
         markSignupStarted('email');
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -124,7 +151,27 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
     setError(null);
     // Google is both sign-in and sign-up; the flag is only consumed if a
     // session appears, and a returning user's sign-in is harmless to mark.
-    if (mode === 'register') markSignupStarted('google');
+    if (mode === 'register') markSignupStarted('google', isAnon);
+
+    // Converting an anonymous user: link the Google identity to the existing
+    // account rather than signing into a different one, or their conversation
+    // is orphaned.
+    if (isAnon) {
+      const { error } = await supabase.auth.linkIdentity({
+        provider: 'google',
+        options: { redirectTo },
+      });
+      if (!error) return;
+      if (error.message?.toLowerCase().includes('already')) {
+        setError(
+          'That Google account already has a profile here. Sign in with it to continue (this trial conversation will not carry over).'
+        );
+        return;
+      }
+      setError(error.message);
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },
@@ -151,6 +198,7 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
           We sent a confirmation link to <strong className="text-ink-800">{email}</strong>.
           Click it to activate your account, and you’ll land right back here, signed in.
+          {isAnon && ' Your conversation is saved and waiting.'}
         </p>
         {notice && <p className="mt-3 text-sm text-brand-700">{notice}</p>}
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
@@ -178,12 +226,14 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
   return (
     <div className="mx-auto max-w-md rounded-3xl border border-slate-100 bg-white p-6 shadow-card sm:p-8">
       <h1 className="font-heading text-2xl font-bold text-ink-800">
-        {mode === 'signin' ? 'Sign in' : 'Create your account'}
+        {mode === 'signin' ? 'Sign in' : isAnon ? 'Save your conversation' : 'Create your account'}
       </h1>
       <p className="mt-2 text-sm text-slate-600">
         {mode === 'signin'
           ? 'Sign in to save your work and talk to the AI assistants.'
-          : 'Register to save and revisit your work. It’s free.'}
+          : isAnon
+            ? `Create a free account and your conversation comes with you, plus ${FREE_MESSAGES_AFTER_SIGNUP} more free messages.`
+            : 'Register to save and revisit your work. It’s free.'}
       </p>
 
       <button type="button" onClick={google} className="btn-secondary mt-6 w-full">

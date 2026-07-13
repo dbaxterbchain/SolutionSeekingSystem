@@ -3,8 +3,14 @@ import Anthropic from '@anthropic-ai/sdk';
 import { getUserFromRequest, json } from '../../lib/server/auth';
 import { supabaseAdmin } from '../../lib/server/supabaseAdmin';
 import { serverEnv } from '../../lib/server/env';
-import { checkEntitlement, FREE_MESSAGE_LIMIT } from '../../lib/server/entitlement';
+import { checkEntitlement } from '../../lib/server/entitlement';
 import { buildSystem, AGENT_IDS, type AgentId } from '../../lib/server/agents';
+import {
+  clientIp,
+  isRateLimited,
+  ANON_CHAT_PER_IP,
+  ANON_CHAT_WINDOW_SECONDS,
+} from '../../lib/server/rateLimit';
 
 export const prerender = false;
 
@@ -26,9 +32,33 @@ interface ChatBody {
  * Streaming chat with the Guide or Mentor. Auth: Supabase JWT. Gate: active
  * subscription, or the 10 lifetime free messages. Streams plain text chunks.
  */
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, clientAddress }) => {
   const user = await getUserFromRequest(request);
   if (!user) return json({ error: 'unauthorized' }, 401);
+
+  const isAnon = user.is_anonymous === true;
+
+  // Kill switch: if the anonymous trial ever costs more than it earns, set
+  // ANON_TRIAL_ENABLED=false and redeploy. Anonymous callers then get the same
+  // "create an account" response as an exhausted trial, and the UI falls back
+  // to the sign-in wall.
+  if (isAnon && serverEnv('ANON_TRIAL_ENABLED') === 'false') {
+    return json({ error: 'account_required', freeUsed: 0 }, 403);
+  }
+
+  // The allowance below is per user id, and anonymous ids are free to mint, so
+  // the only thing actually bounding cost is a per-IP cap on messages.
+  if (isAnon) {
+    const limited = await isRateLimited(
+      'anon_chat',
+      clientIp(request, clientAddress),
+      ANON_CHAT_PER_IP,
+      ANON_CHAT_WINDOW_SECONDS
+    );
+    if (limited) {
+      return json({ error: 'rate_limited' }, 429);
+    }
+  }
 
   const body = (await request.json().catch(() => null)) as ChatBody | null;
   if (!body || !AGENT_IDS.includes(body.agent) || !Array.isArray(body.messages)) {
@@ -46,9 +76,14 @@ export const POST: APIRoute = async ({ request }) => {
     return json({ error: 'bad_request' }, 400);
   }
 
-  const entitlement = await checkEntitlement(user.id);
+  const entitlement = await checkEntitlement(user);
   if (entitlement.kind === 'blocked') {
-    return json({ error: 'subscription_required', freeUsed: entitlement.used }, 403);
+    // Two very different dead ends, and the client shows a different card for
+    // each: an anonymous visitor needs an account (and still has free messages
+    // waiting), while a registered user needs a subscription.
+    return entitlement.tier === 'anon'
+      ? json({ error: 'account_required', freeUsed: entitlement.used }, 403)
+      : json({ error: 'subscription_required', freeUsed: entitlement.used }, 403);
   }
 
   const stream = getAnthropic().messages.stream({
@@ -71,7 +106,9 @@ export const POST: APIRoute = async ({ request }) => {
     return upstreamError(err);
   }
 
-  // Count the free message only after the upstream call is accepted.
+  // Count the free message only after the upstream call is accepted. Anonymous
+  // and registered users share this counter but not the limit, so remaining is
+  // measured against whichever allowance applies to this user.
   let remaining: number | null = null;
   if (entitlement.kind === 'free') {
     const { data, error } = await supabaseAdmin.rpc('increment_free_messages', {
@@ -79,7 +116,7 @@ export const POST: APIRoute = async ({ request }) => {
     });
     if (error) console.error('free-message increment failed', error);
     const used = typeof data === 'number' ? data : entitlement.used + 1;
-    remaining = Math.max(0, FREE_MESSAGE_LIMIT - used);
+    remaining = Math.max(0, entitlement.limit - used);
   }
 
   const encoder = new TextEncoder();
@@ -114,6 +151,8 @@ export const POST: APIRoute = async ({ request }) => {
       'Content-Type': 'text/plain; charset=utf-8',
       'Cache-Control': 'no-store',
       ...(remaining !== null ? { 'X-Free-Messages-Remaining': String(remaining) } : {}),
+      // The client needs the tier to know which allowance the count refers to.
+      'X-Free-Tier': isAnon ? 'anon' : 'account',
     },
   });
 };
