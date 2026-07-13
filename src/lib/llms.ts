@@ -23,7 +23,7 @@ export function attributionFooter(site: URL | undefined): string {
 export function principleToMarkdown(entry: CollectionEntry<'principles'>): string {
   const p = entry.data;
   return [
-    `# ${p.title} — Wisdom Principle ${p.order} of 12`,
+    `# ${p.title}: Wisdom Principle ${p.order} of 12`,
     '',
     `> ${p.tagline}`,
     '',
@@ -70,7 +70,7 @@ export function protocolToMarkdown(entry: CollectionEntry<'protocol'>): string {
     '',
     '## Wisdom Principles this step requires',
     '',
-    ...s.requires.map((r) => `- **${r.name}** — ${r.why}`),
+    ...s.requires.map((r) => `- **${r.name}**: ${r.why}`),
     '',
     (entry.body ?? '').trim(),
   ].join('\n');
@@ -79,7 +79,7 @@ export function protocolToMarkdown(entry: CollectionEntry<'protocol'>): string {
 export function toolToMarkdown(entry: CollectionEntry<'tools'>): string {
   const t = entry.data;
   return [
-    `# ${t.title} — Leadership Tool ${t.order} of 4`,
+    `# ${t.title}: Leadership Tool ${t.order} of 4`,
     '',
     `> ${t.summary}`,
     '',
@@ -143,12 +143,12 @@ export function overviewToMarkdown(): string {
     '',
     '## The Four Pillars of Understanding',
     '',
-    'The philosophical foundation of the system — treated as practical tools, not abstract values:',
+    'The philosophical foundation of the system, treated as practical tools rather than abstract values:',
     '',
-    ...pillars.map((p) => `- **${p.name}** — ${p.description}`),
+    ...pillars.map((p) => `- **${p.name}**: ${p.description}`),
     '',
     '## Key terminology',
     '',
-    ...glossary.map((t) => `- **${t.term}** — ${t.definition}`),
+    ...glossary.map((t) => `- **${t.term}**: ${t.definition}`),
   ].join('\n');
 }

@@ -476,7 +476,7 @@ function SubscriptionSection() {
       )}
       {activationSlow && (
         <p className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-800">
-          Payment received — your subscription is taking a moment to activate. It will
+          Payment received. Your subscription is taking a moment to activate. It will
           appear here shortly; try refreshing in a minute.
         </p>
       )}
@@ -500,7 +500,7 @@ function SubscriptionSection() {
             </p>
           ) : (
             <p className="mt-1 text-sm text-slate-600">
-              Free plan — {Math.min(freeUsed, FREE_LIMIT)} of {FREE_LIMIT} free messages used.
+              Free plan: {Math.min(freeUsed, FREE_LIMIT)} of {FREE_LIMIT} free messages used.
             </p>
           )}
         </div>
@@ -522,7 +522,7 @@ function SubscriptionSection() {
                 disabled={busy}
                 className="btn-primary disabled:opacity-60"
               >
-                {busy ? 'Opening checkout…' : 'Subscribe — $5/month'}
+                {busy ? 'Opening checkout…' : 'Subscribe for $5/month'}
               </button>
             )
           ))}
@@ -533,7 +533,7 @@ function SubscriptionSection() {
           <span className="mr-1 text-sm text-slate-600">
             {entitled
               ? 'Unlimited conversations, anytime:'
-              : 'Try them free — your first 10 messages are on us:'}
+              : 'Try them free. Your first 10 messages are on us:'}
           </span>
         )}
         <a

@@ -12,7 +12,8 @@ import {
   type ChatMessage,
   type ChatSession,
 } from '../../lib/chatSessions';
-import { getContextMeta } from '../../lib/contexts';
+import { getContextMeta, MODE_CONTEXTS } from '../../lib/contexts';
+import { useDialog } from './Dialog';
 
 const FREE_LIMIT = 10;
 /** Client-side truncation guard: send at most the last N messages. */
@@ -61,6 +62,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { confirm, dialog } = useDialog();
   // On touch devices Enter should insert a newline; sending is the button's job.
   const [coarsePointer] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
@@ -224,7 +226,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
         const message = (err as Error).message;
         setError(
           message === 'Failed to fetch'
-            ? 'Connection problem — your message wasn’t sent. Check your internet and retry.'
+            ? 'Connection problem: your message wasn’t sent. Check your internet and retry.'
             : message || 'Something went wrong. Please retry.'
         );
       }
@@ -266,6 +268,39 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     const url = new URL(window.location.href);
     url.searchParams.delete('chat');
     url.searchParams.delete('context');
+    window.history.replaceState(null, '', url);
+  };
+
+  /** Modes this assistant offers, for the status-bar selector. */
+  const agentModes = MODE_CONTEXTS.filter((m) => m.agents.includes(agent));
+
+  /**
+   * Switch the conversation mode. Free while the conversation is still empty;
+   * once messages exist it starts a fresh conversation (the current one is
+   * already persisted to History), after confirming.
+   */
+  const switchMode = async (nextId: string) => {
+    const next = nextId || null;
+    if (streaming || next === contextId) return;
+    if (messages.length > 0) {
+      const label = next ? agentModes.find((m) => m.id === next)?.label : null;
+      const ok = await confirm({
+        title: label ? `Switch to ${label}?` : 'Turn off this mode?',
+        message:
+          'Modes apply from the start of a conversation, so this begins a fresh one. Your current conversation is saved in History.',
+        confirmLabel: 'Start new conversation',
+      });
+      if (!ok) return;
+      setMessages([]);
+      setChatId(null);
+      setError(null);
+      setShowHistory(false);
+    }
+    setContextId(next);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('chat');
+    if (next) url.searchParams.set('context', next);
+    else url.searchParams.delete('context');
     window.history.replaceState(null, '', url);
   };
 
@@ -324,7 +359,25 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     <div className="rounded-3xl border border-slate-100 bg-white shadow-card">
       {/* Status bar */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-3">
-        <p className="text-sm font-semibold text-ink-800">{agentName}</p>
+        <div className="flex items-center gap-2.5">
+          <p className="text-sm font-semibold text-ink-800">{agentName}</p>
+          {agentModes.length > 0 && (
+            <select
+              value={contextMeta?.kind === 'mode' ? contextMeta.id : ''}
+              onChange={(e) => void switchMode(e.target.value)}
+              disabled={streaming}
+              aria-label="Conversation mode"
+              className="max-w-[11rem] cursor-pointer rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:border-brand-300 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 disabled:cursor-default disabled:opacity-60"
+            >
+              <option value="">No mode</option>
+              {agentModes.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
         <div className="flex items-center gap-3">
           {gate.kind === 'free' && (
             <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
@@ -352,7 +405,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
             <p className="mt-2 text-sm text-slate-400">Loading…</p>
           ) : history.length === 0 ? (
             <p className="mt-2 text-sm text-slate-500">
-              Nothing here yet — your conversations save automatically as you chat.
+              Nothing here yet. Your conversations save automatically as you chat.
             </p>
           ) : (
             <ul className="mt-2 max-h-48 space-y-0.5 overflow-y-auto">
@@ -439,7 +492,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
             disabled={checkoutBusy}
             className="btn-primary mt-4 disabled:opacity-60"
           >
-            {checkoutBusy ? 'Opening checkout…' : 'Subscribe — $5/month'}
+            {checkoutBusy ? 'Opening checkout…' : 'Subscribe for $5/month'}
           </button>
         </div>
       ) : (
@@ -481,6 +534,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
           )}
         </form>
       )}
+      {dialog}
     </div>
   );
 }
@@ -497,7 +551,7 @@ function MessageBubble({
   if (message.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-brand-500 px-4 py-2.5 text-sm leading-relaxed text-white">
+        <div className="max-w-[min(85%,34rem)] whitespace-pre-wrap rounded-2xl rounded-br-md bg-brand-500 px-4 py-2.5 text-sm leading-relaxed text-white">
           {message.content}
         </div>
       </div>
@@ -507,7 +561,7 @@ function MessageBubble({
   const looksLikeDocument = /^##\s/m.test(message.content);
   return (
     <div className="flex justify-start">
-      <div className="max-w-[92%] rounded-2xl rounded-bl-md bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700">
+      <div className="max-w-[min(92%,48rem)] rounded-2xl rounded-bl-md bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700">
         {message.content === '' && streaming ? (
           <span className="text-slate-400">{agentName} is thinking…</span>
         ) : (

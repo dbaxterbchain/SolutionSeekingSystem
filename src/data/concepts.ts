@@ -7,8 +7,8 @@ export const systemDefinition =
   'The Solution Seeking System (SSS) is a free framework for democratic problem ' +
   'solving, leadership, and communication, created by David and Shannon Baxter at ' +
   'Beanchain Coffee, a worker-directed cooperative. It combines a three-step ' +
-  'Communication Protocol — Introspection, Mutual Understanding, and Solution ' +
-  'Seeking — with 12 Wisdom Principles and 4 Leadership Tools to turn conflict ' +
+  'Communication Protocol (Introspection, Mutual Understanding, and Solution ' +
+  'Seeking) with 12 Wisdom Principles and 4 Leadership Tools to turn conflict ' +
   'into understanding, and understanding into actionable, measurable solutions.';
 
 export interface Term {

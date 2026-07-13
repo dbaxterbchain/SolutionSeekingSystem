@@ -46,10 +46,10 @@ export const MODES: ModeLanding[] = [
     icon: '🧸',
     heroTitle: 'Prepare for a hard conversation with your child',
     heroIntro:
-      'The Guide walks you through the Communication Protocol adapted to parenting — your responsibility, their age, and solutions a family can actually keep.',
+      'The Guide walks you through the Communication Protocol adapted to parenting: your responsibility, their age, and solutions a family can actually keep.',
     metaDescription:
       'An AI guide for parents preparing a hard conversation with their child: understand your own reaction, see their side, and leave with a plan that fits your family.',
-    pickerBlurb: 'A conflict with your child — adapted to their age and your role.',
+    pickerBlurb: 'A conflict with your child, adapted to their age and your role.',
     exampleSituations: [
       'The same fight about screens, chores, or homework keeps repeating',
       'Your teenager has stopped talking to you and you don’t know why',
@@ -57,7 +57,7 @@ export const MODES: ModeLanding[] = [
       'You and your child see a rule completely differently',
     ],
     welcome:
-      'Hi — I’m the Solution Seeking Guide, in Parent mode. Tell me a bit about what’s going on with your child — how old they are and what’s been happening — and we’ll work through it step by step.',
+      'Hi, I’m the Solution Seeking Guide, in Parent mode. Tell me a bit about what’s going on with your child (how old they are and what’s been happening), and we’ll work through it step by step.',
     mentorCta:
       'Want to build better family communication habits, not just handle this one moment? The Mentor can help you design a repeatable practice.',
   },
@@ -67,10 +67,10 @@ export const MODES: ModeLanding[] = [
     icon: '🍎',
     heroTitle: 'Work through a hard situation with a student',
     heroIntro:
-      'The Guide adapts the Communication Protocol to the classroom — your duty of care, the student’s age, and the parents and administrators around you both.',
+      'The Guide adapts the Communication Protocol to the classroom: your duty of care, the student’s age, and the parents and administrators around you both.',
     metaDescription:
       'An AI guide for teachers navigating a hard situation with a student: sort out your own read, understand theirs, and leave with a plan that fits your classroom.',
-    pickerBlurb: 'A situation with a student — adapted to your duty of care.',
+    pickerBlurb: 'A situation with a student, adapted to your duty of care.',
     exampleSituations: [
       'A student’s behavior is derailing the class and warnings aren’t working',
       'A capable student has suddenly disengaged',
@@ -78,9 +78,9 @@ export const MODES: ModeLanding[] = [
       'You reacted in front of the class and want to repair it',
     ],
     welcome:
-      'Hi — I’m the Solution Seeking Guide, in Teacher mode. Tell me a bit about the situation — the student’s age and what’s been happening — and we’ll work through it together.',
+      'Hi, I’m the Solution Seeking Guide, in Teacher mode. Tell me a bit about the situation (the student’s age and what’s been happening), and we’ll work through it together.',
     mentorCta:
-      'Want to build classroom practices that prevent these situations — not just handle this one? The Mentor can help you design them.',
+      'Want to build classroom practices that prevent these situations, not just handle this one? The Mentor can help you design them.',
   },
   {
     id: 'partner',
@@ -88,10 +88,10 @@ export const MODES: ModeLanding[] = [
     icon: '💞',
     heroTitle: 'Work through a recurring conflict with your partner',
     heroIntro:
-      'The Guide adapts the Communication Protocol to a relationship between equals sharing a life — the fight that keeps coming back, and the need underneath it.',
+      'The Guide adapts the Communication Protocol to a relationship between equals sharing a life: the fight that keeps coming back, and the need underneath it.',
     metaDescription:
       'An AI guide for couples: understand what a recurring fight is really about, prepare a conversation your partner can hear, and leave with an arrangement you’ll both keep.',
-    pickerBlurb: 'A conflict with your partner — the fight that keeps coming back.',
+    pickerBlurb: 'A conflict with your partner: the fight that keeps coming back.',
     exampleSituations: [
       'You have the same argument on repeat and nothing changes after',
       'Something’s been building and you don’t know how to raise it',
@@ -99,7 +99,7 @@ export const MODES: ModeLanding[] = [
       'A decision you disagree about keeps getting postponed',
     ],
     welcome:
-      'Hi — I’m the Solution Seeking Guide, in Partner mode. Tell me a bit about what’s been happening between you two, and we’ll take it one step at a time.',
+      'Hi, I’m the Solution Seeking Guide, in Partner mode. Tell me a bit about what’s been happening between you two, and we’ll take it one step at a time.',
     relatedDemoIds: ['home-chores'],
   },
   {
@@ -108,10 +108,10 @@ export const MODES: ModeLanding[] = [
     icon: '🏡',
     heroTitle: 'Navigate a hard conversation in your family',
     heroIntro:
-      'Siblings, aging parents, in-laws — decades of history and no clean exit. The Guide adapts the Communication Protocol to family, where boundaries and old roles are the real terrain.',
+      'Siblings, aging parents, in-laws: decades of history and no clean exit. The Guide adapts the Communication Protocol to family, where boundaries and old roles are the real terrain.',
     metaDescription:
-      'An AI guide for adult family conflict — siblings, aging parents, in-laws: untangle the old patterns, prepare the conversation, and set boundaries that hold.',
-    pickerBlurb: 'Adult family conflict — siblings, parents, in-laws, old history.',
+      'An AI guide for adult family conflict (siblings, aging parents, in-laws): untangle the old patterns, prepare the conversation, and set boundaries that hold.',
+    pickerBlurb: 'Adult family conflict: siblings, parents, in-laws, old history.',
     exampleSituations: [
       'Caregiving for a parent is falling unevenly and resentment is building',
       'A holiday blowup is still hanging in the air',
@@ -119,7 +119,7 @@ export const MODES: ModeLanding[] = [
       'You need a boundary with a family member who won’t hear it',
     ],
     welcome:
-      'Hi — I’m the Solution Seeking Guide, in Family mode. Tell me a bit about who this is with and what’s been going on, and we’ll work through it together.',
+      'Hi, I’m the Solution Seeking Guide, in Family mode. Tell me a bit about who this is with and what’s been going on, and we’ll work through it together.',
   },
   {
     id: 'friend',
@@ -127,10 +127,10 @@ export const MODES: ModeLanding[] = [
     icon: '🤝',
     heroTitle: 'Repair things with a friend',
     heroIntro:
-      'No org chart, no shared house — just the friendship itself. The Guide adapts the Communication Protocol to a bond held up entirely by choice.',
+      'No org chart, no shared house. Just the friendship itself. The Guide adapts the Communication Protocol to a bond held up entirely by choice.',
     metaDescription:
       'An AI guide for friendship ruptures and drift: figure out what actually hurt, whether to say something, and how to repair without making it weird.',
-    pickerBlurb: 'A rupture or drift with a friend — repair without the weirdness.',
+    pickerBlurb: 'A rupture or drift with a friend: repair without the weirdness.',
     exampleSituations: [
       'A friend said something that stung and you keep replaying it',
       'You’re always the one who reaches out, and it’s wearing thin',
@@ -138,7 +138,7 @@ export const MODES: ModeLanding[] = [
       'You messed up and want to make it right',
     ],
     welcome:
-      'Hi — I’m the Solution Seeking Guide, in Friend mode. Tell me a bit about the friendship and what happened, and we’ll figure out what — if anything — to do about it.',
+      'Hi, I’m the Solution Seeking Guide, in Friend mode. Tell me a bit about the friendship and what happened, and we’ll figure out what, if anything, to do about it.',
   },
   {
     id: 'manager',
@@ -146,7 +146,7 @@ export const MODES: ModeLanding[] = [
     icon: '🧭',
     heroTitle: 'Handle a hard conversation with someone on your team',
     heroIntro:
-      'You hold the power in the room — which changes everything about how the conversation should go. The Guide adapts the Communication Protocol to leading people.',
+      'You hold the power in the room, which changes everything about how the conversation should go. The Guide adapts the Communication Protocol to leading people.',
     metaDescription:
       'An AI guide for managers preparing a hard conversation with a report: test your assumptions, make it safe for them to be honest, and leave with an agreement that sticks.',
     pickerBlurb: 'A situation with someone who reports to you.',
@@ -157,10 +157,10 @@ export const MODES: ModeLanding[] = [
       'You’re worried a good person is about to quit',
     ],
     welcome:
-      'Hi — I’m the Solution Seeking Guide, in Manager mode. Tell me a bit about the situation with your team member, and we’ll prepare a conversation that’s fair to everyone — including you.',
+      'Hi, I’m the Solution Seeking Guide, in Manager mode. Tell me a bit about the situation with your team member, and we’ll prepare a conversation that’s fair to everyone, including you.',
     relatedDemoIds: ['workplace-lateness', 'team-one-on-ones'],
     mentorCta:
-      'Want to build leadership practices — one-on-ones, feedback habits, team processes — instead of handling one situation? That’s the Mentor’s specialty.',
+      'Want to build leadership practices (one-on-ones, feedback habits, team processes) instead of handling one situation? That’s the Mentor’s specialty.',
   },
   {
     id: 'coworker',
@@ -168,10 +168,10 @@ export const MODES: ModeLanding[] = [
     icon: '🧑‍💼',
     heroTitle: 'Work things out with a co-worker',
     heroIntro:
-      'No authority in either direction — just influence, good faith, and a working relationship you need to keep functional. The Guide adapts the Communication Protocol to peers.',
+      'No authority in either direction: just influence, good faith, and a working relationship you need to keep functional. The Guide adapts the Communication Protocol to peers.',
     metaDescription:
       'An AI guide for co-worker friction: test the story you’re telling about them, prepare a low-drama conversation, and land on something you can both count on.',
-    pickerBlurb: 'Friction with a peer — influence without authority.',
+    pickerBlurb: 'Friction with a peer: influence without authority.',
     exampleSituations: [
       'A co-worker keeps taking credit or dropping handoffs',
       'Someone snapped at you and it’s been awkward since',
@@ -179,7 +179,7 @@ export const MODES: ModeLanding[] = [
       'You’re tempted to escalate to your manager but not sure you should',
     ],
     welcome:
-      'Hi — I’m the Solution Seeking Guide, in Co-worker mode. Tell me a bit about what’s been happening between you two, and we’ll work out a way through it.',
+      'Hi, I’m the Solution Seeking Guide, in Co-worker mode. Tell me a bit about what’s been happening between you two, and we’ll work out a way through it.',
     relatedDemoIds: ['coworker-snapped'],
   },
   {
@@ -191,7 +191,7 @@ export const MODES: ModeLanding[] = [
       'Volunteers can simply leave, so legitimacy and trust are everything. The Guide adapts the Communication Protocol to movements, co-ops, unions, congregations, and volunteer groups.',
     metaDescription:
       'An AI guide for organizers and movement leaders: untangle conflict inside a shared cause, design fair participatory decisions, and keep people from burning out or walking out.',
-    pickerBlurb: 'Conflict inside a shared cause — where people can just leave.',
+    pickerBlurb: 'Conflict inside a shared cause, where people can just leave.',
     exampleSituations: [
       'Two committed members are clashing and it’s splitting the group',
       'Meetings keep collapsing into fights about what’s fair',
@@ -199,9 +199,9 @@ export const MODES: ModeLanding[] = [
       'An ideological rift is hiding inside a logistics argument',
     ],
     welcome:
-      'Hi — I’m the Solution Seeking Guide, in Organizer mode. Tell me a bit about your group and what’s been happening, and we’ll work through it in a way that keeps people in the room.',
+      'Hi, I’m the Solution Seeking Guide, in Organizer mode. Tell me a bit about your group and what’s been happening, and we’ll work through it in a way that keeps people in the room.',
     relatedDemoIds: ['coop-scheduling'],
     mentorCta:
-      'Want to build durable conflict processes for your organization — fairness criteria, participatory decisions, review loops? The Mentor can help you design them.',
+      'Want to build durable conflict processes for your organization: fairness criteria, participatory decisions, review loops? The Mentor can help you design them.',
   },
 ];

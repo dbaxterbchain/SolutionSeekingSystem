@@ -121,13 +121,13 @@ export const POST: APIRoute = async ({ request }) => {
 function upstreamError(err: unknown): Response {
   if (err instanceof Anthropic.RateLimitError) {
     return json(
-      { error: 'busy', message: 'The assistant is busy right now — please try again in a moment.' },
+      { error: 'busy', message: 'The assistant is busy right now. Please try again in a moment.' },
       429
     );
   }
   if (err instanceof Anthropic.APIError && err.status === 529) {
     return json(
-      { error: 'overloaded', message: 'The assistant is temporarily overloaded — please retry shortly.' },
+      { error: 'overloaded', message: 'The assistant is temporarily overloaded. Please retry shortly.' },
       503
     );
   }

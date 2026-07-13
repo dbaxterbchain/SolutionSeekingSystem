@@ -109,7 +109,7 @@ export function glossaryTermSet(site: URL): Schema {
   return {
     '@context': CONTEXT,
     '@type': 'DefinedTermSet',
-    name: `${SITE_NAME} — Key Terminology`,
+    name: `${SITE_NAME}: Key Terminology`,
     url: new URL('/system', site).href,
     hasDefinedTerm: glossary.map((t) => ({
       '@type': 'DefinedTerm',
@@ -159,7 +159,7 @@ export function aboutPage(site: URL): Schema {
     publisher: { '@id': orgId(site) },
     hasPart: {
       '@type': 'DigitalDocument',
-      name: 'Solution Seeking System — Complete Guide',
+      name: 'Solution Seeking System: Complete Guide',
       url: new URL('/solution-seeking-complete-guide.pdf', site).href,
       encodingFormat: 'application/pdf',
       isAccessibleForFree: true,

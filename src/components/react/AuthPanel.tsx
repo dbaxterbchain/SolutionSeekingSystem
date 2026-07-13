@@ -23,7 +23,7 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(
-    linkExpired ? 'That link has expired or was already used — request a new one below.' : null
+    linkExpired ? 'That link has expired or was already used. Request a new one below.' : null
   );
   const [notice, setNotice] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
@@ -58,7 +58,7 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
         return;
       }
       if (password !== confirm) {
-        setError('Passwords don’t match — double-check both fields.');
+        setError('Passwords don’t match. Double-check both fields.');
         return;
       }
     }
@@ -145,7 +145,7 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
         <h1 className="mt-3 font-heading text-xl font-bold text-ink-800">Check your inbox</h1>
         <p className="mt-2 text-sm leading-relaxed text-slate-600">
           We sent a confirmation link to <strong className="text-ink-800">{email}</strong>.
-          Click it to activate your account — then you’ll land right back here, signed in.
+          Click it to activate your account, and you’ll land right back here, signed in.
         </p>
         {notice && <p className="mt-3 text-sm text-brand-700">{notice}</p>}
         {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
@@ -293,7 +293,7 @@ export function NewPasswordForm({
       return;
     }
     if (password !== confirm) {
-      setError('Passwords don’t match — double-check both fields.');
+      setError('Passwords don’t match. Double-check both fields.');
       return;
     }
     setBusy(true);
@@ -363,7 +363,7 @@ export function RecoveryPanel({ onDone }: { onDone: () => void }) {
       <h1 className="font-heading text-2xl font-bold text-ink-800">Set a new password</h1>
       <p className="mt-2 text-sm text-slate-600">
         You followed a reset link for{' '}
-        <strong className="text-ink-800">{user?.email ?? 'your account'}</strong> — choose a new
+        <strong className="text-ink-800">{user?.email ?? 'your account'}</strong>. Choose a new
         password to finish.
       </p>
       <div className="mt-6">

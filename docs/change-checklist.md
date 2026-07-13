@@ -11,6 +11,9 @@ stale docs, no orphaned pages, no broken prompt cache.
       `PUBLIC_SUPABASE_URL=https://placeholder.supabase.co`, `PUBLIC_SUPABASE_ANON_KEY=x`
       (prerendering imports the Supabase client at module load).
 - [ ] Click through the changed flow in `npm run dev` — not just the build.
+- [ ] **New user-facing copy contains no AI tells** — above all, no em dashes (`—`) and no
+      en dashes between words; see the "Voice & punctuation" section in
+      [content-guide.md](content-guide.md). Quick audit: search changed files for `—`.
 - [ ] **Update [status.md](status.md) in the same commit** if scope/status changed; update
       [roadmap.md](roadmap.md) / [architecture.md](architecture.md) /
       [content-guide.md](content-guide.md) if the plan, structure, or authoring format

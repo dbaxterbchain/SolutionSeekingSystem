@@ -106,7 +106,7 @@ export const CHAT_CONTEXTS: ChatContextMeta[] = [
     agents: ['guide'],
     label: 'Scenario: this may be more than a misunderstanding',
     description:
-      'The Guide will start with your safety and options — not by assuming a conversation is the answer.',
+      'The Guide will start with your safety and options, not by assuming a conversation is the answer.',
   },
   {
     id: 'parent',
@@ -114,7 +114,7 @@ export const CHAT_CONTEXTS: ChatContextMeta[] = [
     agents: ['guide', 'mentor'],
     label: 'Parent mode',
     description:
-      'Adapted to a parent–child dynamic: your responsibility, their age, and solutions that fit a family.',
+      'Adapted to a parent-child dynamic: your responsibility, their age, and solutions that fit a family.',
   },
   {
     id: 'teacher',
@@ -122,7 +122,7 @@ export const CHAT_CONTEXTS: ChatContextMeta[] = [
     agents: ['guide', 'mentor'],
     label: 'Teacher mode',
     description:
-      'Adapted to a teacher–student dynamic: your duty of care, their development, and the classroom around you.',
+      'Adapted to a teacher-student dynamic: your duty of care, their development, and the classroom around you.',
   },
   {
     id: 'partner',
@@ -146,7 +146,7 @@ export const CHAT_CONTEXTS: ChatContextMeta[] = [
     agents: ['guide'],
     label: 'Friend mode',
     description:
-      'Adapted to a friendship: no authority to lean on — just the relationship itself.',
+      'Adapted to a friendship: no authority to lean on, just the relationship itself.',
   },
   {
     id: 'manager',
@@ -154,7 +154,7 @@ export const CHAT_CONTEXTS: ChatContextMeta[] = [
     agents: ['guide', 'mentor'],
     label: 'Manager mode',
     description:
-      'Adapted to a manager–report dynamic: your power in the room, and agreements that stick.',
+      'Adapted to a manager-report dynamic: your power in the room, and agreements that stick.',
   },
   {
     id: 'coworker',

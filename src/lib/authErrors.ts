@@ -7,7 +7,7 @@ const MESSAGES: Record<string, string> = {
   invalid_credentials:
     'That email and password don’t match. Try again, or tap “Forgot password?”.',
   email_not_confirmed:
-    'Please confirm your email address first — check your inbox for the link.',
+    'Please confirm your email address first. Check your inbox for the link.',
   user_already_exists: 'That email is already registered. Sign in instead, or reset your password.',
   email_exists: 'That email is already registered. Sign in instead, or reset your password.',
   over_email_send_rate_limit: 'We’ve emailed that address very recently. Wait a minute, then try again.',

@@ -8,6 +8,30 @@ After editing content, run `npm run dev` to preview or `npm run check` to valida
 
 ---
 
+## Voice & punctuation — no AI tells
+
+Readers increasingly read certain patterns as "an AI wrote this," and react badly. These
+rules apply to ALL user-facing copy: pages, content collections, demo transcripts, mode
+landing copy, chip labels, error messages, llms.txt strings, and the assistants' own
+prompts (the personas instruct the live Guide/Mentor to follow the same punctuation
+rules, so demos and real output stay consistent).
+
+- **No em dashes (`—`).** This is the biggest tell. Rewrite instead: split into two
+  sentences, use a comma for a light aside, a colon before an explanation, or
+  parentheses (sparingly). Never substitute a spaced hyphen (` - `) or `--`.
+- **No en dashes (`–`) between words.** Use a plain hyphen: `parent-child dynamic`,
+  `15-20 minutes`.
+- Fine to keep: curly quotes/apostrophes, `·` middots in labels, `→` arrows in link text,
+  ellipses.
+- Watch for other tells while writing: "delve", "It's not just X, it's Y" constructions,
+  "Moreover/Furthermore", starting every list item the same way, and relentless
+  triplets. Prefer plain, specific sentences.
+
+Internal docs and code comments are developer-facing and exempt (though the habit is
+worth keeping everywhere).
+
+---
+
 ## Wisdom Principles — `src/content/principles/*.yaml`
 
 One YAML file per principle. The filename (kebab-case) becomes the URL slug

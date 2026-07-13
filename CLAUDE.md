@@ -25,6 +25,9 @@ affects scope or status. Docs index: [docs/README.md](docs/README.md).
   `subscriptions`/`ai_usage`.
 - Content is Zod-validated collections in `src/content/` — authoring formats are in
   [docs/content-guide.md](docs/content-guide.md).
+- **No em dashes (—) in user-facing copy** — pages, content, demo transcripts, prompts,
+  error messages. They read as an AI tell. Use a comma, period, colon, or parentheses,
+  or split the sentence. Full rules: "Voice & punctuation" in docs/content-guide.md.
 
 ## Commands
 

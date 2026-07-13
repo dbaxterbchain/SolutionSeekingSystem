@@ -61,7 +61,7 @@ export const GET: APIRoute = async ({ site }) => {
     '## AI assistants (sign in for 10 free messages; $5/month unlimited)',
     '',
     `- [Solution Seeking Guide](${abs('/practice/guide')}): AI chat that walks you through the Communication Protocol for a real conflict, step by step`,
-    `- [Solution Seeking Mentor](${abs('/practice/mentor')}): AI chat expert on the whole system — the framework, protocol, principles, and tools`,
+    `- [Solution Seeking Mentor](${abs('/practice/mentor')}): AI chat expert on the whole system, covering the framework, protocol, principles, and tools`,
     '',
     '## Conversation modes (the Guide adapted to a relationship)',
     '',

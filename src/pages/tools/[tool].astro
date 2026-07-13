@@ -19,7 +19,7 @@ const t = entry.data;
 const site = Astro.site ?? Astro.url;
 const schemas = [
   learningArticle(site, {
-    headline: `${t.title} — Leadership Tool ${t.order} of 4`,
+    headline: `${t.title}: Leadership Tool ${t.order} of 4`,
     description: t.summary,
     path: `/tools/${entry.id}`,
     teaches: t.title,

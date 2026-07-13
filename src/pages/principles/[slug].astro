@@ -24,7 +24,7 @@ const p = entry.data;
 const site = Astro.site ?? Astro.url;
 const schemas = [
   learningArticle(site, {
-    headline: `${p.title} — Wisdom Principle ${p.order} of 12`,
+    headline: `${p.title}: Wisdom Principle ${p.order} of 12`,
     description: p.tagline,
     path: `/principles/${entry.id}`,
     teaches: p.title,
