@@ -279,6 +279,15 @@ Netlify env changes only reach Functions after a **redeploy**.
 
 ### 3. GTM container setup (one time, in the GTM UI)
 
+> **Two different lists, do not mix them up.**
+> **Event names** (`cta_clicked`, `demo_viewed`, `checkout_success_viewed`, …) are what
+> *fire* the tag. They belong only in the trigger regex in step 3, and GTM supplies them
+> via `{{Event}}`. They are **not** variables. If you reference one as `{{event_name}}`
+> anywhere, GTM warns "Unknown variable … found in a tag" on publish.
+> **Parameters** (`agent`, `tier`, `cta_location`, `demo_id`, `value`, …) are the data
+> carried *with* an event. Only these get Data Layer Variables and rows in the Event
+> Parameters table.
+
 1. **Tag → Google Tag**, Measurement ID = your `G-...`, trigger **All Pages**.
 2. **Variables → New → Data Layer Variable**, one per event parameter. The "Data Layer
    Variable Name" must match the key we push exactly:
