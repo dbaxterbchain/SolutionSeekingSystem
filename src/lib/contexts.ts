@@ -182,3 +182,22 @@ export function getContextMeta(id: string | null | undefined, agent: AgentId): C
   if (!id) return null;
   return CHAT_CONTEXTS.find((c) => c.id === id && c.agents.includes(agent)) ?? null;
 }
+
+/**
+ * THE canonical home of a mode for a given assistant. Every way of choosing a
+ * mode (the picker buttons, the modes hub, the in-chat dropdown) must resolve
+ * through here, or they drift apart.
+ *
+ * They already had: the Guide's buttons navigate to the mode's landing page,
+ * while the dropdown used to only add `?context=`. That let you sit on the
+ * Co-worker page, with all of its copy, while the dropdown said "Parent mode"
+ * and the assistant was seeded as a parent. Same idea, two sources of truth.
+ *
+ * The Guide has a real page per mode. The Mentor does not (it has no
+ * mode-specific copy to contradict), so a query param is its honest home.
+ */
+export function modeUrl(agent: AgentId, modeId: string | null): string {
+  if (!modeId) return `/practice/${agent}`;
+  if (agent === 'mentor') return `/practice/mentor?context=${modeId}`;
+  return `/practice/modes/${modeId}`;
+}

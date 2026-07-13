@@ -13,7 +13,7 @@ import {
   type ChatMessage,
   type ChatSession,
 } from '../../lib/chatSessions';
-import { getContextMeta, MODE_CONTEXTS } from '../../lib/contexts';
+import { getContextMeta, modeUrl, MODE_CONTEXTS } from '../../lib/contexts';
 import { useDialog } from './Dialog';
 import { track, getGaIds, type Tier } from '../../lib/analytics';
 import UpgradeAnonCard from './UpgradeAnonCard';
@@ -428,34 +428,38 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
   const agentModes = MODE_CONTEXTS.filter((m) => m.agents.includes(agent));
 
   /**
-   * Switch the conversation mode. Free while the conversation is still empty;
-   * once messages exist it starts a fresh conversation (the current one is
-   * already persisted to History), after confirming.
+   * Switch the conversation mode by GOING TO THAT MODE'S PAGE, rather than
+   * quietly rewriting `?context=` on whatever page we happen to be on.
+   *
+   * The old behaviour let the page and the mode disagree: pick Parent from the
+   * dropdown while sitting on /practice/modes/coworker and you kept all of the
+   * Co-worker copy around a Parent-seeded assistant. Navigating means choosing a
+   * mode here lands you in exactly the same place as clicking its button, which
+   * is the only way the two stay honest. modeUrl() is the single definition.
    */
   const switchMode = async (nextId: string) => {
     const next = nextId || null;
-    if (streaming || next === contextId) return;
+    // A scenario context (from a demo CTA) is not a mode, so it counts as "no mode".
+    const active = getContextMeta(contextId, agent);
+    const current = active?.kind === 'mode' ? active.id : null;
+    if (streaming || next === current) return;
+
+    // Modes apply from the first message, so an in-flight conversation can't
+    // adopt one. Warn before we navigate away from it.
     if (messages.length > 0) {
       const label = next ? agentModes.find((m) => m.id === next)?.label : null;
       const ok = await confirm({
         title: label ? `Switch to ${label}?` : 'Turn off this mode?',
-        message:
-          'Modes apply from the start of a conversation, so this begins a fresh one. Your current conversation is saved in History.',
+        message: label
+          ? `Modes apply from the start of a conversation, so this opens ${label} and begins a fresh one. This conversation is saved, and you can reopen it from History.`
+          : 'This opens a plain conversation with no mode, and begins a fresh one. This conversation is saved, and you can reopen it from History.',
         confirmLabel: 'Start new conversation',
       });
+      // On cancel there is nothing to undo: the <select> is controlled by the
+      // active context, so React snaps it back to the current mode on re-render.
       if (!ok) return;
-      setMessages([]);
-      setChatId(null);
-      setError(null);
-      setShowHistory(false);
-      setFeedbackDone(false);
     }
-    setContextId(next);
-    const url = new URL(window.location.href);
-    url.searchParams.delete('chat');
-    if (next) url.searchParams.set('context', next);
-    else url.searchParams.delete('context');
-    window.history.replaceState(null, '', url);
+    window.location.href = modeUrl(agent, next);
   };
 
   const toggleHistory = () => {
