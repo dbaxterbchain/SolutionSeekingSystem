@@ -153,6 +153,11 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       ...(remaining !== null ? { 'X-Free-Messages-Remaining': String(remaining) } : {}),
       // The client needs the tier to know which allowance the count refers to.
       'X-Free-Tier': isAnon ? 'anon' : 'account',
+      // Lets the client correct itself on any send without a second round trip:
+      // a subscriber (personal or via their organization) gets no count above,
+      // and this says why rather than leaving the UI to guess.
+      'X-Entitlement': entitlement.kind,
+      ...(entitlement.kind === 'subscriber' ? { 'X-Entitlement-Via': entitlement.via } : {}),
     },
   });
 };

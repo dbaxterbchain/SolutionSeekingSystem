@@ -3,8 +3,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
 import PricingPlans from '../components/react/PricingPlans.tsx';
 import TeamEnquiryForm from '../components/react/TeamEnquiryForm.tsx';
+import Testimonials from '../components/Testimonials.astro';
 import { breadcrumbs, faqPage, subscriptionProduct } from '../lib/schema';
 import { PLANS, FREE_ANON_MESSAGES, FREE_ACCOUNT_MESSAGES } from '../data/pricing';
+import { getApprovedTestimonials } from '../lib/server/testimonials';
+
+// Proof belongs immediately after the price, which is where the hesitation is.
+const quotes = await getApprovedTestimonials();
 
 const freeForever = [
   'The whole system: the Communication Protocol, all 12 Wisdom Principles, and the 4 Leadership Tools',
@@ -105,6 +110,15 @@ const schemas = [
         <PricingPlans client:load />
       </div>
     </section>
+
+    <!-- Testimonials. Absent entirely until real people have written some. -->
+    {
+      quotes.length > 0 && (
+        <section class="mt-16">
+          <Testimonials quotes={quotes} heading="What people say after using them" />
+        </section>
+      )
+    }
 
     <!-- Teams -->
     <section class="mt-16 grid gap-8 rounded-3xl border border-slate-100 bg-white p-7 shadow-card lg:grid-cols-2 sm:p-8">

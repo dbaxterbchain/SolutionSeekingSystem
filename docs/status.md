@@ -183,6 +183,42 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       single mistaken policy would have let any browser grant itself a subscription. Verified
       after: the browser can still read its own usage and subscription and manage its own
       conversations, and can no longer write either entitlement table.
+- [x] **Admin area, testimonial display, and concierge organizations** (done 2026-07-13).
+      **`/admin`** (client-gated, `noindex`, sitemap-excluded, robots-disallowed, deliberately
+      unlinked) manages feedback and testimonials, organizations, the email list, and team
+      enquiries. Access is an `ADMIN_EMAILS` allowlist that **fails closed when unset**. The
+      page is public HTML carrying no data: auth is a Bearer token in localStorage, so no page
+      can be gated before it renders, and the whole boundary lives in `requireAdmin()` on every
+      `/api/admin/*` route. Admin reads never emit `email_subscribers.token` (a capability: it
+      unsubscribes an address) or any `ip_hash`.
+      **Testimonials** are read from the database at build time
+      ([`src/lib/server/testimonials.ts`](../src/lib/server/testimonials.ts)) and appear on the
+      home page and `/pricing`, or **not at all** when there are none. Approving does not
+      publish: a "Publish to site" button fires a Netlify build hook, so approving stays a
+      private editorial act while publishing is the deliberate one. The `demoExcerpt.ts` sibling
+      *throws* on bad data; this one must **never** throw, because a database blip must not take
+      the marketing site down. The "No invented praise" card was reworded so the page does not
+      contradict itself once real quotes sit above it.
+      **Concierge organizations** (migration `0012`): an operator creates an org, sets seats, and
+      adds member emails; a member gets unlimited access by signing in with a listed address
+      (`claim_org_seat`, SECURITY INVOKER with execute revoked from anon/authenticated). Billing
+      is by hand; the Stripe webhook now syncs an org's status by `stripe_customer_id`, without
+      which **a lapsed organization would keep access forever**. Self-serve seats stay unbuilt:
+      still zero validated demand. Runbook in [deployment.md](deployment.md#teams-how-to-onboard-an-organization).
+      **The bug this caught before it shipped:** `ChatView` decided the paywall from a browser
+      read of `subscriptions`. An org member has no such row, so once their 10 free messages were
+      gone the client would have **replaced the composer with a paywall**, locking them out of a
+      product their employer pays for, with no request ever reaching the server to say otherwise.
+      Entitlement is now asked of the server (`/api/entitlement`, the same `checkEntitlement()`
+      `/api/chat` enforces), so the client cannot hold an opinion that differs from the server's.
+      That also took the unfiltered `.maybeSingle()` reads of `subscriptions` from 4 call sites
+      to 1. Verified against a live database: a user at 10/10 messages goes from `blocked` to
+      `subscriber via org` the moment their email is added, seats are capped, one person holds
+      one seat, a canceled org drops everyone, an unconfirmed address can never claim a seat, and
+      the anonymous trial is untouched.
+      **Requires** `ADMIN_EMAILS` and `NETLIFY_BUILD_HOOK_URL` in Netlify, migration `0012`, and
+      `SUPABASE_SERVICE_ROLE_KEY` **scoped to Builds** (not only Functions), or the testimonials
+      section silently vanishes from a green deploy.
 - [ ] Then: SEO/community/AEO channels, and only after that a small (~$300-500) paid test
       aimed at email capture rather than direct subscriptions.
 

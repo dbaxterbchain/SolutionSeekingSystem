@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { useSession } from '../../lib/useSession';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { accountLink } from '../../lib/accountLink';
-import { ENTITLED_STATUSES } from '../../lib/subscription';
+import { fetchEntitlement, type ClientEntitlement } from '../../lib/entitlement';
 import {
   createChatSession,
   getChatSession,
@@ -85,8 +85,40 @@ type Gate =
   | { kind: 'subscriber' }
   | { kind: 'free'; remaining: number }
   | { kind: 'paywalled' }
+  /**
+   * The entitlement lookup failed. Live composer, no badge, no paywall.
+   *
+   * We must NEVER show a paywall because a request failed. The server is the
+   * gate and it still refuses anyone who is genuinely out of messages (the 403
+   * handler below flips them to `paywalled` then). Failing open here costs, at
+   * worst, one message from someone who had none left. Failing closed would lock
+   * out a paying customer on a flaky connection, which is far more expensive.
+   */
+  | { kind: 'open' }
   /** Supabase missing, or anonymous sign-in refused: fall back to the old wall. */
   | { kind: 'unavailable' };
+
+/**
+ * Server entitlement -> the gate this component renders.
+ *
+ * A null entitlement means the lookup failed, NOT that they are out of
+ * messages. That distinction is the whole point of the `open` gate.
+ */
+function toGate(entitlement: ClientEntitlement | null): Gate {
+  if (!entitlement) return { kind: 'open' };
+  switch (entitlement.kind) {
+    case 'subscriber':
+      return { kind: 'subscriber' };
+    case 'free':
+      return entitlement.tier === 'anon'
+        ? { kind: 'anon', remaining: entitlement.remaining }
+        : { kind: 'free', remaining: entitlement.remaining };
+    case 'blocked':
+      return entitlement.tier === 'anon'
+        ? { kind: 'anon-exhausted', rateLimited: false }
+        : { kind: 'paywalled' };
+  }
+}
 
 export default function ChatView({ agent, agentName, welcome, initialContext }: Props) {
   const { session, user, loading } = useSession();
@@ -127,8 +159,20 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
   }, [input]);
 
-  // Resolve the entitlement gate whenever auth state settles. Note the server is
-  // the authority on all of this; these queries only decide what UI to show.
+  /**
+   * Ask the SERVER what this user is allowed to do.
+   *
+   * This used to read `subscriptions` and `ai_usage` from the browser and work
+   * it out here, which was a second copy of the server's rules. It broke as soon
+   * as entitlement could come from anywhere but a personal Stripe row: a member
+   * of an organization has no `subscriptions` record, so the browser called them
+   * a free user and, once their 10 free messages were gone, swapped the composer
+   * for a paywall. Locked out of a product their employer pays for, with no
+   * request ever reaching the server to say otherwise.
+   *
+   * One authority now (/api/entitlement, the same function /api/chat enforces),
+   * so the client cannot hold a different opinion from the server.
+   */
   useEffect(() => {
     if (loading) return;
     if (!isSupabaseConfigured) {
@@ -136,45 +180,24 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
       return;
     }
     // No session: the composer stays live and the first Send creates an
-    // anonymous one. Nobody has to sign up to find out whether this works.
-    if (!user) {
+    // anonymous one. Nobody has to sign up to find out whether this works. No
+    // round trip here, so nothing is added to the "just start typing" latency.
+    if (!session || !user) {
       setGate({ kind: 'anon-idle' });
       // Load the captcha now, while they're reading and typing, so it isn't
       // ~1.5s of dead time between hitting Send and the reply starting.
       prewarmCaptcha();
       return;
     }
-    const isAnon = user.is_anonymous === true;
     let active = true;
-    (async () => {
-      // An anonymous user can never be a subscriber, so skip that query.
-      const [sub, usage] = await Promise.all([
-        isAnon
-          ? Promise.resolve({ data: null })
-          : supabase.from('subscriptions').select('status').maybeSingle(),
-        supabase.from('ai_usage').select('free_messages_used').maybeSingle(),
-      ]);
+    fetchEntitlement(session.access_token).then((entitlement) => {
       if (!active) return;
-      if (sub.data && ENTITLED_STATUSES.includes(sub.data.status)) {
-        setGate({ kind: 'subscriber' });
-        return;
-      }
-      // One counter, two limits: an anonymous user who spent 3 messages keeps
-      // that count when they register, and lands on 7 of 10 remaining.
-      const used = usage.data?.free_messages_used ?? 0;
-      const limit = isAnon ? ANON_LIMIT : FREE_LIMIT;
-      if (used < limit) {
-        setGate(
-          isAnon ? { kind: 'anon', remaining: limit - used } : { kind: 'free', remaining: limit - used }
-        );
-      } else {
-        setGate(isAnon ? { kind: 'anon-exhausted', rateLimited: false } : { kind: 'paywalled' });
-      }
-    })();
+      setGate(toGate(entitlement));
+    });
     return () => {
       active = false;
     };
-  }, [loading, user?.id, user?.is_anonymous]);
+  }, [loading, session?.access_token, user?.id]);
 
   // Resume a conversation from ?chat=<id>.
   useEffect(() => {

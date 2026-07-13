@@ -126,6 +126,27 @@ stale docs, no orphaned pages, no broken prompt cache.
       your hand approval. The `testimonials` check constraint enforces it; leave it enforcing.
 - [ ] Honest trust signals we *can* use: the Beanchain provenance, the free-forever core, the
       annotated demos. Use those.
+- [ ] **Approving a testimonial does not publish it.** Quotes are read from the database at
+      BUILD time, so a live site only changes on a rebuild. Approve in `/admin`, then press
+      **Publish to site**. The same is true in reverse: if somebody withdraws consent,
+      rejecting the row removes it from the *next* build, so reject **and** publish, then
+      check it is gone.
+- [ ] Testimonial display must survive an empty list (the section disappears) and a missing
+      name (no attribution line, and never an invented one like "Verified user").
+
+## Entitlement changes
+
+- [ ] **The server decides who is entitled, and the client asks it.** `checkEntitlement()`
+      ([`src/lib/server/entitlement.ts`](../src/lib/server/entitlement.ts)) is the only
+      authority; `/api/chat` enforces it and `/api/entitlement` reports it. Never re-derive
+      entitlement in the browser by reading a table: entitlement can come from a personal
+      subscription **or** from an organization paying for the user, and the org tables are
+      deliberately unreadable from a browser. A client-side guess locks org members out of a
+      product their employer pays for.
+- [ ] A failed entitlement lookup must **fail open in the UI** (live composer) and closed on
+      the server (the 403 still lands). Never render a paywall because a request failed.
+- [ ] New tables backing entitlement stay server-write-only, and the browser never gets a
+      policy or a grant on them (migrations `0010`/`0012`).
 
 ## New environment variable
 

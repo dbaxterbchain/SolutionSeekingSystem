@@ -20,8 +20,14 @@ export const ENTITLED_STATUSES = ['active', 'trialing', 'past_due'];
 /** Which allowance a user is spending. Anonymous users get a smaller one. */
 export type Tier = 'anon' | 'account';
 
+/**
+ * `via` is required rather than optional on purpose: making it so forces the
+ * compiler to visit every place a subscriber entitlement is constructed (all of
+ * them are in this file). Consumers that only ask `kind === 'subscriber'` carry
+ * on unchanged.
+ */
 export type Entitlement =
-  | { kind: 'subscriber' }
+  | { kind: 'subscriber'; via: 'stripe' | 'org'; orgName?: string }
   | { kind: 'free'; tier: Tier; used: number; remaining: number; limit: number }
   | { kind: 'blocked'; tier: Tier; used: number; limit: number };
 
@@ -52,7 +58,28 @@ export async function checkEntitlement(user: User): Promise<Entitlement> {
     // log loudly instead of silently treating everyone as a free user.
     if (subError) console.error('subscription lookup failed', subError);
     if (sub && ENTITLED_STATUSES.includes(sub.status)) {
-      return { kind: 'subscriber' };
+      return { kind: 'subscriber', via: 'stripe' };
+    }
+
+    // No subscription of their own: is somebody paying for them?
+    //
+    // Access is granted by EMAIL. An org's operator adds addresses; a person
+    // claims their seat by signing in with one. `email_confirmed_at` is what
+    // makes that safe: without it, anyone could sign up as ceo@bigco.com,
+    // never confirm, and help themselves to that company's seat.
+    const email = user.email_confirmed_at ? user.email : null;
+    if (email) {
+      const { data, error: orgError } = await supabaseAdmin.rpc('claim_org_seat', {
+        p_user_id: user.id,
+        p_email: email,
+      });
+      if (orgError) console.error('org seat lookup failed', orgError);
+      const seat = Array.isArray(data) ? data[0] : null;
+      // The status vocabulary lives here, not in SQL, so ENTITLED_STATUSES stays
+      // the single definition of what "entitled" means.
+      if (seat && ENTITLED_STATUSES.includes(seat.org_status)) {
+        return { kind: 'subscriber', via: 'org', orgName: seat.org_name };
+      }
     }
   }
 

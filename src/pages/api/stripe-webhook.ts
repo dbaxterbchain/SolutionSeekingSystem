@@ -75,7 +75,13 @@ export const POST: APIRoute = async ({ request }) => {
         const sub = event.data.object;
         const userId = sub.metadata?.user_id ?? (await lookupUserByCustomer(sub.customer));
         if (!userId) {
-          console.warn('could not resolve a user for subscription event', sub.id);
+          // Not an individual's subscription. It may be an organization's, which
+          // has no user_id anywhere. Without this branch a LAPSED ORGANIZATION
+          // KEEPS ACCESS FOREVER: the event would be shrugged off and the only
+          // thing standing between a cancelled customer and unlimited use would
+          // be a human remembering to flip a status by hand.
+          if (await syncOrgSubscription(sub)) break;
+          console.warn('could not resolve a user or an org for subscription event', sub.id);
           break;
         }
         await upsertSubscription(userId, sub);
@@ -103,6 +109,50 @@ async function lookupUserByCustomer(
     .eq('stripe_customer_id', customerId)
     .maybeSingle();
   return data?.user_id ?? null;
+}
+
+/**
+ * Keep an ORGANIZATION's status in step with Stripe. Returns true if this
+ * subscription belonged to one.
+ *
+ * Deliberately only ever UPDATES a row the operator already created and stamped
+ * with a `stripe_customer_id`. It never inserts, so a stray Stripe customer can
+ * never conjure entitlement for an organization that does not exist.
+ *
+ * If an org is billed by hand (an invoice rather than a Stripe subscription)
+ * there are no events at all, and the status the operator set in /admin stands.
+ * That is expected, and it is why the admin panel flags a renewal date coming up.
+ */
+async function syncOrgSubscription(sub: Stripe.Subscription): Promise<boolean> {
+  const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
+  const { data: org } = await supabaseAdmin
+    .from('organizations')
+    .select('id, name')
+    .eq('stripe_customer_id', customerId)
+    .maybeSingle();
+  if (!org) return false;
+
+  const item = sub.items.data[0];
+  const periodEnd =
+    item?.current_period_end ??
+    (sub as unknown as { current_period_end?: number }).current_period_end ??
+    null;
+
+  const { error } = await supabaseAdmin
+    .from('organizations')
+    .update({
+      status: sub.status,
+      stripe_subscription_id: sub.id,
+      current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+    })
+    .eq('id', org.id);
+
+  if (error) {
+    console.error('organization sync failed', error);
+    throw new Error(`organization sync failed: ${error.message}`);
+  }
+  console.log(`organization ${org.name} (${org.id}) is now ${sub.status}`);
+  return true;
 }
 
 async function upsertSubscription(userId: string, sub: Stripe.Subscription) {

@@ -18,6 +18,7 @@ import {
 } from '../../lib/chatSessions';
 import { safeNext } from '../../lib/accountLink';
 import { ENTITLED_STATUSES } from '../../lib/subscription';
+import { useEntitlement } from '../../lib/entitlement';
 import { track, getGaIds, consumeSignupCompleted } from '../../lib/analytics';
 import { FREE_ACCOUNT_MESSAGES, priceCopy } from '../../data/pricing';
 import { usePasswordRecovery } from '../../lib/usePasswordRecovery';
@@ -393,6 +394,11 @@ interface SubRow {
 
 function SubscriptionSection() {
   const { session } = useSession();
+  // The subscriptions row stays a direct read: the billing panel genuinely needs
+  // cancel_at_period_end and current_period_end, which only a personal Stripe
+  // subscription has. Entitlement itself comes from the server, because it can
+  // also come from an organization.
+  const { entitlement } = useEntitlement();
   const [sub, setSub] = useState<SubRow | null>(null);
   const [freeUsed, setFreeUsed] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -496,6 +502,13 @@ function SubscriptionSection() {
   };
 
   const entitled = sub ? ENTITLED_STATUSES.includes(sub.status) : false;
+
+  // Someone whose organization pays for them has NO subscriptions row, so the
+  // read above tells us nothing about them. They get access, but no billing
+  // controls: they are not the customer, their organization is.
+  const viaOrg = !entitled && entitlement?.kind === 'subscriber' && entitlement.via === 'org';
+  const orgName = entitlement?.kind === 'subscriber' ? entitlement.orgName : undefined;
+
   const formatDate = (iso: string | null) =>
     iso
       ? new Date(iso).toLocaleDateString(undefined, {
@@ -537,13 +550,24 @@ function SubscriptionSection() {
                   ? `Renews ${formatDate(sub.current_period_end)}`
                   : 'Unlimited conversations with the Guide and Mentor.'}
             </p>
+          ) : viaOrg ? (
+            <p className="mt-1 text-sm text-slate-600">
+              <span className="mr-2 inline-block rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+                Team access
+              </span>
+              {orgName
+                ? `${orgName} covers your access, so there is nothing to pay and nothing to manage here.`
+                : 'Your organization covers your access, so there is nothing to pay and nothing to manage here.'}
+            </p>
           ) : (
             <p className="mt-1 text-sm text-slate-600">
               Free plan: {Math.min(freeUsed, FREE_LIMIT)} of {FREE_LIMIT} free messages used.
             </p>
           )}
         </div>
+        {/* No billing controls for an org member: they are not the customer. */}
         {!loading &&
+          !viaOrg &&
           (entitled ? (
             <button
               type="button"

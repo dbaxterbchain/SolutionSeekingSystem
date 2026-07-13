@@ -1,37 +1,29 @@
 import { useState } from 'react';
 import { useSession } from '../../lib/useSession';
-import { supabase } from '../../lib/supabase';
 import { accountLink } from '../../lib/accountLink';
-import { ENTITLED_STATUSES } from '../../lib/subscription';
+import { useEntitlement } from '../../lib/entitlement';
 import { track, getGaIds } from '../../lib/analytics';
 import { SELF_SERVE_PLANS, PLANS, type PlanId } from '../../data/pricing';
-import { useEffect } from 'react';
 
 /**
  * The buy buttons on /pricing. An island (rather than static links) because
  * checkout needs the session, and because `checkout_started` has to fire with
  * the plan the user actually chose.
+ *
+ * Entitlement comes from the server, not from a `subscriptions` read here. That
+ * matters most for the person whose employer already pays: they have no
+ * subscription row of their own, and selling them a second, personal one would
+ * be a refund request with extra steps.
  */
 export default function PricingPlans() {
-  const { session, user, loading } = useSession();
+  const { session, user } = useSession();
+  const { entitlement } = useEntitlement();
   const [busy, setBusy] = useState<PlanId | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [subscribed, setSubscribed] = useState(false);
+  const [justSubscribed, setJustSubscribed] = useState(false);
 
-  useEffect(() => {
-    if (loading || !user || user.is_anonymous) return;
-    let active = true;
-    supabase
-      .from('subscriptions')
-      .select('status')
-      .maybeSingle()
-      .then(({ data }) => {
-        if (active && data && ENTITLED_STATUSES.includes(data.status)) setSubscribed(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, [loading, user?.id]);
+  const viaOrg = entitlement?.kind === 'subscriber' && entitlement.via === 'org';
+  const subscribed = justSubscribed || entitlement?.kind === 'subscriber';
 
   const choose = async (plan: PlanId) => {
     const chosen = PLANS[plan];
@@ -67,7 +59,7 @@ export default function PricingPlans() {
         return;
       }
       if (res.status === 409) {
-        setSubscribed(true);
+        setJustSubscribed(true);
         return;
       }
       throw new Error('Could not start checkout. Please try again.');
@@ -112,7 +104,13 @@ export default function PricingPlans() {
               ))}
             </ul>
 
-            {subscribed ? (
+            {/* No buy button for someone whose organization already pays: a second,
+                personal subscription would be a refund request with extra steps. */}
+            {viaOrg ? (
+              <p className="mt-6 rounded-xl bg-emerald-50 px-4 py-3 text-center text-sm font-semibold text-emerald-700">
+                Already covered by your organization
+              </p>
+            ) : subscribed ? (
               <a href="/account" className="btn-secondary mt-6 text-center">
                 Manage your subscription
               </a>
@@ -130,10 +128,16 @@ export default function PricingPlans() {
         ))}
       </div>
 
-      {subscribed && (
+      {viaOrg ? (
         <p className="mt-4 text-sm text-emerald-700">
-          You're already subscribed. Thank you.
+          {entitlement?.kind === 'subscriber' && entitlement.orgName
+            ? `${entitlement.orgName} already pays for your access, so there is nothing for you to buy.`
+            : 'Your organization already pays for your access, so there is nothing for you to buy.'}
         </p>
+      ) : (
+        subscribed && (
+          <p className="mt-4 text-sm text-emerald-700">You're already subscribed. Thank you.</p>
+        )
       )}
       {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
     </div>

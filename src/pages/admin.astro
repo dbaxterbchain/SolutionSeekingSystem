@@ -1,0 +1,33 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import AdminView from '../components/react/AdminView.tsx';
+
+/**
+ * The operator's console.
+ *
+ * Deliberately an orphan: no nav link, no footer link, noindex, excluded from
+ * the sitemap, disallowed in robots.txt. Do not "fix" that by linking it.
+ *
+ * This page carries NO data. Auth in this codebase is a Bearer token held in
+ * localStorage, so no page can be gated before it renders; the whole security
+ * boundary lives in the /api/admin/* routes, each of which calls requireAdmin()
+ * before it does anything at all. A stranger who guesses this URL gets an empty
+ * shell and a 403.
+ */
+---
+
+<BaseLayout
+  title="Admin"
+  description="Internal."
+  noindex
+>
+  <div class="container-page py-12">
+    <h1 class="font-heading text-2xl font-bold text-ink-800">Admin</h1>
+    <p class="mt-1 text-sm text-slate-500">
+      Feedback, organizations, the email list, and team enquiries.
+    </p>
+    <div class="mt-8">
+      <AdminView client:load />
+    </div>
+  </div>
+</BaseLayout>

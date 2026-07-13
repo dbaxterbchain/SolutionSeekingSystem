@@ -338,6 +338,76 @@ in a table. A bare rating does not email: it is a number, not news.
 approved testimonials yet, because there are none. Build it when there is something real to
 put in it.
 
+## The admin area (/admin)
+
+Feedback and testimonials, organizations, the email list, and team enquiries, in one place.
+
+**Access** is an env allowlist: `ADMIN_EMAILS` (comma-separated, server-only, never
+`PUBLIC_`). **Unset means nobody**, deliberately: the admin area fails closed. The address
+must belong to a real, non-anonymous account with a **confirmed** email.
+
+**Where the security actually lives.** The `/admin` page is public HTML containing no data.
+Auth in this codebase is a Bearer token in localStorage, so no page can be gated before it
+renders, and pretending otherwise would put the boundary in the wrong place. Every
+`/api/admin/*` route calls `requireAdmin()` before it does anything. A stranger who finds
+the URL gets an empty shell and a 403.
+
+The page is `noindex`, excluded from the sitemap, and disallowed in `robots.txt`. It is a
+deliberate orphan: **do not link it from the nav or the footer.**
+
+### Publishing a testimonial
+
+Approved testimonials are read from the database **when the site builds**, so there are two
+steps, and the second one is not optional:
+
+1. **Approve** it in `/admin`. Nothing on the live site changes yet.
+2. **Press "Publish to site"**, which fires a Netlify build hook (`NETLIFY_BUILD_HOOK_URL`).
+   About two minutes later the quote is live on the home page and `/pricing`.
+
+That split is a feature. Approving is a private, reversible editorial act; publishing is the
+moment a named person's words go up in public. It also keeps the home page a static file
+with no runtime database dependency, which is why a Supabase outage cannot take the
+marketing site down.
+
+**The corollary, which matters more than the feature: un-approving also needs a Publish.**
+If someone withdraws consent, reject the row, press Publish, and check it is gone. Practise
+that drill once before you need it.
+
+A row can only be approved if the person ticked the consent box and actually wrote
+something. The database enforces it, so the Approve button does not appear otherwise.
+
+## Teams: how to onboard an organization
+
+Self-serve seats are **not** built, on purpose (see `PLANS.team.selfServe = false`). The
+enquiry form on `/pricing` is the front door, and fulfilment is a ten-minute job in `/admin`.
+
+1. **The enquiry arrives by email** (from `/api/team-enquiry`). It is also in `/admin` under
+   Enquiries.
+2. **Reply and agree seats and price.** The listed rate is "From $4/person/month, 5 seat
+   minimum".
+3. **Bill them.** Either a Stripe subscription you create by hand in the dashboard, or an
+   invoice outside Stripe. If you use Stripe, **paste the `stripe_customer_id` onto the
+   organization row**: the webhook uses it to keep the status in step, so a lapsed
+   organization actually loses access instead of keeping it forever. If you bill by invoice
+   there are no webhooks, and the status you set by hand is the truth.
+4. **`/admin` → Organizations → New organization.** Name and seat count.
+5. **Add their members' email addresses.**
+6. **Tell them which address to use.** This is the step people forget. Access is granted by
+   signing in with a listed address; somebody who signs up with a different one gets nothing.
+   They do not need an invite link, and there is no code to enter: they just sign in.
+7. Members get unlimited access immediately. The seat is claimed on their first message, and
+   the admin list then shows them as "signed in".
+
+**Renewals.** If billed through Stripe, the webhook updates the status automatically. If
+billed by invoice, update `current_period_end` by hand; the admin panel highlights a renewal
+inside 14 days. Setting an organization to `canceled` drops every member back to the free
+tier on their next message.
+
+**Rules the database enforces**, so you cannot get them wrong quietly:
+- A member cannot be added beyond the seat count. Raise the seats first.
+- One person holds one seat: the same address cannot be on two organizations.
+- An unconfirmed email address can never claim a seat.
+
 ## Search Console & Bing verification
 
 **Still outstanding, and it is the cheapest win left.** This has been open since before the

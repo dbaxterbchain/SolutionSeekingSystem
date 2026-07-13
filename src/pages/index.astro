@@ -4,9 +4,11 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import ProtocolDiagram from '../components/ProtocolDiagram.astro';
 import PrincipleCard from '../components/PrincipleCard.astro';
 import DemoExcerpt from '../components/DemoExcerpt.astro';
+import Testimonials from '../components/Testimonials.astro';
 import { pillars, systemDefinition } from '../data/concepts';
 import { organization, webSite } from '../lib/schema';
 import { getFeaturedDemo } from '../lib/demoExcerpt';
+import { getApprovedTestimonials } from '../lib/server/testimonials';
 
 const site = Astro.site ?? Astro.url;
 
@@ -16,6 +18,11 @@ const principles = (await getCollection('principles')).sort(
 
 // Throws at build time if the excerpt is not verbatim in the transcript.
 const featuredDemo = getFeaturedDemo(await getCollection('demos'));
+
+// Approved, consented quotes. Empty until real people write some, and the
+// section below simply does not render then. Never throws: a database blip must
+// not take the site down.
+const quotes = await getApprovedTestimonials();
 
 /**
  * The honest trust signals. We have no testimonials and no user count, so we
@@ -35,7 +42,11 @@ const provenance = [
   {
     icon: '🎭',
     title: 'No invented praise',
-    body: 'Every example conversation on this site is labelled as a fictional demonstration, because it is. We would rather show you the method than quote a testimonial we made up.',
+    // Careful with this one. It used to say we would rather show the method than
+    // quote a testimonial we made up, which read as "we have no testimonials" and
+    // would sit directly beneath real ones. The promise is about fabrication, not
+    // absence, so it stays true whether there are zero quotes on this page or six.
+    body: 'Every example conversation on this site is labelled as a fictional demonstration, because it is. The only quotes we publish are real ones, in the words of the person who wrote them, used with their permission.',
   },
 ];
 
@@ -140,6 +151,17 @@ const parts = [
       <DemoExcerpt demo={featuredDemo} />
     </div>
   </section>
+
+  <!-- Testimonials. Absent entirely until real people have written some. -->
+  {
+    quotes.length > 0 && (
+      <section class="border-b border-slate-100 bg-white">
+        <div class="container-page py-20">
+          <Testimonials quotes={quotes} />
+        </div>
+      </section>
+    )
+  }
 
   <!-- Provenance -->
   <section class="border-b border-slate-100 bg-white">

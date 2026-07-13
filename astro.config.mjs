@@ -18,8 +18,9 @@ export default defineConfig({
     react(),
     mdx(),
     sitemap({
-      // Auth-gated and error pages carry no search value.
-      filter: (page) => !page.includes('/account') && !page.includes('/404'),
+      // Auth-gated, internal, and error pages carry no search value.
+      filter: (page) =>
+        !page.includes('/account') && !page.includes('/admin') && !page.includes('/404'),
     }),
   ],
 });
