@@ -126,8 +126,23 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       and `STRIPE_PRICE_ID_ANNUAL` in Netlify**, plus migration `0007`.
       ⚠ Team enquiries currently land in the `team_enquiries` table with **no notification
       email** — read them from the table until P4 adds the alert.
-- [ ] **P4 — Email capture**: no list exists today, and the PDF guide is given away with zero
-      capture. Resend + a `/guide` landing page.
+- [x] **P4 — Email capture** (done 2026-07-13). There was no list at all, and the complete-guide
+      PDF was handed out with **zero** capture, so every downloader was lost. Now `/guide` is a
+      real lead-magnet landing page, and **double opt-in is done as one click**: the "Download
+      the guide" button in the delivery email *is* the confirmation link
+      (`/api/confirm?token=…` → marks confirmed → 302 to the PDF). Only a real address gets the
+      guide, with no step that feels like a step. **Soft gate:** the raw PDF URL still works and
+      stays in llms.txt (it's indexed, and AI agents aren't leads).
+      `email_subscribers` (migration `0008`) is server-write-only; verified the browser gets
+      `permission denied` and cannot forge a row. `source` records **first touch** and isn't
+      overwritten on re-submit, so you can tell which capture point converts. One-click
+      unsubscribe accepts GET and POST. Team enquiries now **email you** (closing the P4 gap
+      from P3). Sends go through Resend ([`src/lib/server/email.ts`](../src/lib/server/email.ts))
+      with idempotency keys so a retry can't email twice.
+      **Requires** `RESEND_API_KEY`, `EMAIL_FROM`, `TEAM_ENQUIRY_TO` in Netlify, a verified
+      domain in Resend, and migration `0008`.
+      ⚠ No drip sequence, deliberately: ship the one email, read the click-through, and let
+      that decide what email two should be.
 - [ ] **P5 — Polish**: social proof (there is none), a real testimonial collector, Search
       Console + Bing verification.
 - [ ] Then: SEO/community/AEO channels, and only after that a small (~$300-500) paid test

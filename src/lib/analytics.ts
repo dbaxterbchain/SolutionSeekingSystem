@@ -40,6 +40,9 @@ export type Tier = 'anon' | 'free' | 'subscriber';
 
 export type PlanId = 'monthly' | 'annual' | 'team';
 
+/** Where an email address was captured. */
+export type EmailSource = 'pdf_guide' | 'footer' | 'pricing';
+
 export type AnalyticsEvent =
   | { event: 'cta_clicked'; cta_location: CtaLocation; cta_label: string; destination?: string }
   | { event: 'demo_viewed'; demo_id: string; agent: AgentId }
@@ -55,7 +58,9 @@ export type AnalyticsEvent =
   | { event: 'checkout_abandoned' }
   | { event: 'checkout_success_viewed' }
   /** Demand signal for the team tier, which is deliberately not self-serve yet. */
-  | { event: 'team_enquiry_submitted' };
+  | { event: 'team_enquiry_submitted' }
+  /** An address joined the list (the delivery email is on its way). */
+  | { event: 'email_captured'; source: EmailSource };
 
 declare global {
   interface Window {

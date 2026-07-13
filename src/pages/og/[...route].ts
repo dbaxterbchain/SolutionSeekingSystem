@@ -58,6 +58,11 @@ const pages: Record<string, OgPage> = {
     title: 'Solution Builder',
     description: 'Draft solutions that are actionable, testable, effective, and time-bound.',
   },
+  guide: {
+    title: 'The complete guide, free',
+    description:
+      'The whole system in one PDF: the Communication Protocol, the 12 Wisdom Principles, and the four Leadership Tools.',
+  },
   pricing: {
     title: 'Pricing',
     description:

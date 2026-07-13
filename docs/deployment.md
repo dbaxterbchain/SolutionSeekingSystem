@@ -245,6 +245,57 @@ then a $5/month subscription (status `active`/`trialing`/`past_due` in `subscrip
 is required. The Stripe webhook is the only writer of subscription state. A portal
 cancel sets `cancel_at_period_end` while access continues until the period ends.
 
+## Email (Resend)
+
+Used for two things: the **guide delivery email** (which doubles as the double opt-in
+confirmation) and **team enquiry alerts**. [`src/lib/server/email.ts`](../src/lib/server/email.ts)
+holds the client and the templates.
+
+### Setup
+
+1. **Resend → Domains** → add `solutionseeking.com`, then add the SPF, DKIM, and DMARC
+   records at your registrar. **Start this first: DNS can take hours, and every send 403s
+   until the domain is verified.** The domain in `EMAIL_FROM` must match a verified domain
+   exactly.
+2. **Netlify env**: `RESEND_API_KEY` (secret), `EMAIL_FROM`
+   (e.g. `Solution Seeking System <hello@solutionseeking.com>`), and **`TEAM_ENQUIRY_TO`**
+   (a real inbox you read; falls back to `EMAIL_FROM` if unset).
+3. Apply migration `0008_email_subscribers.sql`.
+
+### How the list works
+
+- `/guide` is the lead-magnet landing page. The PDF used to be handed out with **zero**
+  email capture, so every downloader was lost.
+- **Double opt-in, but the confirmation click IS the download click**: submitting the form
+  emails a "Download the guide" button pointing at `/api/confirm?token=…`, which marks the
+  address confirmed and 302s to the PDF. Only a real address gets the guide, and there is
+  no second step that feels like one.
+- **Soft gate:** the raw PDF URL keeps working, and is still listed in `llms.txt`. It is
+  indexed, AI agents are not leads, and 404ing it would be an own goal. Almost nobody hunts
+  for the direct link.
+- `email_subscribers` is **server-write-only** (RLS on, no policies, service role only).
+  Verified: the browser gets `permission denied` on read and cannot forge a row.
+- The `source` column records **first touch** and is deliberately not overwritten when
+  someone re-submits from a different form, so you can tell which capture point works.
+- One-click unsubscribe is at `/api/unsubscribe?token=…` and accepts POST as well as GET,
+  because some clients (and Gmail's List-Unsubscribe) POST.
+
+Useful queries:
+
+```sql
+-- The list.
+select created_at, email, source, status from public.email_subscribers
+where status = 'confirmed' order by created_at desc;
+
+-- Which capture point actually converts.
+select source, count(*) filter (where status = 'confirmed') as confirmed, count(*) as total
+from public.email_subscribers group by source;
+```
+
+**Testing:** send to `delivered@resend.dev` (simulates delivery), `bounced@resend.dev`, or
+`complained@resend.dev`. **Never test with a fake address at a real provider** like
+`test@gmail.com` — it bounces and damages sender reputation.
+
 ## Pricing & plans
 
 **One source of truth: [`src/data/pricing.ts`](../src/data/pricing.ts).** Prices, free

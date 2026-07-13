@@ -1,0 +1,127 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHero from '../components/PageHero.astro';
+import SubscribeForm from '../components/react/SubscribeForm.tsx';
+import { breadcrumbs } from '../lib/schema';
+import { FREE_ANON_MESSAGES } from '../data/pricing';
+
+const contents = [
+  {
+    title: 'The Communication Protocol',
+    body: 'Three steps, in order: understand yourself, understand each other, then seek a solution together. This is the spine of everything else.',
+  },
+  {
+    title: 'The 12 Wisdom Principles',
+    body: 'The values that make the protocol actually work, each one documented with best practices, goals, anti-goals, and the ways people get it wrong.',
+  },
+  {
+    title: 'The 4 Leadership Tools',
+    body: 'One-on-ones, feedback, targeted conversations, and solution seeking sessions: how to apply the protocol as someone responsible for a team.',
+  },
+  {
+    title: 'How to build your own tools',
+    body: 'The system is meant to be adapted. The guide shows you how to design practices that fit your own organization.',
+  },
+];
+
+const forYou = [
+  'You are a first-time manager and the hard conversations are the part nobody trained you for',
+  'Your team keeps having the same argument, and every "resolution" quietly evaporates',
+  'You run a co-op, a nonprofit, or a small company, and you want decisions people actually accept',
+  'You just want to stop dreading one specific conversation',
+];
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'The complete guide', path: '/guide' },
+  ]),
+];
+---
+
+<BaseLayout
+  title="The complete guide (free PDF)"
+  description="The whole Solution Seeking System in one free PDF: the three-step Communication Protocol, the 12 Wisdom Principles, and the four Leadership Tools. Written for people responsible for a team."
+  schemas={schemas}
+>
+  <PageHero
+    eyebrow="Free guide"
+    title="The whole system, in one document"
+    intro="The Communication Protocol, all 12 Wisdom Principles, and the four Leadership Tools. Written by the founders of a worker-directed company to run their own company. Free, and yours to keep."
+  />
+
+  <div class="container-page py-16">
+    <div class="grid gap-12 lg:grid-cols-[1fr_340px]">
+      <div>
+        <section>
+          <p class="eyebrow mb-3">What's inside</p>
+          <h2 class="text-3xl font-bold text-ink-800">Everything, in teaching order</h2>
+          <div class="mt-8 space-y-5">
+            {
+              contents.map((item, i) => (
+                <div class="flex gap-4 rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
+                  <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-50 text-sm font-bold text-brand-700">
+                    {i + 1}
+                  </span>
+                  <div>
+                    <h3 class="font-bold text-ink-800">{item.title}</h3>
+                    <p class="mt-1.5 text-sm leading-relaxed text-slate-600">{item.body}</p>
+                  </div>
+                </div>
+              ))
+            }
+          </div>
+        </section>
+
+        <section class="mt-14">
+          <p class="eyebrow mb-3">Who it's for</p>
+          <h2 class="text-3xl font-bold text-ink-800">You'll recognize yourself if</h2>
+          <ul class="mt-6 space-y-2.5 text-slate-700">
+            {
+              forYou.map((item) => (
+                <li class="relative pl-6">
+                  <span class="absolute left-0 top-2 h-1.5 w-1.5 rounded-full bg-brand-400" />
+                  {item}
+                </li>
+              ))
+            }
+          </ul>
+        </section>
+
+        <section class="mt-14 rounded-2xl border border-slate-100 bg-slate-50/70 p-7">
+          <h2 class="font-heading text-xl font-bold text-ink-800">
+            Prefer to just talk it through?
+          </h2>
+          <p class="mt-2 text-sm leading-relaxed text-slate-600">
+            The guide is a book, and books take time you might not have if a conversation is
+            looming tomorrow. The Guide assistant walks you through the same system for your
+            actual situation, and you can start with {FREE_ANON_MESSAGES} messages and no
+            account.
+          </p>
+          <a
+            href="/practice/guide"
+            class="btn-secondary mt-4"
+            data-track-cta="practice_assistants"
+            data-track-label="Try the Guide instead"
+          >
+            Try the Guide instead
+          </a>
+        </section>
+      </div>
+
+      <aside>
+        <div class="sticky top-24 rounded-2xl border border-brand-100 bg-white p-6 shadow-card">
+          <h2 class="font-heading text-lg font-bold text-ink-800">Get the guide</h2>
+          <p class="mt-2 text-sm leading-relaxed text-slate-600">
+            Tell us where to send it and the download link arrives in your inbox, along with
+            three suggestions for where to start.
+          </p>
+          <div class="mt-5">
+            <SubscribeForm client:visible source="pdf_guide" />
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</BaseLayout>

@@ -2,6 +2,8 @@ import type { APIRoute } from 'astro';
 import { getUserFromRequest, json } from '../../lib/server/auth';
 import { supabaseAdmin } from '../../lib/server/supabaseAdmin';
 import { clientIp, isRateLimited, hashIp } from '../../lib/server/rateLimit';
+import { sendEmail, teamEnquiryAlertEmail } from '../../lib/server/email';
+import { serverEnv } from '../../lib/server/env';
 
 export const prerender = false;
 
@@ -13,11 +15,7 @@ const clean = (value: unknown, max: number): string =>
 /** Deliberately permissive: rejecting valid addresses is worse than storing a typo. */
 const looksLikeEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
 
-/**
- * Team plan enquiries from /pricing. Stored for follow-up by hand; the
- * notification email arrives with the email work in the next phase, so until
- * then these have to be read out of the table.
- */
+/** Team plan enquiries from /pricing. Stored, and emailed so they aren't missed. */
 export const POST: APIRoute = async ({ request, clientAddress }) => {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return json({ error: 'bad_request' }, 400);
@@ -39,18 +37,36 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   // Signed in? Attach the account, so a follow-up isn't a guessing game.
   const user = await getUserFromRequest(request);
 
-  const { error } = await supabaseAdmin.from('team_enquiries').insert({
-    name,
-    email,
-    team_size: clean(body.team_size, MAX.team_size) || null,
-    note: clean(body.note, MAX.note) || null,
-    user_id: user && !user.is_anonymous ? user.id : null,
-    ip_hash: ip ? hashIp(ip) : null,
-  });
+  const teamSize = clean(body.team_size, MAX.team_size) || null;
+  const note = clean(body.note, MAX.note) || null;
+
+  const { data: row, error } = await supabaseAdmin
+    .from('team_enquiries')
+    .insert({
+      name,
+      email,
+      team_size: teamSize,
+      note,
+      user_id: user && !user.is_anonymous ? user.id : null,
+      ip_hash: ip ? hashIp(ip) : null,
+    })
+    .select('id')
+    .single();
 
   if (error) {
     console.error('team enquiry insert failed', error);
     return json({ error: 'server_error' }, 500);
+  }
+
+  // Alert, so an enquiry never sits unread in a table. The row is already saved,
+  // so a failed send costs the notification, not the lead.
+  const to = serverEnv('TEAM_ENQUIRY_TO') || serverEnv('EMAIL_FROM');
+  if (to) {
+    await sendEmail({
+      to,
+      ...teamEnquiryAlertEmail({ name, email, teamSize, note }),
+      idempotencyKey: `team-enquiry/${row.id}`,
+    });
   }
 
   return json({ ok: true });
