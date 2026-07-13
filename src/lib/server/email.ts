@@ -61,6 +61,30 @@ export async function sendEmail(opts: SendOptions): Promise<boolean> {
 const BRAND = '#5271FF';
 const INK = '#16276B';
 
+/**
+ * Escape anything a stranger typed before it goes into an HTML email.
+ *
+ * These alerts are addressed to us, which makes it tempting to skip: the cost
+ * is not a classic XSS but an attacker composing markup inside an email we
+ * trust, e.g. a plausible-looking link. Escape at the boundary and it cannot
+ * happen at all.
+ */
+const esc = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+/**
+ * Where internal alerts go. ALERTS_TO is the general one; TEAM_ENQUIRY_TO is
+ * honoured for compatibility, and EMAIL_FROM is the last resort so an alert
+ * lands *somewhere* rather than being dropped.
+ */
+export const internalAlertTo = (): string =>
+  serverEnv('ALERTS_TO') || serverEnv('TEAM_ENQUIRY_TO') || serverEnv('EMAIL_FROM');
+
 const layout = (bodyHtml: string, footerHtml: string) => `
 <!doctype html>
 <html>
@@ -144,10 +168,10 @@ export function teamEnquiryAlertEmail(enquiry: {
   const html = layout(
     `
     <h1 style="margin:0 0 16px;font-size:20px;color:${INK};">New team enquiry</h1>
-    ${row('Name', enquiry.name)}
-    ${row('Email', `<a href="mailto:${enquiry.email}" style="color:${BRAND};">${enquiry.email}</a>`)}
-    ${row('Team size', enquiry.teamSize ?? 'not given')}
-    ${enquiry.note ? `<p style="margin:16px 0 0;padding:12px 14px;background:#f8fafc;border-radius:10px;">${enquiry.note}</p>` : ''}`,
+    ${row('Name', esc(enquiry.name))}
+    ${row('Email', `<a href="mailto:${esc(enquiry.email)}" style="color:${BRAND};">${esc(enquiry.email)}</a>`)}
+    ${row('Team size', esc(enquiry.teamSize ?? 'not given'))}
+    ${enquiry.note ? `<p style="margin:16px 0 0;padding:12px 14px;background:#f8fafc;border-radius:10px;">${esc(enquiry.note)}</p>` : ''}`,
     'Sent because someone submitted the team form on /pricing.'
   );
 
@@ -161,4 +185,68 @@ export function teamEnquiryAlertEmail(enquiry: {
   ].join('\n');
 
   return { subject: `Team enquiry: ${enquiry.name}`, html, text };
+}
+
+/**
+ * Internal alert when someone answers "Did this help?" with something written.
+ *
+ * Sent for praise AND for criticism, deliberately. A "not yet" with a sentence
+ * explaining what was missing is the most actionable message this site can
+ * produce, and it is the one nobody would ever send us unprompted.
+ */
+export function feedbackAlertEmail(feedback: {
+  helpful: boolean;
+  agent: string;
+  quote: string | null;
+  note: string | null;
+  displayName: string | null;
+  roleTitle: string | null;
+  consentPublish: boolean;
+  adminUrl: string;
+}) {
+  const heading = feedback.helpful ? 'Someone said the assistant helped' : 'Someone said it missed';
+  const attribution = [feedback.displayName, feedback.roleTitle].filter(Boolean).join(', ');
+  const body = feedback.quote ?? feedback.note ?? '';
+
+  const html = layout(
+    `
+    <h1 style="margin:0 0 16px;font-size:20px;color:${INK};">${heading}</h1>
+    <p style="margin:0 0 6px;"><strong style="color:${INK};">Assistant:</strong> ${esc(feedback.agent)}</p>
+    ${
+      body
+        ? `<blockquote style="margin:16px 0;padding:12px 14px;background:#f8fafc;border-left:3px solid ${BRAND};border-radius:6px;">${esc(body)}</blockquote>`
+        : '<p style="margin:16px 0;color:#94a3b8;">They rated it but did not write anything.</p>'
+    }
+    ${attribution ? `<p style="margin:0 0 6px;">${esc(attribution)}</p>` : ''}
+    ${
+      feedback.quote
+        ? feedback.consentPublish
+          ? `<p style="margin:16px 0 0;color:#15803d;font-weight:600;">They consented to publication. Approve it to use it.</p>`
+          : `<p style="margin:16px 0 0;color:#b45309;font-weight:600;">No consent to publish. Do not quote this publicly.</p>`
+        : ''
+    }
+    <p style="margin:20px 0 0;font-size:13px;color:#64748b;">${esc(feedback.adminUrl)}</p>`,
+    'Sent because someone answered "Did this help?" in the chat.'
+  );
+
+  const text = [
+    heading,
+    '',
+    `Assistant: ${feedback.agent}`,
+    body ? `\n"${body}"` : '\n(No written feedback.)',
+    attribution ? `\n${attribution}` : '',
+    feedback.quote
+      ? feedback.consentPublish
+        ? '\nCONSENTED to publication. Approve it to use it.'
+        : '\nNO CONSENT to publish. Do not quote this publicly.'
+      : '',
+    '',
+    feedback.adminUrl,
+  ].join('\n');
+
+  return {
+    subject: feedback.helpful ? 'Positive feedback on the assistant' : 'The assistant missed',
+    html,
+    text,
+  };
 }

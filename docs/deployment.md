@@ -258,8 +258,10 @@ holds the client and the templates.
    until the domain is verified.** The domain in `EMAIL_FROM` must match a verified domain
    exactly.
 2. **Netlify env**: `RESEND_API_KEY` (secret), `EMAIL_FROM`
-   (e.g. `Solution Seeking System <hello@solutionseeking.com>`), and **`TEAM_ENQUIRY_TO`**
-   (a real inbox you read; falls back to `EMAIL_FROM` if unset).
+   (e.g. `Solution Seeking System <hello@solutionseeking.com>`), and **`ALERTS_TO`**
+   (a real inbox you read). `ALERTS_TO` receives team enquiries *and* written chat feedback;
+   it falls back to `TEAM_ENQUIRY_TO`, then `EMAIL_FROM`, so an alert always lands somewhere.
+   Check the value is not still the `you@example.com` placeholder from `.env.example`.
 3. Apply migration `0008_email_subscribers.sql`.
 
 ### How the list works
@@ -295,6 +297,68 @@ from public.email_subscribers group by source;
 **Testing:** send to `delivered@resend.dev` (simulates delivery), `bounced@resend.dev`, or
 `complained@resend.dev`. **Never test with a fake address at a real provider** like
 `test@gmail.com` — it bounces and damages sender reputation.
+
+## Feedback & testimonials
+
+The site has no social proof. The plan is to earn some, never to invent it.
+
+**Where the ask happens.** ChatView shows "Did this help?" **once**, and only when the
+assistant has produced a prep summary, i.e. the conversation actually reached the end of
+the protocol. Asking earlier would measure our nagging rather than our quality.
+
+**Two different things get stored** (`testimonials`, migration `0009`):
+
+- `helpful` — the quality signal, saved for **everyone who answers**. It posts the instant
+  they click, before any form appears: recording only on submit would throw away the
+  opinion of everyone who cannot be bothered to write prose, and that is most people.
+- `quote` / `note` — words, when they write them. A "Not yet" is followed by "what was
+  missing?", and that sentence is the most actionable thing this site can produce. It is
+  stored in `note`, never in `quote`, so a complaint can never be mistaken for praise.
+
+**Publishing a testimonial takes two independent yeses**: the person ticks the consent box,
+*and* you approve the row by hand. The table's check constraint enforces it, so a UI bug
+cannot put words in a real person's mouth:
+
+```sql
+-- Read what came in.
+select created_at, helpful, agent, display_name, role_title, quote, note, consent_publish
+from public.testimonials order by created_at desc;
+
+-- The hit rate, which is the number that actually matters.
+select helpful, count(*) from public.testimonials group by helpful;
+
+-- Approve one for publication. Fails (23514) unless it has consent AND a quote.
+update public.testimonials set status = 'approved' where id = '<uuid>';
+```
+
+Written feedback (praise **and** criticism) emails `ALERTS_TO` so it is never sitting unread
+in a table. A bare rating does not email: it is a number, not news.
+
+**Nothing is published automatically.** There is no surface on the site that renders
+approved testimonials yet, because there are none. Build it when there is something real to
+put in it.
+
+## Search Console & Bing verification
+
+**Still outstanding, and it is the cheapest win left.** This has been open since before the
+7 demos and 8 mode pages shipped, which means Google may not yet know ~48 indexable pages
+exist. Everything about the site is built for organic search; nobody ever told the search
+engines.
+
+1. **Google Search Console** → add a property for `solutionseeking.com`.
+   - Easiest: **DNS TXT** record (verifies the whole domain, survives redesigns).
+   - Or: set `PUBLIC_GOOGLE_SITE_VERIFICATION` in Netlify to the token from the "HTML tag"
+     method and redeploy. BaseLayout renders the meta tag on every page.
+2. **Submit the sitemap**: `https://solutionseeking.com/sitemap-index.xml`.
+3. **Bing Webmaster Tools** → import from Search Console (one click), or verify with
+   `PUBLIC_BING_SITE_VERIFICATION`.
+4. **Link GA4 ↔ Search Console** (GA4 → Admin → Product links → Search Console links, then
+   publish the "Search Console" report collection in the Library). **Do not skip this.** It
+   is what makes "which query led to a subscription" answerable at all; without it you have
+   queries in one tool and conversions in another and no way to join them.
+
+IndexNow already pings on every Netlify deploy (see `netlify.toml`), but that only tells
+engines a URL *changed*, which is worthless until the property is verified.
 
 ## Pricing & plans
 

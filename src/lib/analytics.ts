@@ -18,6 +18,7 @@ import type { AgentId } from './chatSessions';
 /** Where a CTA lives. A closed set, so "which button" stays analyzable. */
 export type CtaLocation =
   | 'home_hero'
+  | 'home_proof'
   | 'home_closing'
   | 'nav'
   | 'footer'
@@ -60,7 +61,17 @@ export type AnalyticsEvent =
   /** Demand signal for the team tier, which is deliberately not self-serve yet. */
   | { event: 'team_enquiry_submitted' }
   /** An address joined the list (the delivery email is on its way). */
-  | { event: 'email_captured'; source: EmailSource };
+  | { event: 'email_captured'; source: EmailSource }
+  /**
+   * The quality signal. Asked once, when a conversation reaches a prep summary
+   * (i.e. it actually finished the protocol). Everyone who answers tells us the
+   * hit rate, not just the people who go on to write a testimonial: "not yet" is
+   * the more valuable answer of the two, and the only one we would never
+   * otherwise hear.
+   */
+  | { event: 'feedback_given'; helpful: boolean; agent: AgentId; tier: Tier }
+  /** A real, quotable testimonial arrived. `consented` = publishable by us. */
+  | { event: 'testimonial_submitted'; agent: AgentId; consented: boolean };
 
 declare global {
   interface Window {

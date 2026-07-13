@@ -71,21 +71,51 @@ const tools = defineCollection({
  */
 const demos = defineCollection({
   loader: glob({ pattern: '**/*.mdx', base: './src/content/demos' }),
-  schema: z.object({
-    title: z.string(),
-    order: z.number(),
-    agent: z.enum(['guide', 'mentor']),
-    // Named context id (src/lib/contexts.ts) the "use this yourself" CTA links
-    // to; cross-checked against the registry at build time in the demo pages.
-    context: z.string(),
-    scenario: z.string(), // one-line setup for cards, meta descriptions, OG
-    before: z.string(), // the user's raw starting state, quoted on the card
-    after: z.array(z.string()).min(3), // concrete outcome bullets
-    spec: z.object({
-      expected: z.array(z.string()),
-      unacceptable: z.array(z.string()),
+  schema: z
+    .object({
+      title: z.string(),
+      order: z.number(),
+      agent: z.enum(['guide', 'mentor']),
+      // Named context id (src/lib/contexts.ts) the "use this yourself" CTA links
+      // to; cross-checked against the registry at build time in the demo pages.
+      context: z.string(),
+      scenario: z.string(), // one-line setup for cards, meta descriptions, OG
+      before: z.string(), // the user's raw starting state, quoted on the card
+      after: z.array(z.string()).min(3), // concrete outcome bullets
+      spec: z.object({
+        expected: z.array(z.string()),
+        unacceptable: z.array(z.string()),
+      }),
+      /**
+       * Exactly one demo is `featured` and carries an `excerpt`: the short
+       * exchange lifted onto the home page as proof the system does something.
+       *
+       * The turns must appear VERBATIM in the transcript below. That is checked
+       * at build time (src/lib/demoExcerpt.ts) and the build fails otherwise, so
+       * the home page cannot drift into saying something the Guide never said.
+       * Our only social proof is that these conversations are real; an excerpt
+       * that quietly diverges from its source would spend exactly that.
+       */
+      featured: z.boolean().default(false),
+      excerpt: z
+        .object({
+          turns: z
+            .array(
+              z.object({
+                role: z.enum(['user', 'assistant']),
+                text: z.string(),
+              })
+            )
+            .min(2),
+          // What a reader should notice in the exchange.
+          caption: z.string(),
+        })
+        .optional(),
+    })
+    .refine((d) => !d.featured || d.excerpt !== undefined, {
+      message: 'A featured demo must have an `excerpt` (the home page renders it).',
+      path: ['excerpt'],
     }),
-  }),
 });
 
 export const collections = { principles, protocol, tools, demos };

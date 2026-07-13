@@ -1,0 +1,98 @@
+---
+import type { FeaturedDemo } from '../lib/demoExcerpt';
+import DemoDisclaimer from './demo/DemoDisclaimer.astro';
+
+/**
+ * The featured demo's turning point, rendered as the exchange it actually was.
+ *
+ * This is the site's proof section. It is a *demonstration*, not a customer
+ * story, and it carries the same disclaimer as the demo pages, because the one
+ * thing that would cost us more than having no social proof is having fake
+ * social proof. The turns are verified verbatim against the transcript at build
+ * time (src/lib/demoExcerpt.ts).
+ */
+interface Props {
+  demo: FeaturedDemo;
+}
+
+const { demo } = Astro.props;
+const { excerpt } = demo.data;
+const href = `/practice/demos/${demo.id}`;
+
+/** Split a turn into paragraphs, then into plain/emphasised runs (*like this*). */
+const paragraphs = (text: string) =>
+  text
+    .trim()
+    .split(/\n\s*\n/)
+    .map((p) => p.split(/(\*[^*]+\*)/g).filter(Boolean));
+
+const isEmphasis = (run: string) => run.startsWith('*') && run.endsWith('*') && run.length > 2;
+---
+
+<figure class="mx-auto max-w-3xl">
+  <div class="overflow-hidden rounded-3xl border border-slate-100 bg-white shadow-card">
+    <div class="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+      <p class="text-sm font-semibold text-ink-800">Solution Seeking Guide</p>
+      <span class="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
+        Step 1: Introspection
+      </span>
+    </div>
+
+    <div class="space-y-4 px-5 py-6">
+      {
+        excerpt.turns.map((turn) =>
+          turn.role === 'user' ? (
+            <div class="flex justify-end">
+              <div class="max-w-[min(85%,34rem)] space-y-2 rounded-2xl rounded-br-md bg-brand-500 px-4 py-2.5 text-sm leading-relaxed text-white">
+                {paragraphs(turn.text).map((runs) => (
+                  <p>
+                    {runs.map((run) =>
+                      isEmphasis(run) ? <em>{run.slice(1, -1)}</em> : run
+                    )}
+                  </p>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div class="flex justify-start">
+              <div class="max-w-[min(92%,44rem)] space-y-2 rounded-2xl rounded-bl-md bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700">
+                {paragraphs(turn.text).map((runs) => (
+                  <p>
+                    {runs.map((run) =>
+                      isEmphasis(run) ? <em>{run.slice(1, -1)}</em> : run
+                    )}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )
+        )
+      }
+    </div>
+  </div>
+
+  <figcaption class="mt-6 space-y-4 text-center">
+    <p class="mx-auto max-w-2xl leading-relaxed text-slate-600">{excerpt.caption}</p>
+    <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+      <a
+        href={href}
+        class="font-semibold text-brand-600 hover:text-brand-700"
+        data-track-cta="home_proof"
+        data-track-label="Read the full conversation"
+      >
+        Read the whole conversation, annotated →
+      </a>
+      <a
+        href="/practice/demos"
+        class="text-sm font-medium text-slate-500 hover:text-brand-600"
+        data-track-cta="home_proof"
+        data-track-label="See all demos"
+      >
+        See all seven
+      </a>
+    </div>
+    <div class="flex justify-center">
+      <DemoDisclaimer />
+    </div>
+  </figcaption>
+</figure>

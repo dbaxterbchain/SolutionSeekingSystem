@@ -1,12 +1,12 @@
 # Project Status
 
-_Last updated: 2026-07-12_
+_Last updated: 2026-07-13_
 
 ## At a glance
 
 | | |
 |---|---|
-| **Current phase** | Phase 4 shipped (demo library + context seeding + conversation Modes); marketing/conversion work ongoing |
+| **Current phase** | Growth plan P1-P5 shipped (measurement, anonymous trial, pricing, email capture, social proof + testimonial collector). Next: SEO/community channels, then a small paid test. |
 | **Live URL** | https://solutionseeking.com (apex is primary; www and the netlify.app subdomain 301 to it) |
 | **Build health** | `npm run build` ✅ · `npm run check` ✅ (0 errors) |
 | **Hosting** | Netlify (Beanchain team), site `solution-seeking-system` |
@@ -32,7 +32,13 @@ _Last updated: 2026-07-12_
 - [x] Link the GitHub repo to Netlify for continuous deploys (see [deployment.md](deployment.md)).
 - [x] Point the custom domain at the Netlify site — live at **solutionseeking.com** (apex primary).
 - [ ] Confirm real brand fonts (currently using close free stand-ins: Anton/Poppins/Inter).
-- [ ] Verify in Google Search Console + Bing Webmaster (DNS TXT) and submit `/sitemap-index.xml`.
+- [ ] **Verify in Google Search Console + Bing Webmaster, submit `/sitemap-index.xml`, and link
+      GA4 ↔ Search Console.** Open since before the demos and modes shipped, which means Google
+      may not yet know those ~48 pages exist. The code side is done (set
+      `PUBLIC_GOOGLE_SITE_VERIFICATION` / `PUBLIC_BING_SITE_VERIFICATION`, or use DNS TXT); the
+      account side is a 20-minute job that nothing else can substitute for. The GA4 link is what
+      makes "which query led to a subscription" answerable at all. See
+      [deployment.md](deployment.md#search-console--bing-verification).
 
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)
@@ -143,8 +149,40 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       domain in Resend, and migration `0008`.
       ⚠ No drip sequence, deliberately: ship the one email, read the click-through, and let
       that decide what email two should be.
-- [ ] **P5 — Polish**: social proof (there is none), a real testimonial collector, Search
-      Console + Bing verification.
+- [x] **P5 — Conversion polish** (done 2026-07-13). The site had **no social proof anywhere**,
+      and the honest fix is to earn some rather than invent it.
+      **Home page proof section**: the turning point of the featured demo, rendered as the
+      exchange it actually was, carrying the same "fictional demonstration" disclaimer as the
+      demo pages. The excerpt lives in the demo's frontmatter and **the build fails if it is
+      not verbatim in that demo's transcript** ([`src/lib/demoExcerpt.ts`](../src/lib/demoExcerpt.ts)) —
+      a quote that has drifted from its source is a fabricated testimonial wearing the clothes
+      of a real one, and real conversations are the only proof we have. Plus an honest
+      provenance band (built at Beanchain to run a real company; the system is free; no
+      invented praise).
+      **Testimonial collector**: "Did this help?" appears once, when a conversation reaches a
+      prep summary (so the protocol actually ran to the end). The rating posts **on click**,
+      before any form, because recording only on submit would discard the opinion of everyone
+      who will not write prose — which is most of them. "Not yet" asks what was missing, and
+      that answer is worth more than a testimonial we never get. Publishing needs **both**
+      explicit consent and hand approval, and the `testimonials` table's check constraint makes
+      it impossible to approve a row without them (migration `0009`).
+      **Search Console / Bing**: `PUBLIC_GOOGLE_SITE_VERIFICATION` and
+      `PUBLIC_BING_SITE_VERIFICATION` render verification meta tags when set; DNS TXT works too.
+      Still needs the one-time verification + sitemap submit + GA4 link (see below).
+- [x] **Grant hardening** (2026-07-13, found while testing P5). Migrations 0006-0009 each claimed
+      "no grants to anon/authenticated". **On the hosted project that was false**: Supabase's
+      default privileges grant ALL on every new `public` table to `anon` and `authenticated`, so
+      `rate_limit`, `team_enquiries`, `email_subscribers` and `testimonials` were reachable by any
+      browser holding the publishable key, and RLS-with-no-policies was the *only* thing between
+      the email list and the internet. RLS was holding (verified against production: reads return
+      zero rows, writes raise 42501), so this was a missing second layer, not a breach — but one
+      careless `using (true)` policy would have published the lot. Migration `0010` revokes those
+      grants and stops the default privileges re-granting on the next table. Migration `0011`
+      makes the entitlement tables **read-only from the browser at the grant level**, which is
+      what CLAUDE.md's "entitlements are server-written only" has always claimed; before it, a
+      single mistaken policy would have let any browser grant itself a subscription. Verified
+      after: the browser can still read its own usage and subscription and manage its own
+      conversations, and can no longer write either entitlement table.
 - [ ] Then: SEO/community/AEO channels, and only after that a small (~$300-500) paid test
       aimed at email capture rather than direct subscriptions.
 

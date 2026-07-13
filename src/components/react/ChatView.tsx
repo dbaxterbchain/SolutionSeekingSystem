@@ -17,6 +17,7 @@ import { getContextMeta, MODE_CONTEXTS } from '../../lib/contexts';
 import { useDialog } from './Dialog';
 import { track, getGaIds, type Tier } from '../../lib/analytics';
 import UpgradeAnonCard from './UpgradeAnonCard';
+import FeedbackPrompt from './FeedbackPrompt';
 import { FREE_ACCOUNT_MESSAGES, FREE_ANON_MESSAGES, priceCopy } from '../../data/pricing';
 import { getCaptchaToken, prewarmCaptcha } from '../../lib/turnstile';
 
@@ -24,6 +25,42 @@ const FREE_LIMIT = FREE_ACCOUNT_MESSAGES;
 const ANON_LIMIT = FREE_ANON_MESSAGES;
 /** Client-side truncation guard: send at most the last N messages. */
 const SENT_HISTORY_LIMIT = 30;
+
+/**
+ * The assistant produced a structured document (a prep summary), which means the
+ * conversation reached the end of the protocol rather than trailing off. This is
+ * both what reveals the Download/Print actions and what earns us the right to
+ * ask "did this help?", so it is defined once.
+ */
+const looksLikeDocument = (content: string) => /^##\s/m.test(content);
+
+/**
+ * Chats we have already asked about, so nobody is nagged twice for the same
+ * conversation (including after a reload, or when reopening it from History).
+ */
+const FEEDBACK_ASKED_KEY = 'sss-feedback-asked';
+
+const feedbackAsked = (chatId: string): boolean => {
+  try {
+    const raw = window.localStorage.getItem(FEEDBACK_ASKED_KEY);
+    return raw ? (JSON.parse(raw) as string[]).includes(chatId) : false;
+  } catch {
+    return false;
+  }
+};
+
+const rememberFeedbackAsked = (chatId: string): void => {
+  try {
+    const raw = window.localStorage.getItem(FEEDBACK_ASKED_KEY);
+    const all = raw ? (JSON.parse(raw) as string[]) : [];
+    if (all.includes(chatId)) return;
+    // Keep the tail: this is a nag-guard, not an archive.
+    const next = [...all, chatId].slice(-50);
+    window.localStorage.setItem(FEEDBACK_ASKED_KEY, JSON.stringify(next));
+  } catch {
+    // Storage disabled: worst case we ask once more. Not worth handling.
+  }
+};
 
 interface Props {
   agent: AgentId;
@@ -72,6 +109,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<ChatSession[] | null>(null);
+  const [feedbackDone, setFeedbackDone] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -379,6 +417,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     setContextId(getContextMeta(initialContext, agent) ? initialContext! : null);
     setError(null);
     setShowHistory(false);
+    setFeedbackDone(false);
     const url = new URL(window.location.href);
     url.searchParams.delete('chat');
     url.searchParams.delete('context');
@@ -409,6 +448,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
       setChatId(null);
       setError(null);
       setShowHistory(false);
+      setFeedbackDone(false);
     }
     setContextId(next);
     const url = new URL(window.location.href);
@@ -436,6 +476,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     setContextId(saved.context ?? null);
     setError(null);
     setShowHistory(false);
+    setFeedbackDone(false);
     const url = new URL(window.location.href);
     url.searchParams.set('chat', saved.id);
     window.history.replaceState(null, '', url);
@@ -443,6 +484,27 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
 
   const contextMeta = getContextMeta(contextId, agent);
   const isAnonUser = user?.is_anonymous === true || gate.kind === 'anon-idle';
+
+  const currentTier: Tier =
+    gate.kind === 'subscriber' ? 'subscriber' : isAnonUser ? 'anon' : 'free';
+
+  // Ask for feedback only once the conversation actually landed: the assistant
+  // produced a prep summary, so the protocol ran to the end. Asking earlier would
+  // measure our nagging, not our quality.
+  const last = messages[messages.length - 1];
+  const showFeedback =
+    !feedbackDone &&
+    !streaming &&
+    Boolean(session) &&
+    last?.role === 'assistant' &&
+    last.content !== '' &&
+    looksLikeDocument(last.content) &&
+    !(chatId !== null && feedbackAsked(chatId));
+
+  const finishFeedback = () => {
+    setFeedbackDone(true);
+    if (chatId) rememberFeedbackAsked(chatId);
+  };
 
   if (loading || (user && gate.kind === 'loading')) {
     return (
@@ -606,6 +668,19 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
         </div>
       )}
 
+      {/* Did this help? Asked once, when the conversation reached a summary. */}
+      {showFeedback && (
+        <FeedbackPrompt
+          agent={agent}
+          agentName={agentName}
+          tier={currentTier}
+          context={contextId}
+          chatId={chatId}
+          messageCount={messages.filter((m) => m.role === 'user').length}
+          onDone={finishFeedback}
+        />
+      )}
+
       {/* Account prompt / paywall / composer */}
       {gate.kind === 'anon-exhausted' ? (
         <UpgradeAnonCard rateLimited={gate.rateLimited} />
@@ -696,7 +771,6 @@ function MessageBubble({
     );
   }
 
-  const looksLikeDocument = /^##\s/m.test(message.content);
   return (
     <div className="flex justify-start">
       <div className="max-w-[min(92%,48rem)] rounded-2xl rounded-bl-md bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700">
@@ -706,7 +780,10 @@ function MessageBubble({
           <Markdown text={message.content} />
         )}
         {!streaming && message.content !== '' && (
-          <MessageActions content={message.content} showDocumentActions={looksLikeDocument} />
+          <MessageActions
+            content={message.content}
+            showDocumentActions={looksLikeDocument(message.content)}
+          />
         )}
       </div>
     </div>

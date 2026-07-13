@@ -39,6 +39,14 @@ const canonical = new URL(Astro.url.pathname, site).href;
 // (see src/pages/og/[...route].png.ts, which enumerates the same routes).
 const pathKey = Astro.url.pathname.replace(/\/+$/, '') || '/index';
 const ogImageUrl = new URL(ogImage ?? `/og${pathKey}.png`, site).href;
+
+// Search Console / Bing Webmaster Tools ownership. Not secrets: the whole point
+// is that the crawler reads them. Unset means the tag is simply omitted, so a
+// DNS TXT verification (the alternative, and the one that survives a redesign)
+// works just as well. Verification is what turns "we published 48 pages" into
+// "we can see which queries find them".
+const googleVerification = import.meta.env.PUBLIC_GOOGLE_SITE_VERIFICATION;
+const bingVerification = import.meta.env.PUBLIC_BING_SITE_VERIFICATION;
 ---
 
 <!doctype html>
@@ -69,6 +77,8 @@ const ogImageUrl = new URL(ogImage ?? `/og${pathKey}.png`, site).href;
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     {noindex && <meta name="robots" content="noindex" />}
+    {googleVerification && <meta name="google-site-verification" content={googleVerification} />}
+    {bingVerification && <meta name="msvalidate.01" content={bingVerification} />}
 
     <meta property="og:type" content={type} />
     <meta property="og:site_name" content="Solution Seeking System" />

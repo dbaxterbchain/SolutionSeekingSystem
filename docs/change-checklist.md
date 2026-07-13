@@ -96,8 +96,36 @@ stale docs, no orphaned pages, no broken prompt cache.
       `authenticated`/`anon` as appropriate (see migrations 0003/0004 for the pattern).
       New columns on existing tables inherit row-scoped policies and table-level grants —
       usually no new policy needed.
-- [ ] Entitlement-bearing tables stay server-write-only (no client insert/update policies).
+- [ ] **A new table reaches the browser only if you say so.** Migration `0010` revoked the
+      Supabase default privileges that used to grant `anon`/`authenticated` ALL on every new
+      `public` table, so a new table now has **no client grants at all** until a migration adds
+      them. If the browser must read it: `grant select on <table> to authenticated;` *and* a
+      row-scoped policy. Both, or it fails closed. (Before 0010, the opposite was true and the
+      migrations' own comments were wrong about it — RLS was the only thing protecting the
+      email list. Do not reintroduce that.)
+- [ ] Entitlement-bearing tables stay server-write-only — **no client write policies AND no
+      client write grants** (`subscriptions`, `ai_usage`; see migration `0011`).
+- [ ] **Verify the RLS claim rather than asserting it.** Hit the table with the *publishable*
+      key and confirm the read is empty and the write is refused. Local and the hosted project
+      have had different default grants, so "it's safe locally" has proven nothing.
 - [ ] Update TypeScript types that mirror the schema (e.g. `src/lib/chatSessions.ts`).
+
+## Claims about users, and social proof
+
+- [ ] **Never fabricate a testimonial, a user count, or a review.** Not as a placeholder, not
+      as lorem ipsum, not "just for the layout". It is the one thing that would cost more than
+      having no social proof at all, and a placeholder has a way of shipping.
+- [ ] **Example conversations are fictional and must be labelled so**, wherever they appear.
+      Reuse [`DemoDisclaimer.astro`](../src/components/demo/DemoDisclaimer.astro) rather than
+      writing new framing. They prove capability; they are not customer stories.
+- [ ] **Quoting a demo means quoting it exactly.** The home page excerpt lives in the demo's
+      frontmatter and is checked verbatim against that demo's transcript at build time
+      ([`src/lib/demoExcerpt.ts`](../src/lib/demoExcerpt.ts)). If you edit either one, the build
+      tells you. Do not weaken the check to make a build pass.
+- [ ] **Publishing a real testimonial takes two yeses**: their explicit consent checkbox and
+      your hand approval. The `testimonials` check constraint enforces it; leave it enforcing.
+- [ ] Honest trust signals we *can* use: the Beanchain provenance, the free-forever core, the
+      annotated demos. Use those.
 
 ## New environment variable
 

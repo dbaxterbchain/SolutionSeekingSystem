@@ -3,14 +3,41 @@ import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ProtocolDiagram from '../components/ProtocolDiagram.astro';
 import PrincipleCard from '../components/PrincipleCard.astro';
+import DemoExcerpt from '../components/DemoExcerpt.astro';
 import { pillars, systemDefinition } from '../data/concepts';
 import { organization, webSite } from '../lib/schema';
+import { getFeaturedDemo } from '../lib/demoExcerpt';
 
 const site = Astro.site ?? Astro.url;
 
 const principles = (await getCollection('principles')).sort(
   (a, b) => a.data.order - b.data.order
 );
+
+// Throws at build time if the excerpt is not verbatim in the transcript.
+const featuredDemo = getFeaturedDemo(await getCollection('demos'));
+
+/**
+ * The honest trust signals. We have no testimonials and no user count, so we
+ * say what is actually true instead of inventing either.
+ */
+const provenance = [
+  {
+    icon: '☕',
+    title: 'Built to run a real company',
+    body: 'Beanchain Coffee is a worker-directed café with no HR department to escalate to. We wrote this system because we needed it, then used it on ourselves.',
+  },
+  {
+    icon: '📖',
+    title: 'The system is free, forever',
+    body: 'Every page, the complete PDF, the worksheets, and all seven example conversations. You only pay if you want unlimited time with the AI assistants.',
+  },
+  {
+    icon: '🎭',
+    title: 'No invented praise',
+    body: 'Every example conversation on this site is labelled as a fictional demonstration, because it is. We would rather show you the method than quote a testimonial we made up.',
+  },
+];
 
 const parts = [
   {
@@ -94,6 +121,59 @@ const parts = [
         </h2>
         <p class="mt-4 leading-relaxed text-slate-600">{systemDefinition}</p>
       </div>
+    </div>
+  </section>
+
+  <!-- Proof: the featured demo's turning point -->
+  <section class="border-b border-slate-100 bg-slate-50/60">
+    <div class="container-page py-20">
+      <div class="mx-auto mb-12 max-w-2xl text-center">
+        <p class="eyebrow mb-3">What it looks like</p>
+        <h2 class="text-3xl font-bold text-ink-800 sm:text-4xl">
+          The best question is the one you never asked yourself
+        </h2>
+        <p class="mt-4 leading-relaxed text-slate-600">
+          A man came to the Guide wanting a script to say no to his boss. Here is the
+          moment his own story stopped holding up.
+        </p>
+      </div>
+      <DemoExcerpt demo={featuredDemo} />
+    </div>
+  </section>
+
+  <!-- Provenance -->
+  <section class="border-b border-slate-100 bg-white">
+    <div class="container-page py-16">
+      <div class="grid gap-8 md:grid-cols-3">
+        {
+          provenance.map((item) => (
+            <div>
+              <span class="text-2xl" aria-hidden="true">{item.icon}</span>
+              <h3 class="mt-3 font-heading text-lg font-bold text-ink-800">{item.title}</h3>
+              <p class="mt-2 text-sm leading-relaxed text-slate-600">{item.body}</p>
+            </div>
+          ))
+        }
+      </div>
+      <p class="mt-10 text-center text-sm text-slate-500">
+        Built by David and Shannon Baxter at
+        <a
+          href="https://www.bchain.coffee"
+          rel="noopener"
+          class="font-medium text-brand-600 hover:text-brand-700"
+        >
+          Beanchain Coffee
+        </a>
+        ·
+        <a
+          href="/about"
+          class="font-medium text-brand-600 hover:text-brand-700"
+          data-track-cta="home_proof"
+          data-track-label="Why we built this"
+        >
+          Why we built this →
+        </a>
+      </p>
     </div>
   </section>
 
