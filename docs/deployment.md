@@ -280,14 +280,32 @@ Netlify env changes only reach Functions after a **redeploy**.
 ### 3. GTM container setup (one time, in the GTM UI)
 
 1. **Tag → Google Tag**, Measurement ID = your `G-...`, trigger **All Pages**.
-2. **Variables → New → Data Layer Variable**, one for each event parameter:
+2. **Variables → New → Data Layer Variable**, one per event parameter. The "Data Layer
+   Variable Name" must match the key we push exactly:
    `cta_location`, `cta_label`, `destination`, `agent`, `tier`, `plan`, `mode_id`,
    `demo_id`, `method`, `from_anon`, `message_index`, `value`, `currency`.
 3. **Trigger → Custom Event**, event name (regex enabled):
    `^(cta_clicked|demo_viewed|mode_viewed|signup_started|signup_completed|first_message_sent|message_sent|free_limit_reached|checkout_started|checkout_abandoned|checkout_success_viewed)$`
    One trigger for everything is far easier to maintain than one per event.
-4. **Tag → Google Analytics: GA4 Event**, Event Name = `{{Event}}`, add the variables
-   above as Event Parameters, fire on the trigger from step 3.
+4. **Tag → Google Analytics: GA4 Event**, Event Name = `{{Event}}`, fire on the trigger
+   from step 3. Under **Event Parameters**, add one row per parameter. Only the *value*
+   is a variable:
+
+   | Event Parameter (literal text) | Value (the variable from step 2) |
+   |---|---|
+   | `agent` | `{{agent}}` |
+   | `tier` | `{{tier}}` |
+   | `cta_location` | `{{cta_location}}` |
+   | … and so on for each parameter in step 2 | |
+
+   The left column is **typed as plain text**, never `{{agent}}` — GTM would resolve that
+   and send a parameter named after its value (e.g. a parameter literally called `guide`).
+   The name in the left column is the string GA4 receives, and it is what you type into
+   the "Event parameter" field when registering the custom dimension in step 4 below.
+
+   If a variable is undefined for a given event, GTM **omits that parameter**, which is
+   why one passthrough tag safely covers all eleven events (a `demo_viewed` event simply
+   won't carry `plan` or `tier`).
 5. **Publish** the container.
 
 ### 4. GA4 UI setup
