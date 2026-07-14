@@ -3,10 +3,13 @@ import { getCollection } from 'astro:content';
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import ChatView from '../../../components/react/ChatView.tsx';
 import PricingLine from '../../../components/react/PricingLine.tsx';
+import Testimonials from '../../../components/Testimonials.astro';
+import ProvenanceBand from '../../../components/ProvenanceBand.astro';
 import { breadcrumbs, webApplication } from '../../../lib/schema';
 import { CHAT_CONTEXTS } from '../../../lib/contexts';
 import { MODES } from '../../../data/modes';
 import { priceCopy } from '../../../data/pricing';
+import { getApprovedTestimonials } from '../../../lib/server/testimonials';
 
 export async function getStaticPaths() {
   const demos = await getCollection('demos');
@@ -48,6 +51,11 @@ export async function getStaticPaths() {
 
 const { mode, relatedDemos } = Astro.props;
 
+// Approved, consented quotes, read at build time. Empty until real people write
+// some, and the section below then renders nothing at all. Memoised across the
+// eight mode pages, so this is one query per build, not eight.
+const quotes = await getApprovedTestimonials();
+
 const site = Astro.site ?? Astro.url;
 const schemas = [
   webApplication(site, {
@@ -66,29 +74,73 @@ const schemas = [
 ---
 
 <BaseLayout title={mode.heroTitle} description={mode.metaDescription} schemas={schemas}>
+  {/*
+    The hero is deliberately SHORTER on a phone than on a desktop. It used to eat
+    639px of an 844px screen, which left no room for the one thing the page is
+    for. Every size below that starts small and grows at `sm:` is doing that job:
+    the desktop hero is unchanged.
+  */}
   <section class="border-b border-slate-100 bg-gradient-to-b from-brand-50/70 to-white">
-    <div class="container-page py-12 sm:py-16">
-      <a href="/practice/modes" class="text-sm font-semibold text-brand-600 hover:text-brand-700">
+    <div class="container-page py-6 sm:py-16">
+      {/* A "back to the index" link is not what a paid visitor needs from their
+          first screen, so it waits until there is room for it. */}
+      <a
+        href="/practice/modes"
+        class="hidden text-sm font-semibold text-brand-600 hover:text-brand-700 sm:inline-block"
+      >
         ← All modes
       </a>
-      <p class="eyebrow mt-4">AI Assistant · {mode.icon} {mode.name} mode</p>
-      <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-ink-800 sm:text-5xl">
+      <p class="eyebrow mt-0 sm:mt-4">AI Assistant · {mode.icon} {mode.name} mode</p>
+      <h1 class="mt-2 text-3xl font-extrabold tracking-tight text-ink-800 sm:text-5xl">
         {mode.heroTitle}
       </h1>
-      <p class="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
+      <p class="mt-3 max-w-2xl leading-relaxed text-slate-600 sm:mt-4 sm:text-lg">
         {mode.heroIntro}
+        {/* client:idle, not client:load: this renders one sentence, and it has no
+            business competing with the chat for the main thread. */}
         <PricingLine
-          client:load
+          client:idle
           generic={priceCopy.generic}
           subscriber="You're subscribed: unlimited conversations, anytime."
         />
       </p>
+      {/* One tap to the thing the visitor came for. Most arrivals here are on a
+          phone, where the composer is otherwise a scroll away. */}
+      <a
+        href="#chat"
+        class="btn-primary mt-4 inline-block sm:hidden"
+        data-track-cta="mode_page"
+        data-track-label="Start the conversation"
+      >
+        Start the conversation
+      </a>
     </div>
   </section>
 
-  <div class="container-page py-12">
+  <div class="container-page py-6 sm:py-12">
     <div class="mx-auto max-w-5xl">
-      <div class="mb-8 rounded-2xl border border-slate-100 bg-slate-50/70 p-6">
+      {/*
+        The chat comes FIRST, above the supporting copy.
+
+        It used to sit below the hero AND a "When this helps" card, which on a
+        390px phone put the composer a full screen down. That is the one thing a
+        visitor is here to use, and on a paid click it is the conversion. The
+        situations list reads perfectly well as supporting detail underneath.
+
+        scroll-mt-20 because the header is sticky: a bare #chat anchor would park
+        the top of the chat underneath it.
+      */}
+      <div id="chat" class="scroll-mt-20">
+        <ChatView
+          client:load
+          agent="guide"
+          agentName="Guide"
+          welcome={mode.welcome}
+          initialContext={mode.id}
+        />
+      </div>
+
+      <div class="mt-8 rounded-2xl border border-slate-100 bg-slate-50/70 p-6">
         <h2 class="text-sm font-semibold uppercase tracking-wide text-emerald-700">
           When this helps
         </h2>
@@ -104,13 +156,26 @@ const schemas = [
         </ul>
       </div>
 
-      <ChatView
-        client:load
-        agent="guide"
-        agentName="Guide"
-        welcome={mode.welcome}
-        initialContext={mode.id}
-      />
+      {/*
+        Trust signals, BELOW the chat and never above it. A cold visitor from an
+        ad has no idea who we are, and these pages carried nothing at all. But
+        anything placed above the composer pushes it off a phone screen, which
+        costs the very thing we are paying for. So: proof, after the product.
+
+        Testimonials render only when a real, consented, approved quote exists,
+        so today this is silent and it lights up on its own the moment one does.
+      */}
+      {
+        quotes.length > 0 && (
+          <div class="mt-12">
+            <Testimonials quotes={quotes} heading="What people say after using it" />
+          </div>
+        )
+      }
+
+      <div class="mt-10 border-t border-slate-100 pt-8">
+        <ProvenanceBand compact />
+      </div>
 
       {
         mode.mentorCta && (

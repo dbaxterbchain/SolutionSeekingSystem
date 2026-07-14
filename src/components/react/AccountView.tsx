@@ -21,6 +21,7 @@ import { ENTITLED_STATUSES } from '../../lib/subscription';
 import { useEntitlement } from '../../lib/entitlement';
 import { claimTrialWork, hasTrialStash } from '../../lib/trialClaim';
 import { track, getGaIds, consumeSignupCompleted } from '../../lib/analytics';
+import { getFirstTouch } from '../../lib/attribution';
 import { FREE_ACCOUNT_MESSAGES, priceCopy } from '../../data/pricing';
 import { usePasswordRecovery } from '../../lib/usePasswordRecovery';
 import AuthPanel, { NewPasswordForm, RecoveryPanel } from './AuthPanel';
@@ -528,7 +529,12 @@ function SubscriptionSection() {
         // Attribution ids for the server-side conversion, and where to return
         // the user if they abandon checkout.
         body: isCheckout
-          ? JSON.stringify({ plan: 'monthly', ga: getGaIds(), returnPath: '/account' })
+          ? JSON.stringify({
+              plan: 'monthly',
+              ga: getGaIds(),
+              attribution: getFirstTouch() ?? undefined,
+              returnPath: '/account',
+            })
           : undefined,
       });
       const data = await res.json().catch(() => null);

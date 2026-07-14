@@ -5,6 +5,7 @@ import ProtocolDiagram from '../components/ProtocolDiagram.astro';
 import PrincipleCard from '../components/PrincipleCard.astro';
 import DemoExcerpt from '../components/DemoExcerpt.astro';
 import Testimonials from '../components/Testimonials.astro';
+import ProvenanceBand from '../components/ProvenanceBand.astro';
 import { pillars, systemDefinition } from '../data/concepts';
 import { organization, webSite } from '../lib/schema';
 import { getFeaturedDemo } from '../lib/demoExcerpt';
@@ -23,32 +24,6 @@ const featuredDemo = getFeaturedDemo(await getCollection('demos'));
 // section below simply does not render then. Never throws: a database blip must
 // not take the site down.
 const quotes = await getApprovedTestimonials();
-
-/**
- * The honest trust signals. We have no testimonials and no user count, so we
- * say what is actually true instead of inventing either.
- */
-const provenance = [
-  {
-    icon: '☕',
-    title: 'Built to run a real company',
-    body: 'Beanchain Coffee is a worker-directed café with no HR department to escalate to. We wrote this system because we needed it, then used it on ourselves.',
-  },
-  {
-    icon: '📖',
-    title: 'The system is free, forever',
-    body: 'Every page, the complete PDF, the worksheets, and all seven example conversations. You only pay if you want unlimited time with the AI assistants.',
-  },
-  {
-    icon: '🎭',
-    title: 'No invented praise',
-    // Careful with this one. It used to say we would rather show the method than
-    // quote a testimonial we made up, which read as "we have no testimonials" and
-    // would sit directly beneath real ones. The promise is about fabrication, not
-    // absence, so it stays true whether there are zero quotes on this page or six.
-    body: 'Every example conversation on this site is labelled as a fictional demonstration, because it is. The only quotes we publish are real ones, in the words of the person who wrote them, used with their permission.',
-  },
-];
 
 const parts = [
   {
@@ -163,39 +138,10 @@ const parts = [
     )
   }
 
-  <!-- Provenance -->
+  <!-- Provenance. One definition, shared with the mode landing pages. -->
   <section class="border-b border-slate-100 bg-white">
     <div class="container-page py-16">
-      <div class="grid gap-8 md:grid-cols-3">
-        {
-          provenance.map((item) => (
-            <div>
-              <span class="text-2xl" aria-hidden="true">{item.icon}</span>
-              <h3 class="mt-3 font-heading text-lg font-bold text-ink-800">{item.title}</h3>
-              <p class="mt-2 text-sm leading-relaxed text-slate-600">{item.body}</p>
-            </div>
-          ))
-        }
-      </div>
-      <p class="mt-10 text-center text-sm text-slate-500">
-        Built by David and Shannon Baxter at
-        <a
-          href="https://www.bchain.coffee"
-          rel="noopener"
-          class="font-medium text-brand-600 hover:text-brand-700"
-        >
-          Beanchain Coffee
-        </a>
-        ·
-        <a
-          href="/about"
-          class="font-medium text-brand-600 hover:text-brand-700"
-          data-track-cta="home_proof"
-          data-track-label="Why we built this"
-        >
-          Why we built this →
-        </a>
-      </p>
+      <ProvenanceBand />
     </div>
   </section>
 

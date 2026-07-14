@@ -17,6 +17,7 @@ import {
 import { getContextMeta, modeUrl, MODE_CONTEXTS } from '../../lib/contexts';
 import { useDialog } from './Dialog';
 import { track, getGaIds, type Tier } from '../../lib/analytics';
+import { getFirstTouch } from '../../lib/attribution';
 import UpgradeAnonCard from './UpgradeAnonCard';
 import FeedbackPrompt from './FeedbackPrompt';
 import { FREE_ACCOUNT_MESSAGES, FREE_ANON_MESSAGES, priceCopy } from '../../data/pricing';
@@ -426,6 +427,9 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
         body: JSON.stringify({
           plan: 'monthly',
           ga: getGaIds(),
+          // Which ad, if any, bought this customer. Captured on their first page
+          // view and kept across the OAuth redirect that happens in between.
+          attribution: getFirstTouch() ?? undefined,
           returnPath: window.location.pathname + window.location.search,
         }),
       });

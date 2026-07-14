@@ -41,8 +41,15 @@ export type Tier = 'anon' | 'free' | 'subscriber';
 
 export type PlanId = 'monthly' | 'annual' | 'team';
 
-/** Where an email address was captured. */
-export type EmailSource = 'pdf_guide' | 'footer' | 'pricing';
+/**
+ * Where an email address was captured.
+ *
+ * KEEP THIS IN STEP WITH `SOURCES` in src/pages/api/subscribe.ts. They are two
+ * independent lists, and the server silently rewrites an unrecognised source to
+ * 'footer'. Add a value to one and not the other and the client reports one
+ * thing while the database records another, with no error anywhere.
+ */
+export type EmailSource = 'pdf_guide' | 'footer' | 'pricing' | 'chat_wall';
 
 export type AnalyticsEvent =
   | { event: 'cta_clicked'; cta_location: CtaLocation; cta_label: string; destination?: string }

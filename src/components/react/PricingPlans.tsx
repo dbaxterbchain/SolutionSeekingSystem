@@ -3,6 +3,7 @@ import { useSession } from '../../lib/useSession';
 import { accountLink } from '../../lib/accountLink';
 import { useEntitlement } from '../../lib/entitlement';
 import { track, getGaIds } from '../../lib/analytics';
+import { getFirstTouch } from '../../lib/attribution';
 import { SELF_SERVE_PLANS, PLANS, type PlanId } from '../../data/pricing';
 
 /**
@@ -51,7 +52,12 @@ export default function PricingPlans() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ plan, ga: getGaIds(), returnPath: '/pricing' }),
+        body: JSON.stringify({
+          plan,
+          ga: getGaIds(),
+          attribution: getFirstTouch() ?? undefined,
+          returnPath: '/pricing',
+        }),
       });
       const data = await res.json().catch(() => null);
       if (res.ok && data?.url) {

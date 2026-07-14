@@ -243,8 +243,40 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       **explicit**: the hosted project had them via default privileges and the local stack did
       not, which is the same local-vs-production divergence that hid the grant hole behind
       migrations 0006-0009.
-- [ ] Then: SEO/community/AEO channels, and only after that a small (~$300-500) paid test
-      aimed at email capture rather than direct subscriptions.
+- [x] **Google Ads: made measurable** (done 2026-07-13). The code side of a small US-only Search
+      test. **The test buys data, not customers**: expect 0-2 subscriptions from $300-500, and
+      judge it on **cost per started conversation** instead.
+      **The bug that would have wrecked it:** `email_captured` fired into the dataLayer and
+      **never reached GA4**, because the GTM trigger regex omitted it (along with four other
+      events). The lead-magnet conversion was invisible while the code looked perfectly healthy.
+      Fixed in the docs; it is a GTM UI change.
+      **First-touch attribution** ([`src/lib/attribution.ts`](../src/lib/attribution.ts)):
+      `gclid`/`gbraid`/`wbraid` plus the UTMs and the landing page, kept in localStorage for 30
+      days so they survive the Google OAuth redirect that destroys the query string. Two rules
+      that matter: an organic pageview never overwrites a stored ad click, and a real paid click
+      always beats a stored non-paid touch (**our own guide email links back with
+      `?utm_source=email`** and would otherwise have claimed credit for conversions the ads
+      bought). It rides the existing checkout metadata pipe onto the `subscriptions` row
+      (migration `0014`), so "which keyword bought a subscription" is one SQL query.
+      **The sharpest trap, now closed:** `checkout.ts` sliced every Stripe metadata value at 120
+      characters, and **a real gclid is routinely longer than that**. It would have stored a
+      plausible, useless click id and failed a conversion import months later. Click ids now get
+      Stripe's full 500. Verified with a 195-character id: it arrives character for character.
+      **Landing pages**: on a 390px phone the hero ate 639px and the chat sat 1.3 screens down.
+      The situations card moved below the chat, the hero was trimmed to 471px, and a
+      "Start the conversation" button jumps to a `#chat` anchor that clears the sticky header.
+      Trust signals (shared `ProvenanceBand`, and testimonials when they exist) sit **below** the
+      chat, because anything above it pushes the composer off the screen.
+      **Email capture at the wall**: `UpgradeAnonCard` now offers the guide by email as a
+      collapsed, subordinate option, so a paid visitor who will not make an account is no longer
+      worth nothing. Source `chat_wall`, added to **both** source lists.
+      **Deliberately not built:** Performance Max ("asset groups"), Smart Bidding, Consent Mode
+      v2 and a cookie banner (US-only), the Ads API for offline import (a CSV moves 0-3 rows in
+      ten minutes).
+      **Before spending a cent**, walk the funnel on a real phone: the production funnel has
+      never carried real traffic, and a total Google sign-in blocker survived in it until it was
+      found by hand. Runbook: [deployment.md](deployment.md#google-ads).
+- [ ] Then: SEO/community/AEO channels, and the paid test itself once the pre-flight passes.
 
 ## Open questions / decisions
 

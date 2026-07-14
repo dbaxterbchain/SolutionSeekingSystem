@@ -155,6 +155,44 @@ async function syncOrgSubscription(sub: Stripe.Subscription): Promise<boolean> {
   return true;
 }
 
+/**
+ * Ad attribution carried on the subscription's own metadata.
+ *
+ * Read from `sub.metadata`, NOT from the checkout session, and that is deliberate.
+ * Stripe persists subscription metadata, so these values are present on every
+ * later event about this subscription. Reading them here means there is one code
+ * path instead of two, and no race between `checkout.session.completed` and
+ * `customer.subscription.created`, which Stripe delivers in no guaranteed order.
+ *
+ * Returns only the keys that are actually present, so a renewal event (whose
+ * metadata carries the same values) cannot null out a column, and a subscription
+ * that predates this feature is simply left alone.
+ */
+function attributionColumns(sub: Stripe.Subscription): Record<string, string> {
+  const m = sub.metadata ?? {};
+  const keys = [
+    'click_id',
+    'click_source',
+    'utm_source',
+    'utm_medium',
+    'utm_campaign',
+    'utm_term',
+    'utm_content',
+    'landing_path',
+  ] as const;
+
+  const columns: Record<string, string> = {};
+  for (const key of keys) {
+    if (m[key]) columns[key] = m[key];
+  }
+  // Stored as a string in metadata (Stripe has no number type there).
+  const at = Number(m.first_touch_at);
+  if (Number.isFinite(at) && at > 0) {
+    columns.first_touch_at = new Date(at).toISOString();
+  }
+  return columns;
+}
+
 async function upsertSubscription(userId: string, sub: Stripe.Subscription) {
   // Current Stripe API versions put the billing period on the subscription
   // item; older webhook-endpoint API versions (payload snapshots) keep it on
@@ -172,6 +210,7 @@ async function upsertSubscription(userId: string, sub: Stripe.Subscription) {
     price_id: item?.price.id ?? null,
     cancel_at_period_end: sub.cancel_at_period_end,
     current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+    ...attributionColumns(sub),
   });
   if (error) {
     console.error('subscription upsert failed', error);

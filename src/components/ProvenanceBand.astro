@@ -1,0 +1,66 @@
+---
+import { PROVENANCE, PROVENANCE_LINE } from '../data/provenance';
+
+/**
+ * Why you might trust this, in the only terms we can honestly offer: who built it
+ * and why, what is free, and a promise never to invent praise.
+ *
+ * `compact` renders the one-line version, for pages (the mode landing pages)
+ * where a three-column band would just be noise below the thing the visitor came
+ * to use.
+ */
+interface Props {
+  compact?: boolean;
+}
+
+const { compact = false } = Astro.props;
+---
+
+{
+  compact ? (
+    <p class="text-center text-sm leading-relaxed text-slate-500">
+      {PROVENANCE_LINE}{' '}
+      <a
+        href="/about"
+        class="font-medium text-brand-600 hover:text-brand-700"
+        data-track-cta="mode_page"
+        data-track-label="Why we built this"
+      >
+        Why we built this →
+      </a>
+    </p>
+  ) : (
+    <div>
+      <div class="grid gap-8 md:grid-cols-3">
+        {PROVENANCE.map((item) => (
+          <div>
+            <span class="text-2xl" aria-hidden="true">
+              {item.icon}
+            </span>
+            <h3 class="mt-3 font-heading text-lg font-bold text-ink-800">{item.title}</h3>
+            <p class="mt-2 text-sm leading-relaxed text-slate-600">{item.body}</p>
+          </div>
+        ))}
+      </div>
+      <p class="mt-10 text-center text-sm text-slate-500">
+        Built by David and Shannon Baxter at
+        <a
+          href="https://www.bchain.coffee"
+          rel="noopener"
+          class="font-medium text-brand-600 hover:text-brand-700"
+        >
+          Beanchain Coffee
+        </a>
+        ·
+        <a
+          href="/about"
+          class="font-medium text-brand-600 hover:text-brand-700"
+          data-track-cta="home_proof"
+          data-track-label="Why we built this"
+        >
+          Why we built this →
+        </a>
+      </p>
+    </div>
+  )
+}

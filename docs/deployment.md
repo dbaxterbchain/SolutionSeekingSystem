@@ -581,9 +581,22 @@ Netlify env changes only reach Functions after a **redeploy**.
 2. **Variables → New → Data Layer Variable**, one per event parameter. The "Data Layer
    Variable Name" must match the key we push exactly:
    `cta_location`, `cta_label`, `destination`, `agent`, `tier`, `plan`, `mode_id`,
-   `demo_id`, `method`, `from_anon`, `message_index`, `value`, `currency`.
-3. **Trigger → Custom Event**, event name (regex enabled):
-   `^(cta_clicked|demo_viewed|mode_viewed|signup_started|signup_completed|first_message_sent|message_sent|free_limit_reached|checkout_started|checkout_abandoned|checkout_success_viewed)$`
+   `demo_id`, `method`, `from_anon`, `message_index`, `value`, `currency`,
+   `source`, `helpful`, `consented`.
+3. **Trigger → Custom Event**, event name (regex enabled). **This must list EVERY event in
+   the union in [`src/lib/analytics.ts`](../src/lib/analytics.ts).** An event missing from
+   this regex is pushed to the dataLayer and then dies there: it never reaches GA4, and
+   nothing anywhere reports an error.
+
+   > This is not hypothetical. The regex used to omit `email_captured`, `anon_chat_started`,
+   > `team_enquiry_submitted`, `feedback_given` and `testimonial_submitted`, which meant the
+   > **lead-magnet conversion was invisible in GA4** while the code fired it perfectly. If
+   > you add an event to the union, add it here in the same breath.
+
+   ```
+   ^(cta_clicked|demo_viewed|mode_viewed|signup_started|signup_completed|anon_chat_started|first_message_sent|message_sent|free_limit_reached|checkout_started|checkout_abandoned|checkout_success_viewed|team_enquiry_submitted|email_captured|feedback_given|testimonial_submitted)$
+   ```
+
    One trigger for everything is far easier to maintain than one per event.
 4. **Tag → Google Analytics: GA4 Event**, Event Name = `{{Event}}`, fire on the trigger
    from step 3. Under **Event Parameters**, add one row per parameter. Only the *value*
@@ -609,12 +622,16 @@ Netlify env changes only reach Functions after a **redeploy**.
 ### 4. GA4 UI setup
 
 - **Admin → Events → Mark as key event**: `subscription_completed`, `signup_completed`,
-  `checkout_started`, `free_limit_reached`, `first_message_sent`.
+  `checkout_started`, `free_limit_reached`, `first_message_sent`, `email_captured`.
 - **Admin → Custom definitions → Create custom dimension** (event-scoped) for
-  `cta_location`, `tier`, `plan`, `agent`, `mode_id`, `demo_id`. Without this, the
+  `cta_location`, `tier`, `plan`, `agent`, `mode_id`, `demo_id`, `source`. Without this, the
   parameters are collected but **cannot be reported on**.
 - **Admin → Product links → Search Console** — link it, or "which query led to a
   subscription" stays unanswerable.
+- **Admin → Data Streams → your stream → Configure tag settings → List unwanted referrals:
+  add `checkout.stripe.com`.** Without it, the return trip from Stripe starts a **new
+  session attributed to "referral / stripe"**, which severs every purchase from the campaign
+  that paid for it. One field, and it silently ruins paid reporting if you skip it.
 
 ### 5. Verify
 
@@ -631,3 +648,87 @@ Use **GTM Preview** alongside **GA4 → Admin → DebugView**:
 > **Note:** ad blockers strip GTM for a meaningful share of visitors, so top-of-funnel
 > counts will always undercount. Compare *ratios* over time, not absolutes. Revenue is
 > never undercounted, because it comes from the webhook.
+
+## Google Ads
+
+A small Search test, run to **buy data, not customers**. At $5/month the CAC maths does not
+close, and roughly zero to two subscriptions from a $300 budget is the *expected* outcome.
+Judge the test on **cost per started conversation**, never on subscriptions.
+
+### Ad attribution: how a click becomes a row in the database
+
+`?gclid=...` lands on the page → [`src/lib/attribution.ts`](../src/lib/attribution.ts)
+stores it **first-touch** in localStorage (30-day TTL) → it survives the anonymous chat and
+the **Google OAuth redirect that destroys the query string** → the checkout request carries it
+→ Stripe Checkout metadata → the subscription's metadata → the webhook writes it onto the
+`subscriptions` row (migration `0014`).
+
+The paid-test report is then one query:
+
+```sql
+select utm_term, landing_path, count(*) as subscriptions
+from public.subscriptions
+where click_id is not null
+group by 1, 2 order by 3 desc;
+```
+
+Two things that will bite, both already handled, both worth knowing:
+
+- **A gclid is routinely longer than 120 characters.** `checkout.ts` used to slice every
+  metadata value at 120, which would have stored a plausible-looking, useless click id and
+  failed a conversion import months later. Click ids get 500 (Stripe's hard limit). Do not
+  "tidy" that back into a single constant.
+- **Our own guide-delivery email links back with `?utm_source=email`.** First-touch-wins would
+  have let our own email claim credit for a conversion an ad bought. A real paid click always
+  beats a stored non-paid touch. That clause is the only thing preventing it.
+
+### One-time setup
+
+1. **Google Ads → Account settings → Auto-tagging: ON.** No auto-tagging, no gclid, no test.
+2. **Ads → Tools → Data manager → link the GA4 property.**
+3. **Ads → Goals → Conversions → New → Import → GA4.** Import exactly four:
+
+   | Event | Setting |
+   |---|---|
+   | `first_message_sent` | **Primary**, Count = **One** |
+   | `signup_completed` | Secondary |
+   | `subscription_completed` | Secondary (yes, even though it is the money: at ~150 clicks it fires 0-1 times, and as a Primary it would make CPA meaningless) |
+   | `email_captured` | Secondary |
+
+   **Count = One, not Every.** `first_message_sent` fires whenever a conversation has one user
+   message, and "New conversation" resets that, so one enthusiastic visitor would otherwise
+   look like three conversions.
+
+   Do **not** import `checkout_started`, `message_sent`, `mode_viewed` or `cta_clicked`.
+
+### The campaign
+
+- **Search only. Search partners OFF, Display OFF** (both default ON, both eat the budget).
+- **Locations: United States, "Presence: people in your targeted locations"** (the default,
+  "presence or interest", bills you for clicks from anywhere on earth).
+- **Bidding: Maximize Clicks with a max CPC cap (~$2.50).** NOT Target CPA: Smart Bidding needs
+  roughly 15-30 conversions a month to learn, and you will have far fewer. With manual bidding
+  the conversion actions above are measurement only, which is exactly what is wanted.
+- **Budget: ~$15/day for 21 days.** Put the end date in a calendar.
+- **Two ad groups, each pointing at its matching mode page** (this is what the mode pages are
+  for): manager → `/practice/modes/manager`, co-worker → `/practice/modes/coworker`. Never the
+  homepage.
+- **Negatives, day one:** free, pdf, template, script, letter, jobs, salary, hiring, fire,
+  termination, "write up", lawsuit, attorney, hr complaint, reddit, meme, chatgpt. (`letter`,
+  `write up` and `termination` are HR-paperwork intent, not conversation-prep intent.)
+- **No Performance Max.** "Asset groups" are a PMax concept: it sprays a small budget across
+  YouTube, Display and Gmail, cannot be debugged, and needs a conversion diet we cannot feed.
+
+### Decide the outcome BEFORE spending
+
+- **Spend more if** cost per started conversation is under ~$12 **and** at least 10% of starters
+  give an email or create an account.
+- **Stop if** cost per start is over $25, or under 5% of clicks start a conversation. That means
+  the keyword-to-page match is wrong, and no bid tuning fixes it.
+
+### Not built, on purpose
+
+Consent Mode v2 and a cookie banner (US-only targeting, so not required; adding them costs
+conversions and buys nothing) · the Google Ads API for offline conversion upload (a developer
+token and an approval process, to move 0-3 rows that **Ads → Goals → Conversions → Import →
+Upload CSV** moves in ten minutes) · Enhanced Conversions · server-side GTM.

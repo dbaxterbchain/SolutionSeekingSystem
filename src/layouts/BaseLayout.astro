@@ -126,6 +126,13 @@ const bingVerification = import.meta.env.PUBLIC_BING_SITE_VERIFICATION;
     <Footer />
 
     <script>
+      // Remember where this visit came from BEFORE anything else can navigate or
+      // rewrite the URL. An ad click arrives as ?gclid= on the landing page, but
+      // the purchase happens later, on the far side of an OAuth redirect that
+      // destroys the query string, so it has to be caught on arrival.
+      import { captureFirstTouch } from '../lib/attribution';
+      captureFirstTouch();
+
       // One delegated listener powers every [data-track-cta] link on the site,
       // so static pages can be instrumented without shipping an island.
       import { initDomTracking } from '../lib/analytics';

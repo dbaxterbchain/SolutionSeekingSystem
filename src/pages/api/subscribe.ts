@@ -10,7 +10,15 @@ export const prerender = false;
 /** Deliberately permissive: rejecting a valid address is worse than storing a typo. */
 const looksLikeEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
 
-const SOURCES = ['pdf_guide', 'footer', 'pricing'] as const;
+/**
+ * KEEP IN STEP WITH `EmailSource` in src/lib/analytics.ts. An unrecognised source
+ * is silently rewritten to 'footer' below, so a value that exists on the client
+ * and not here is not an error, it is a quietly wrong row in the database.
+ *
+ * 'chat_wall' is the highest-intent one: they have three messages of a real
+ * conversation on screen and have just hit the trial wall.
+ */
+const SOURCES = ['pdf_guide', 'footer', 'pricing', 'chat_wall'] as const;
 
 /**
  * Join the email list.

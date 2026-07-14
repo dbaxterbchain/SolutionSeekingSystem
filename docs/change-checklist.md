@@ -148,6 +148,26 @@ stale docs, no orphaned pages, no broken prompt cache.
 - [ ] Any endpoint that moves data between users must require proof of BOTH sessions. A user
       id is not a credential.
 
+## Paid traffic and ads
+
+- [ ] **A new analytics event must be added in FOUR places, or it silently does nothing:**
+      the union in [`src/lib/analytics.ts`](../src/lib/analytics.ts), the **GTM custom-event
+      trigger regex**, GA4 **key events** (if it is a conversion), and the **Google Ads
+      import** (if it should bid). The regex is the one people forget: `email_captured` fired
+      into the dataLayer for weeks and never reached GA4, so the lead-magnet conversion was
+      invisible while looking perfectly healthy in the code.
+- [ ] **A new `EmailSource` goes in BOTH `analytics.ts` and `subscribe.ts`.** They are two
+      independent lists and the server **silently rewrites an unknown source to `'footer'`**,
+      so the client reports one thing and the database records another, with no error.
+- [ ] **Never truncate a click id.** Stripe metadata values are capped at 500 characters and a
+      gclid routinely exceeds 120. A truncated click id looks fine and is useless.
+- [ ] **Ad landing pages: nothing goes above the chat.** The composer is the conversion. Trust
+      signals, situation lists and proof all belong below it, or they push the one thing the
+      visitor came for off a phone screen.
+- [ ] Anything that adds a URL parameter to a link back into the site (an email, a QR code)
+      must not be able to overwrite a real ad click. See the first-touch rules in
+      [`src/lib/attribution.ts`](../src/lib/attribution.ts).
+
 ## Entitlement changes
 
 - [ ] **The server decides who is entitled, and the client asks it.** `checkEntitlement()`
