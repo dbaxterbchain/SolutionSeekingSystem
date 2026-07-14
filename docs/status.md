@@ -219,6 +219,30 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       **Requires** `ADMIN_EMAILS` and `NETLIFY_BUILD_HOOK_URL` in Netlify, migration `0012`, and
       `SUPABASE_SERVICE_ROLE_KEY` **scoped to Builds** (not only Functions), or the testimonials
       section silently vanishes from a green deploy.
+- [x] **Trial work follows the user, whatever they do next** (done 2026-07-13). Two bugs, both
+      caused by the anonymous trial meeting an account that already existed.
+      **Google sign-in was broken for anyone who chatted first.** `google()` called
+      `linkIdentity()` whenever the user was anonymous, regardless of whether they pressed Sign
+      in or Register, so a returning user (who now carries an anonymous session the moment they
+      send a message) had their Google identity attached to a throwaway trial user. Supabase
+      refused, correctly, and bounced them back with `email_exists` in the URL, which nothing
+      read: an empty login form, no message, no console error. Linking is now used only when a
+      trial user is REGISTERING; signing in uses `signInWithOAuth`. `readOAuthRedirectError()`
+      surfaces provider failures instead of swallowing them.
+      **A trial conversation was stranded when the person already had an account.** Registering
+      keeps the same user id, so the conversation follows for free; signing in is a different
+      user, and the work stayed behind, unreachable. `/api/claim-trial-work` (migration `0013`)
+      re-parents `chat_sessions` and `saved_sessions`, and the caller must prove they hold
+      **both** JWTs: possession of the trial's token is what proves the trial was theirs, and
+      without it the endpoint would be "hand me any stranger's conversation". `ai_usage` is
+      deliberately never merged: a free-message allowance is not transferable, and merging would
+      punish someone for trying the product twice. Verified end to end in a browser (chat
+      anonymously, sign in, the conversation is in History and the account keeps its own 10 free
+      messages) and against a forged token, a non-anonymous token, and an anonymous caller.
+      Migration `0013` also makes the `service_role` grants on `chat_sessions`/`saved_sessions`
+      **explicit**: the hosted project had them via default privileges and the local stack did
+      not, which is the same local-vs-production divergence that hid the grant hole behind
+      migrations 0006-0009.
 - [ ] Then: SEO/community/AEO channels, and only after that a small (~$300-500) paid test
       aimed at email capture rather than direct subscriptions.
 

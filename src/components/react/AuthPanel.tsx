@@ -8,6 +8,7 @@ import {
 } from '../../lib/authErrors';
 import { PasswordInput, PasswordChecklist } from './PasswordInput';
 import { markSignupStarted } from '../../lib/analytics';
+import { stashTrialSession } from '../../lib/trialClaim';
 import { FREE_MESSAGES_AFTER_SIGNUP } from '../../data/pricing';
 import { getCaptchaToken } from '../../lib/turnstile';
 
@@ -30,7 +31,7 @@ const inputClass =
   'w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100';
 
 export default function AuthPanel({ linkExpired = false }: { linkExpired?: boolean }) {
-  const { user } = useSession();
+  const { session, user } = useSession();
   // An anonymous trial user reaching this panel is converting, not registering
   // fresh: we upgrade their existing account so the conversation survives.
   const isAnon = user?.is_anonymous === true;
@@ -73,14 +74,12 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
   }, [cooldown]);
 
   /**
-   * A trial user who is signing into an account they already have. Their trial
-   * conversation belongs to the anonymous user and cannot follow them, so say so
-   * before they click rather than after.
+   * A trial user signing in to an account they already have. Their conversation
+   * lives under the anonymous user, so it does not follow them by itself; the
+   * server re-parents it (see src/lib/trialClaim.ts). Say so, because otherwise
+   * they have every reason to think they are about to lose it.
    */
-  const abandoningTrial =
-    isAnon &&
-    mode === 'signin' &&
-    Boolean(oauthError && ALREADY_REGISTERED.includes(oauthError.code ?? ''));
+  const signingInFromTrial = isAnon && mode === 'signin';
 
   // Preserves ?next= so OAuth and email links land back here and the
   // post-sign-in redirect can complete the round trip.
@@ -156,6 +155,10 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
         // With confirmations off (e.g. local default), onAuthStateChange
         // re-renders the island into the Library.
       } else {
+        // Signing in replaces an anonymous session with a different user, so the
+        // trial's work would be left behind. Stash its JWT first; once the real
+        // session lands, AccountView uses it to claim the conversation.
+        stashTrialSession(session);
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -229,6 +232,9 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
       return;
     }
 
+    // Same as the password path: signing in hands the session to a different
+    // user, so stash the trial's JWT before we leave for Google.
+    stashTrialSession(session);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo },
@@ -309,7 +315,7 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
       {oauthError && (
         <p className="mt-4 rounded-xl bg-amber-50 px-4 py-2.5 text-sm leading-relaxed text-amber-800">
           {ALREADY_REGISTERED.includes(oauthError.code ?? '')
-            ? 'You already have an account with that Google address. Press Continue with Google again to sign in to it.'
+            ? 'You already have an account with that Google address. Press Continue with Google again to sign in to it, and your conversation will come with you.'
             : oauthError.message}
         </p>
       )}
@@ -377,13 +383,10 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
         )}
 
         {error && <p className="text-sm text-red-600">{error}</p>}
-        {/* Be honest about the cost before they click, not after. Signing into an
-            account they already have replaces this trial session, so the trial
-            conversation stays with the trial user and does not come with them. */}
-        {abandoningTrial && (
+        {signingInFromTrial && (
           <p className="text-xs leading-relaxed text-slate-500">
-            Signing in opens the account you already have. The conversation from this trial
-            will not carry over to it.
+            Signing in opens the account you already have, and your conversation from this
+            trial comes with you.
           </p>
         )}
         {notice && <p className="text-sm text-brand-700">{notice}</p>}

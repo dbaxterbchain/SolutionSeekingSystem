@@ -19,6 +19,7 @@ import {
 import { safeNext } from '../../lib/accountLink';
 import { ENTITLED_STATUSES } from '../../lib/subscription';
 import { useEntitlement } from '../../lib/entitlement';
+import { claimTrialWork, hasTrialStash } from '../../lib/trialClaim';
 import { track, getGaIds, consumeSignupCompleted } from '../../lib/analytics';
 import { FREE_ACCOUNT_MESSAGES, priceCopy } from '../../data/pricing';
 import { usePasswordRecovery } from '../../lib/usePasswordRecovery';
@@ -33,8 +34,38 @@ const checkoutSuccessParam = () =>
   new URLSearchParams(window.location.search).get('checkout') === 'success';
 
 export default function AccountView() {
-  const { user, loading } = useSession();
+  const { session, user, loading } = useSession();
   const { recovering, linkExpired, finishRecovery } = usePasswordRecovery();
+
+  /*
+   * If they chatted anonymously and then signed in to an account they already
+   * had, their trial conversation belongs to a different user and would simply
+   * be gone. AuthPanel stashed the trial's JWT before handing the session over;
+   * claim the work now that a real session exists.
+   *
+   * `claimDone` gates the ?next= redirect below. Without it, a sign-in that came
+   * from the chat page would navigate away mid-request and cancel the claim,
+   * which is a silent, unrecoverable loss of the thing they were working on.
+   */
+  const [claimDone, setClaimDone] = useState(!hasTrialStash());
+  const [claimed, setClaimed] = useState(0);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!session || !user || user.is_anonymous) {
+      setClaimDone(true);
+      return;
+    }
+    let active = true;
+    claimTrialWork(session.access_token, user.id).then((n) => {
+      if (!active) return;
+      setClaimed(n);
+      setClaimDone(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [loading, session?.access_token, user?.id]);
 
   // Tools link here with ?next=<path> — once signed in, send the user back.
   const next =
@@ -63,8 +94,11 @@ export default function AccountView() {
     // A recovery session is a signed-in user — don't bounce away before the
     // set-new-password form has been shown. An anonymous user carries a session
     // too, but bouncing them back would skip the registration they came for.
-    if (user && !user.is_anonymous && next && !recovering) window.location.replace(next);
-  }, [user, next, recovering]);
+    // And never navigate away while a trial claim is still in flight.
+    if (user && !user.is_anonymous && next && !recovering && claimDone) {
+      window.location.replace(next);
+    }
+  }, [user, next, recovering, claimDone]);
 
   if (user && recovering) {
     return <RecoveryPanel onDone={finishRecovery} />;
@@ -107,7 +141,15 @@ export default function AccountView() {
   // create one, so show the auth panel (which converts them in place) rather
   // than a library they don't have.
   return user && !user.is_anonymous ? (
-    <Library email={user.email ?? ''} />
+    <>
+      {claimed > 0 && (
+        <p className="mb-6 rounded-xl bg-emerald-50 px-4 py-3 text-sm leading-relaxed text-emerald-800">
+          We moved {claimed === 1 ? 'the conversation' : `the ${claimed} conversations`} from your
+          trial into this account. {claimed === 1 ? 'It is' : 'They are'} in your history below.
+        </p>
+      )}
+      <Library email={user.email ?? ''} />
+    </>
   ) : (
     <AuthPanel linkExpired={linkExpired} />
   );

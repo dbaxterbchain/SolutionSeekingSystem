@@ -134,6 +134,20 @@ stale docs, no orphaned pages, no broken prompt cache.
 - [ ] Testimonial display must survive an empty list (the section disappears) and a missing
       name (no attribution line, and never an invented one like "Verified user").
 
+## Anonymous trial changes
+
+- [ ] **A trial user's work must survive whatever they do next.** Two different paths, and
+      they are not the same: **registering** converts the anonymous user in place (same
+      `auth.users` id, so conversation + message count carry over with no code), while
+      **signing in** to an account they already had is a *different user*, and their work
+      would be stranded. `stashTrialSession()` + `/api/claim-trial-work` re-parent it.
+- [ ] `linkIdentity()` is for **registering** from a trial, never for signing in. Using it on
+      the sign-in path is what broke Google sign-in for everyone who chatted first.
+- [ ] **Never merge `ai_usage` across users.** Conversations transfer; free-message allowances
+      do not. Merging would punish someone for trying the product twice.
+- [ ] Any endpoint that moves data between users must require proof of BOTH sessions. A user
+      id is not a credential.
+
 ## Entitlement changes
 
 - [ ] **The server decides who is entitled, and the client asks it.** `checkEntitlement()`
