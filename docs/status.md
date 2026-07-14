@@ -32,13 +32,16 @@ _Last updated: 2026-07-13_
 - [x] Link the GitHub repo to Netlify for continuous deploys (see [deployment.md](deployment.md)).
 - [x] Point the custom domain at the Netlify site — live at **solutionseeking.com** (apex primary).
 - [ ] Confirm real brand fonts (currently using close free stand-ins: Anton/Poppins/Inter).
-- [ ] **Verify in Google Search Console + Bing Webmaster, submit `/sitemap-index.xml`, and link
-      GA4 ↔ Search Console.** Open since before the demos and modes shipped, which means Google
-      may not yet know those ~48 pages exist. The code side is done (set
-      `PUBLIC_GOOGLE_SITE_VERIFICATION` / `PUBLIC_BING_SITE_VERIFICATION`, or use DNS TXT); the
-      account side is a 20-minute job that nothing else can substitute for. The GA4 link is what
-      makes "which query led to a subscription" answerable at all. See
-      [deployment.md](deployment.md#search-console--bing-verification).
+- [x] **Google Search Console + Bing: verified by DNS TXT** (2026-07-13). DNS rather than the
+      meta tag, which is the better of the two: it verifies the whole domain and survives a
+      redesign. `PUBLIC_GOOGLE_SITE_VERIFICATION` / `PUBLIC_BING_SITE_VERIFICATION` therefore
+      stay **unset**, and BaseLayout simply omits the tags. They remain as the fallback for
+      anyone who cannot touch DNS.
+- [ ] **Still to do in Search Console: submit `/sitemap-index.xml`, and link GA4 ↔ Search
+      Console.** Verification only proves ownership; it does not tell Google what exists, and it
+      does not join queries to conversions. The sitemap is live and healthy (50 URLs: all 8 mode
+      pages, all 7 demos, `/guide` and `/pricing`; `/admin` and `/account` correctly excluded).
+      The GA4 link is what makes "which query led to a subscription" answerable at all.
 
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)
