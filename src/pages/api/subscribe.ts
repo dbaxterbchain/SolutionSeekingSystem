@@ -97,12 +97,30 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     guideUrl: `${origin}/practice/guide?utm_source=email&utm_campaign=guide_delivery`,
   });
 
-  await sendEmail({
+  const sent = await sendEmail({
     to: email,
     ...mail,
     // A retried request must not send the guide twice.
     idempotencyKey: `guide-delivery/${token}`,
   });
+
+  /*
+   * If the email did not go, SAY SO.
+   *
+   * This used to return 200 regardless, so the form cheerfully said "Check your
+   * inbox. The guide is on its way" while Resend was rejecting every send with a
+   * 403 (EMAIL_FROM pointed at a domain the API key is not allowed to send from).
+   * Nobody got a guide, nobody saw an error, and the only trace was a line in the
+   * function log. A promise we did not keep is worse than an error we admitted to,
+   * and on paid traffic it is money spent on a dead end.
+   *
+   * This does NOT reintroduce the enumeration oracle the 200s exist to prevent:
+   * the failure is about OUR configuration, and the response is identical for
+   * every address, subscribed or not.
+   */
+  if (!sent) {
+    return json({ error: 'send_failed' }, 500);
+  }
 
   return json({ ok: true });
 };

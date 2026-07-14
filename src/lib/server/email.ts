@@ -48,6 +48,16 @@ export async function sendEmail(opts: SendOptions): Promise<boolean> {
 
   if (error) {
     console.error('resend send failed', error.name, error.message);
+    // The one that actually happened, and the one that will happen again: the
+    // domain in EMAIL_FROM must EXACTLY match a domain the API key is allowed to
+    // send from. Get it wrong and every send 403s while the site keeps promising
+    // people their inbox. Say the fix out loud, in the log, at the moment it breaks.
+    if (/not authorized|domain/i.test(error.message ?? '')) {
+      console.error(
+        `EMAIL_FROM is "${serverEnv('EMAIL_FROM')}". Resend refused it. The from-domain must ` +
+          'match a verified domain on this API key, exactly. Fix EMAIL_FROM in Netlify and redeploy.'
+      );
+    }
     return false;
   }
   console.log('email sent', data?.id, opts.subject);
