@@ -11,6 +11,7 @@ Project documentation for the **Solution Seeking System** website.
 | [design-system.md](design-system.md) | Brand tokens, fonts, and the shared UI components. |
 | [deployment.md](deployment.md) | Hosting on Netlify, continuous deploys, and the custom domain. |
 | [change-checklist.md](change-checklist.md) | **The standard for shipping changes** — touchpoints to check per change type (pages, content, AI/prompts, database, env vars, deploys). |
+| [ads-campaign.md](ads-campaign.md) | The Google Ads build sheet: settings, keywords, ad copy, negatives, and the decision rule for the paid test. |
 
 ## Quick links
 
