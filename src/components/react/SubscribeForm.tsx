@@ -91,7 +91,7 @@ export default function SubscribeForm({
           required
           placeholder="you@example.com"
           aria-label="Email address"
-          className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          className="min-w-[12rem] flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
         />
         <button type="submit" disabled={busy} className="btn-primary shrink-0 disabled:opacity-60">
           {busy ? 'Sending…' : cta}
