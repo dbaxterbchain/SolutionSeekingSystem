@@ -12,6 +12,10 @@ dist/
 *.log
 .env
 .env.production
+.env*.local
+
+# feature-verification browser output (curated copies live in docs/features/)
+.playwright-mcp/
 
 # editor / OS
 .DS_Store

@@ -39,3 +39,20 @@ npm run build    # production build; locally set placeholder PUBLIC_SUPABASE_* v
 
 Migrations: `supabase/migrations/000N_name.sql`, apply with `npx supabase db push`,
 verify with `npx supabase migration list`. See [docs/deployment.md](docs/deployment.md).
+
+## Verifying features in the browser
+
+After building or changing a user-facing feature, verify it end to end in a real browser,
+not just `npm run check`. Drive it with the **Playwright MCP** plugin (managed Chromium);
+in a headless session where those tools aren't loaded, fall back to `playwright-core`
+against the system Chrome.
+
+Save the final, successful screenshots to `docs/features/<feature-name>/` with descriptive
+kebab-case names (e.g. `subscriber-dashboard-streamed-reply.png`) plus a short `README.md`
+captioning each. Curated copies only: raw session output (`.playwright-mcp/`) is gitignored.
+This keeps an on-hand visual record of every shipped feature.
+
+Local auth testing: the local Supabase stack has captcha disabled, so keep
+`PUBLIC_TURNSTILE_SITE_KEY` **unset** in `.env`. A set key makes the client demand a
+Turnstile token the local stack never asked for, and a headless browser can't solve the
+challenge (wrong domain), so sign-in fails.
