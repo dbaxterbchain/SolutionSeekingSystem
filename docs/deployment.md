@@ -192,6 +192,51 @@ well-known dev defaults — never use them anywhere real.
 > `net start winnat` in an **admin** PowerShell to release the reservation, then restart
 > Docker.
 
+### Database advisors & accepted findings
+
+Supabase lints the database for security and performance issues. Re-check after any
+schema change (Dashboard equivalent: **Advisors** in the left nav):
+
+```bash
+npx supabase db advisors --linked --type all --level info
+```
+
+A finding either gets fixed in a migration or added to the accepted table below with its
+reason — never silently ignored.
+
+The 2026-07-20 hardening pass (migrations `0015`–`0020`) cleared: `auth_rls_initplan`
+(policies now evaluate `(select auth.uid())` once per query, not per row),
+`function_search_path_mutable` (every function pins `search_path`), `extension_in_public`
+(**`citext` now lives in the `extensions` schema** — PostgREST resolves its operators via
+its extra search path, which includes `extensions` on hosted and in `config.toml`
+locally), both `*_security_definer_function_executable` findings (below),
+`unindexed_foreign_keys` (covering indexes, `0018`), and the unbounded `rate_limit`
+growth hiding behind an unused-index finding (opportunistic purge in `0019`).
+
+**`rls_auto_enable` / `ensure_rls`:** the hosted project carried an event trigger that
+auto-enables RLS on every table created in `public` — added from the dashboard, present
+in no migration, so local stacks silently lacked it. Migration `0020` formalizes the
+hosted definition verbatim and revokes the default PUBLIC execute grant the advisors
+flagged. It stays: it is a third safety layer next to `0010`'s default-privilege revoke.
+
+**Accepted findings** (intentional — do not "fix"):
+
+| Finding | Where | Why it stays |
+|---|---|---|
+| `auth_allow_anonymous_sign_ins` | `chat_sessions`, `saved_sessions`, `subscriptions`, `ai_usage` | The anonymous trial depends on it: anonymous users are real `auth.users` rows carrying `role=authenticated` (see `0006`). `to authenticated` is as narrow as these policies can get. |
+| `rls_enabled_no_policy` | `rate_limit`, `team_enquiries`, `email_subscribers`, `testimonials`, `organizations`, `org_members` | Deliberate deny-all: server-write-only tables; only the service role (which bypasses RLS) touches them (`0010`, `0012`). |
+| `unused_index` | `subscriptions_click_idx`, `email_subscribers_token_idx`, the four `0018` FK indexes | Young or event-driven indexes: attribution just shipped, token lookups seq-scan while the table is tiny, and the FK indexes only fire on deletions. |
+
+**Manual dashboard settings** (cannot be migrations — both set 2026-07-20; re-apply if
+the project is ever restored or recreated):
+
+- **Leaked password protection** (`auth_leaked_password_protection`): Dashboard →
+  Authentication → password settings → HaveIBeenPwned check **enabled**. Pro plan feature.
+- **Auth connection allocation** (`auth_db_connections_absolute`): switched from a fixed
+  10 connections to **percentage strategy at 10%** (6 of the instance's 60 at peak; Auth
+  holds connections only briefly, and the percentage scales automatically with any future
+  instance upgrade).
+
 ## Phase 3 — AI assistants + subscription
 
 The Guide/Mentor chat runs on four Astro server endpoints (`src/pages/api/{chat,

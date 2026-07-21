@@ -105,6 +105,18 @@ stale docs, no orphaned pages, no broken prompt cache.
       email list. Do not reintroduce that.)
 - [ ] Entitlement-bearing tables stay server-write-only — **no client write policies AND no
       client write grants** (`subscriptions`, `ai_usage`; see migration `0011`).
+- [ ] **Policies follow the `0015` pattern**: compare `(select auth.uid())`, never bare
+      `auth.uid()` (the bare call re-evaluates per row — advisor `auth_rls_initplan`), and name
+      the audience with `to authenticated` unless `anon` genuinely needs the policy.
+- [ ] **Functions pin `search_path` in the CREATE header and revoke EXECUTE.**
+      `set search_path = ''` when the body schema-qualifies everything; add `extensions` when
+      citext operators are involved (see `0016`). Plus the 0003-style `revoke execute ... from
+      public, anon, authenticated`. A later `create or replace` silently drops an ALTER-added
+      pin, so re-state it in the header (see `0019`).
+- [ ] **Re-run the advisors after the change** — `npx supabase db advisors --linked` — and
+      either fix a new finding or add it to the accepted table in
+      [deployment.md](deployment.md#database-advisors--accepted-findings). Never ignore one
+      silently.
 - [ ] **Verify the RLS claim rather than asserting it.** Hit the table with the *publishable*
       key and confirm the read is empty and the write is refused. Local and the hosted project
       have had different default grants, so "it's safe locally" has proven nothing.

@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-07-13_
+_Last updated: 2026-07-20_
 
 ## At a glance
 
@@ -279,6 +279,24 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       **Before spending a cent**, walk the funnel on a real phone: the production funnel has
       never carried real traffic, and a total Google sign-in blocker survived in it until it was
       found by hand. Runbook: [deployment.md](deployment.md#google-ads).
+- [x] **Database hardening pass from the Supabase advisors** (2026-07-20). Ran the security and
+      performance advisors against the hosted project (35 findings) and fixed everything fixable
+      in six migrations (`0015`–`0020`): every RLS policy now evaluates `(select auth.uid())`
+      once per query instead of once per row and names its audience (`to authenticated` — the
+      anonymous trial is unaffected, anonymous users carry that role); all five functions pin
+      `search_path`; `citext` moved out of the API schema into `extensions`; the four
+      `on delete set null` foreign keys got covering indexes so deleting a user or a chat does
+      not seq-scan the child tables; `bump_rate_limit` now opportunistically purges buckets
+      older than 48h (the `rate_limit` table had **no cleanup at all** and grew forever — that
+      missing purge was also why its `window_start` index sat "unused"); and the hosted-only
+      `rls_auto_enable`/`ensure_rls` event trigger (dashboard-added, in no migration) is
+      formalized verbatim with its default PUBLIC execute grant revoked — the same
+      local-vs-hosted drift class as the 0010 episode, caught by an advisor this time. The
+      remaining findings are intentional and documented in
+      [deployment.md](deployment.md#database-advisors--accepted-findings). The two
+      dashboard-only items (leaked password protection, Auth connections switched to the
+      percentage strategy at 10%) were toggled the same day; the advisors now report only the
+      documented acceptances.
 - [ ] Then: SEO/community/AEO channels, and the paid test itself once the pre-flight passes.
 
 ## Open questions / decisions
