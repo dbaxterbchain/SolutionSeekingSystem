@@ -88,7 +88,23 @@ history, optional customer CNAME by concierge). Full plan in the approved design
       setup" clause was added to `SHARED_CONDUCT` telling them to adopt a trusted
       `<assistant_setup>` block; after that the assistant answers from its documents. Advisors
       clean; publishable key denied on both new tables.
-- [ ] **Phase D — white-label**: next up.
+- [x] **Phase D — white-label pages** (built, hosted migration applied). A manager can
+      publish a branded chat page at `/a/<org-id>/<slug>` for a shared assistant or a standard
+      Guide/Mentor: title, description, displayed instructions, and an uploaded logo (public
+      `branding` bucket). The page renders server-side ([a/[org]/[slug].astro](../src/pages/a/[org]/[slug].astro),
+      `prerender=false`, 404 for malformed/unknown/inactive) in a bare
+      [WhiteLabelLayout](../src/layouts/WhiteLabelLayout.astro) (noindex, no site header,
+      canonical to solutionseeking.com); chatting requires sign-in (no anonymous trial), and
+      for specialized-assistant pages `/api/chat`'s org-membership check gates access. Managers
+      build and manage pages from a dashboard panel with a copyable link, logo upload, status
+      toggle, and CNAME instructions for putting a page on the customer's own subdomain
+      (concierge-activated, runbook in [deployment.md](deployment.md#white-label-pages--custom-domains)).
+      Migration `0023`; advisors clean; publishable key denied. Verified in a browser: a manager
+      created a page, a signed-out visitor saw the branded sign-in gate, and an org member
+      signed in and chatted with the assistant, all in the white-label chrome.
+
+**The dashboard initiative (Phases A-D) is complete.** Remaining: the custom-domain concierge
+step per customer (manual), and any tuning from real subscriber use.
 
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)

@@ -105,10 +105,11 @@ need. Delivered in four shippable phases:
   shared across users). Browser testing surfaced that the base personas first refused the
   setup as an injection attempt; a byte-stable clause in the shared persona now tells them
   to adopt a trusted `<assistant_setup>` block.
-- **D — White-label pages** — org-branded pages at `/a/<org-id>/<slug>` for any assistant
-  (title, description, instructions, logo), usable by every org member with private
-  per-user history, optionally served on the customer's own subdomain via a concierge
-  CNAME step.
+- **D — White-label pages** _(built)_ — org-branded pages at `/a/<org-id>/<slug>` for any
+  assistant (title, description, instructions, logo), server-rendered and noindex, usable by
+  every org member with private per-user history. Managers build them from a dashboard panel;
+  a page can be served on the customer's own subdomain via a concierge CNAME step
+  (runbook in [deployment.md](deployment.md#white-label-pages--custom-domains)).
 
-Out of scope for now: OCR, spreadsheets, self-serve org billing, and wildcard subdomains
-on our own domain.
+**Phases A-D shipped.** Out of scope for now: OCR, spreadsheets, self-serve org billing, and
+wildcard subdomains on our own domain.

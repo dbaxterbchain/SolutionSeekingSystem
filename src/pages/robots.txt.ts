@@ -18,6 +18,7 @@ export const GET: APIRoute = ({ site }) => {
     'Disallow: /account',
     'Disallow: /admin',
     'Disallow: /dashboard',
+    'Disallow: /a/',
     '',
     `Sitemap: ${new URL('sitemap-index.xml', site)}`,
     '',

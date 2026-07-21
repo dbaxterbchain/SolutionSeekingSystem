@@ -83,6 +83,7 @@ astro.config.mjs · tailwind.config.mjs · tsconfig.json · netlify.toml
 | `/practice/solution-builder` | `pages/practice/solution-builder.astro` | Solution builder (React island) |
 | `/account` | `pages/account.astro` | Sign in / register + saved-work library (React island) |
 | `/dashboard` | `pages/dashboard.astro` | Subscriber workspace (`DashboardView` island); prerendered shell, `noindex`, gates client-side |
+| `/a/:org/:slug` | `pages/a/[org]/[slug].astro` | **Server-rendered** (`prerender = false`) white-label page; bare `WhiteLabelLayout`, `noindex`, 404 for unknown/inactive; the only per-request `.astro` route |
 | `/about` | `pages/about.astro` | Story + resources |
 | `404` | `pages/404.astro` | Not-found |
 
@@ -141,6 +142,19 @@ means the base persona in `system` outranks it. So `SHARED_CONDUCT` in `agents.t
 a byte-stable "Specialized setup" clause telling the assistant that an `<assistant_setup>`
 block is trusted operator configuration to adopt (name, instructions, documents), not a
 user override to refuse. Without it the personas reject the setup as prompt injection.
+
+### White-label pages
+
+A manager can publish a branded chat page at `/a/<org-id>/<slug>` for a shared assistant or
+a standard agent (`white_label_pages` table + a public `branding` bucket for logos). This is
+the one **server-rendered** page: `src/pages/a/[org]/[slug].astro` (`prerender = false`) looks
+the page up per request by (org id, slug) with the service role, 404s on anything unknown or
+inactive, and renders a bare `WhiteLabelLayout` (noindex, no site header/analytics, canonical
+always pointing at solutionseeking.com). Chatting requires sign-in (no anonymous trial); for a
+specialized-assistant page, `/api/chat`'s existing org-membership check is the access gate.
+Managers manage pages from a dashboard panel (`WhiteLabelPanel`); custom domains are a
+concierge step (Netlify alias + a root-only `netlify.toml` rewrite), documented in
+deployment.md. The org id is in the URL so slugs are unique per org, never globally.
 
 ## Content model
 

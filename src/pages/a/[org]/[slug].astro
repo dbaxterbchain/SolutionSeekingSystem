@@ -1,0 +1,59 @@
+---
+import WhiteLabelLayout from '../../../layouts/WhiteLabelLayout.astro';
+import WhiteLabelChat from '../../../components/react/WhiteLabelChat.tsx';
+import { getActivePage, logoUrl, pageAssistantName, pagePath } from '../../../lib/server/whiteLabel';
+
+// Server-rendered: the page is looked up per request by (org id, slug) with the
+// service role. Unknown / malformed / inactive → 404.
+export const prerender = false;
+
+const { org, slug } = Astro.params;
+const page = org && slug ? await getActivePage(org, slug) : null;
+if (!page) return new Response('Not found', { status: 404 });
+
+const logo = logoUrl(page.logo_path);
+const assistantName = await pageAssistantName(page.assistant_id);
+---
+
+<WhiteLabelLayout
+  title={page.title}
+  description={page.description}
+  ogImage={logo}
+  canonicalPath={pagePath(page)}
+>
+  <div class="container-page max-w-3xl py-10 sm:py-14">
+    <header class="text-center">
+      {logo && (
+        <img src={logo} alt={page.title} class="mx-auto mb-5 h-16 w-auto object-contain" />
+      )}
+      <h1 class="font-heading text-3xl font-bold text-ink-800 sm:text-4xl">{page.title}</h1>
+      {page.description && (
+        <p class="mx-auto mt-3 max-w-xl leading-relaxed text-slate-600">{page.description}</p>
+      )}
+    </header>
+
+    {page.display_instructions && (
+      <details class="mx-auto mt-6 max-w-xl rounded-2xl border border-slate-100 bg-slate-50/60 px-4 py-3">
+        <summary class="cursor-pointer text-sm font-semibold text-ink-800">
+          How this assistant works
+        </summary>
+        <div class="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-600">
+          {page.display_instructions}
+        </div>
+      </details>
+    )}
+
+    <div class="mx-auto mt-8 max-w-2xl">
+      <WhiteLabelChat
+        client:load
+        slug={page.slug}
+        orgId={page.org_id}
+        assistantId={page.assistant_id}
+        agent={page.agent}
+        context={page.context}
+        title={page.title}
+        assistantName={assistantName}
+      />
+    </div>
+  </div>
+</WhiteLabelLayout>

@@ -224,7 +224,7 @@ flagged. It stays: it is a third safety layer next to `0010`'s default-privilege
 | Finding | Where | Why it stays |
 |---|---|---|
 | `auth_allow_anonymous_sign_ins` | `chat_sessions`, `saved_sessions`, `subscriptions`, `ai_usage` | The anonymous trial depends on it: anonymous users are real `auth.users` rows carrying `role=authenticated` (see `0006`). `to authenticated` is as narrow as these policies can get. |
-| `rls_enabled_no_policy` | `rate_limit`, `team_enquiries`, `email_subscribers`, `testimonials`, `organizations`, `org_members`, `documents` | Deliberate deny-all: server-write-only tables; only the service role (which bypasses RLS) touches them (`0010`, `0012`, `0021`). |
+| `rls_enabled_no_policy` | `rate_limit`, `team_enquiries`, `email_subscribers`, `testimonials`, `organizations`, `org_members`, `documents`, `assistants`, `assistant_documents`, `white_label_pages` | Deliberate deny-all: server-write-only tables; only the service role (which bypasses RLS) touches them (`0010`, `0012`, `0021`–`0023`). |
 | `unused_index` | `subscriptions_click_idx`, `email_subscribers_token_idx`, the four `0018` FK indexes | Young or event-driven indexes: attribution just shipped, token lookups seq-scan while the table is tiny, and the FK indexes only fire on deletions. |
 
 **Manual dashboard settings** (cannot be migrations — both set 2026-07-20; re-apply if
@@ -452,6 +452,46 @@ tier on their next message.
 - A member cannot be added beyond the seat count. Raise the seats first.
 - One person holds one seat: the same address cannot be on two organizations.
 - An unconfirmed email address can never claim a seat.
+
+**Managers.** In `/admin → Organizations`, each member has a role select (member / manager).
+A manager can share assistants org-wide and manage white-label pages from their own
+dashboard. Set at least one manager per organization that wants those features.
+
+## White-label pages & custom domains
+
+A **manager** builds white-label pages from their dashboard (the "White-label pages" panel):
+a branded chat page at `solutionseeking.com/a/<org-id>/<slug>` for a shared assistant or a
+standard Guide/Mentor. That path works immediately, with sign-in required and each member's
+history kept private. The custom-domain step below is optional and concierge-only.
+
+**Putting a page on a customer's own subdomain** (e.g. `managers-assistant.theirco.com`):
+
+1. **Prerequisite:** the page exists and works at its `/a/<org-id>/<slug>` path.
+2. **Customer adds DNS:** a `CNAME` record, their subdomain → `solutionseeking.netlify.app`
+   (the panel's "Custom domain" note shows them this). They then contact us to activate.
+3. **We add the Netlify domain alias:** Netlify → Domain management → add the subdomain as an
+   alias of the site; wait for the automatic Let's Encrypt certificate.
+4. **We add a root-only rewrite** to `netlify.toml` and deploy. Root-only on purpose — a `/*`
+   catch-all would swallow `/_astro/*` and `/api/*` on the alias host and break the page:
+   ```toml
+   [[redirects]]
+     from = "/"
+     to = "/a/<org-id>/<slug>"
+     status = 200
+     force = true
+     conditions = { Host = ["managers-assistant.theirco.com"] }
+   ```
+5. **We allow the host for auth:** Supabase → Authentication → URL Configuration → add
+   `https://managers-assistant.theirco.com/**` to the redirect allowlist; and add the hostname
+   to the Cloudflare Turnstile widget's allowed hostnames (captcha-enforced auth fails on the
+   alias otherwise).
+6. **We record it:** set `white_label_pages.custom_domain` (bookkeeping only; routing lives in
+   `netlify.toml`).
+7. **Verify on the alias:** the page renders with CSS, password sign-in works, chat streams,
+   and the page's `<link rel="canonical">` still points at solutionseeking.com. Note for the
+   customer: sessions are per-domain, so members sign in once on their domain.
+
+Rehearse the whole flow on a throwaway test subdomain before the first real customer.
 
 ## Search Console & Bing verification
 

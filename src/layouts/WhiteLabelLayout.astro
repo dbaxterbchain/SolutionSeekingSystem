@@ -1,0 +1,64 @@
+---
+import '../styles/global.css';
+
+/**
+ * A deliberately bare layout for white-label pages: no site header, footer, nav,
+ * analytics, or JSON-LD. The org's own branding is the whole chrome. Always
+ * noindex (these are private per-org tools), and the canonical always points at
+ * the solutionseeking.com path even when served on a customer's own domain.
+ */
+interface Props {
+  title: string;
+  description?: string;
+  /** Public logo URL, used as the og:image when present. */
+  ogImage?: string | null;
+  /** Canonical path, e.g. /a/<org-id>/<slug>. */
+  canonicalPath: string;
+}
+
+const { title, description = '', ogImage, canonicalPath } = Astro.props;
+const canonical = `https://solutionseeking.com${canonicalPath}`;
+const ogImageUrl = ogImage ?? 'https://solutionseeking.com/og/index.png';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#5271FF" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={canonical} />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImageUrl} />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="flex min-h-screen flex-col bg-white">
+    <main id="main" class="flex-1">
+      <slot />
+    </main>
+    <footer class="border-t border-slate-100 py-6 text-center">
+      <a
+        href="https://solutionseeking.com"
+        class="text-xs text-slate-400 hover:text-slate-600"
+        target="_blank"
+        rel="noopener"
+      >
+        Powered by the Solution Seeking System
+      </a>
+    </footer>
+  </body>
+</html>

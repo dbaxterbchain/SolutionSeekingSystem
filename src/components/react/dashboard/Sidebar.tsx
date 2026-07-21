@@ -23,6 +23,8 @@ export default function Sidebar({
   onNewAssistant,
   onNewChat,
   onOpenDocuments,
+  onOpenWhiteLabel,
+  canManageOrg,
   mine,
   shared,
   orgName,
@@ -38,6 +40,8 @@ export default function Sidebar({
   onNewAssistant: () => void;
   onNewChat: () => void;
   onOpenDocuments: () => void;
+  onOpenWhiteLabel: () => void;
+  canManageOrg: boolean;
   mine: Assistant[];
   shared: Assistant[];
   orgName: string | null;
@@ -193,6 +197,15 @@ export default function Sidebar({
         >
           📎 Documents
         </button>
+        {canManageOrg && (
+          <button
+            type="button"
+            onClick={onOpenWhiteLabel}
+            className="w-full rounded-xl px-3 py-1.5 text-left text-sm text-slate-500 hover:bg-slate-50 hover:text-ink-800"
+          >
+            🏷️ White-label pages
+          </button>
+        )}
         <a
           href="/account"
           className="block px-3 pt-1 text-xs font-semibold text-brand-600 hover:text-brand-700"

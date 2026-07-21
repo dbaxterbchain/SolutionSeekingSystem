@@ -271,7 +271,17 @@ async function deleteAssistant(userId: string, body: Record<string, unknown>): P
   if (!id) return json({ error: 'bad_request' }, 400);
   const access = await loadOwnedOrManaged(userId, id);
   if ('response' in access) return access.response;
-  // Phase D adds a white-label page_attached pre-check here.
+  // A white-label page cascades away with its assistant (FK on delete cascade),
+  // so warn before that happens unless the caller confirms.
+  if (body.confirm !== true) {
+    const { data: pages } = await supabaseAdmin
+      .from('white_label_pages')
+      .select('slug')
+      .eq('assistant_id', id);
+    if (pages && pages.length > 0) {
+      return json({ error: 'page_attached', slugs: pages.map((p) => p.slug) }, 409);
+    }
+  }
   const { error } = await supabaseAdmin.from('assistants').delete().eq('id', id);
   if (error) {
     console.error('assistant delete failed', error);

@@ -27,6 +27,7 @@ import Sidebar from './dashboard/Sidebar';
 import AttachControl from './dashboard/AttachControl';
 import DocumentsPanel from './dashboard/DocumentsPanel';
 import AssistantEditor from './dashboard/AssistantEditor';
+import WhiteLabelPanel from './dashboard/WhiteLabelPanel';
 
 /** Client-side truncation guard: send at most the last N messages. */
 const SENT_HISTORY_LIMIT = 30;
@@ -65,6 +66,7 @@ export default function DashboardView() {
   const [assistantsData, setAssistantsData] = useState<AssistantsData | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Assistant | null>(null);
+  const [whiteLabelOpen, setWhiteLabelOpen] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -458,6 +460,8 @@ export default function DashboardView() {
           }}
           onNewChat={newConversation}
           onOpenDocuments={() => setDocumentsOpen(true)}
+          onOpenWhiteLabel={() => setWhiteLabelOpen(true)}
+          canManageOrg={membership?.role === 'manager'}
           mine={mine}
           shared={shared}
           orgName={membership?.orgName ?? null}
@@ -619,6 +623,12 @@ export default function DashboardView() {
           onSaved={refreshAssistants}
         />
       )}
+      <WhiteLabelPanel
+        open={whiteLabelOpen}
+        onClose={() => setWhiteLabelOpen(false)}
+        assistants={[...mine, ...shared]}
+        orgName={membership?.orgName ?? null}
+      />
       {dialog}
     </div>
   );
