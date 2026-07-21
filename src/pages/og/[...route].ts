@@ -96,6 +96,10 @@ const pages: Record<string, OgPage> = {
     title: 'Your Account',
     description: 'Save your practice work and pick it back up anytime.',
   },
+  dashboard: {
+    title: 'Dashboard',
+    description: 'Your assistants, conversations, and documents in one place.',
+  },
   admin: {
     title: 'Admin',
     description: 'Internal.',

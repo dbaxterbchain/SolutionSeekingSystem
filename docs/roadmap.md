@@ -83,3 +83,28 @@ Candidate next steps (from the marketing plan, not yet built): outcome-based fre
 experience ("complete one Conversation Plan free" instead of a raw message count),
 worksheet → assistant handoffs, real anonymized Beanchain case studies, situation-specific
 landing pages, post-conversation follow-up as a paid feature, and outcome metrics.
+
+## Phase 5 — Subscriber dashboard & specialized assistants _(in progress)_
+
+Turn the subscription from "unlimited messages" into a workspace. A subscriber-only
+**/dashboard** brings the tools together and becomes the home for everything organizations
+need. Delivered in four shippable phases:
+
+- **A — Dashboard shell** _(built)_ — `/dashboard` with the Guide and Mentor side by side,
+  in-place mode switching (no page hop, unlike the public mode pages), and history across
+  both agents. The public `ChatView` core was extracted into shared modules so all chat
+  surfaces stay in lock-step (see [architecture.md](architecture.md#shared-chat-modules)).
+  Subscribers only, with a nav link that appears just for them.
+- **B — Documents** — upload PDF/docx/txt/md; text is extracted server-side and can be
+  attached to any chat. New `documents` table + a private Supabase Storage bucket.
+- **C — Specialized Assistants** — save an assistant (base agent + mode + custom
+  instructions + up to five knowledge documents); a new `manager` role on `org_members`
+  can share one org-wide. Custom setup is injected as a cache-stable prompt prefix, never
+  into the registry `system` blocks.
+- **D — White-label pages** — org-branded pages at `/a/<org-id>/<slug>` for any assistant
+  (title, description, instructions, logo), usable by every org member with private
+  per-user history, optionally served on the customer's own subdomain via a concierge
+  CNAME step.
+
+Out of scope for now: OCR, spreadsheets, self-serve org billing, and wildcard subdomains
+on our own domain.

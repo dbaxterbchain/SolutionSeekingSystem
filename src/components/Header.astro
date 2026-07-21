@@ -1,6 +1,7 @@
 ---
 import Logo from './Logo.astro';
 import AuthMenu from './react/AuthMenu.tsx';
+import DashboardNavLink from './react/DashboardNavLink.tsx';
 import { navItems, isNavGroup, type NavItem } from '../data/nav';
 
 const currentPath = Astro.url.pathname;
@@ -78,6 +79,8 @@ const idleClass = 'text-slate-600 hover:bg-slate-50 hover:text-ink-800';
           )
         )
       }
+      {/* Subscribers only; renders nothing otherwise (client-side entitlement). */}
+      <DashboardNavLink client:load />
     </nav>
 
     <div class="flex items-center gap-2">
@@ -145,6 +148,7 @@ const idleClass = 'text-slate-600 hover:bg-slate-50 hover:text-ink-800';
           )
         )
       }
+      <DashboardNavLink client:load variant="mobile" />
       <a href="/practice/guide" class="btn-primary mt-2">Talk to the Guide</a>
       <div class="mt-2 border-t border-slate-100 pt-2">
         <AuthMenu client:load variant="mobile" />

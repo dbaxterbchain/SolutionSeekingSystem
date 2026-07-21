@@ -1,0 +1,18 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import DashboardView from '../components/react/DashboardView.tsx';
+
+// Prerendered public shell, like /account and /admin: it carries no data and
+// gates itself client-side. The real boundary is /api/chat (subscriber-only for
+// assistant/attachment paths) and the per-endpoint checks the later phases add.
+---
+
+<BaseLayout
+  title="Dashboard"
+  description="Your assistants, conversations, and documents in one place."
+  noindex
+>
+  <div class="container-page py-8">
+    <DashboardView client:load />
+  </div>
+</BaseLayout>

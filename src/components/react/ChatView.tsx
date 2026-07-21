@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { useSession } from '../../lib/useSession';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
@@ -22,19 +22,14 @@ import UpgradeAnonCard from './UpgradeAnonCard';
 import FeedbackPrompt from './FeedbackPrompt';
 import { FREE_ACCOUNT_MESSAGES, FREE_ANON_MESSAGES, priceCopy } from '../../data/pricing';
 import { getCaptchaToken, prewarmCaptcha } from '../../lib/turnstile';
+import MessageBubble, { looksLikeDocument } from './chat/MessageBubble';
+import Composer from './chat/Composer';
+import { streamChat } from '../../lib/chatStream';
 
 const FREE_LIMIT = FREE_ACCOUNT_MESSAGES;
 const ANON_LIMIT = FREE_ANON_MESSAGES;
 /** Client-side truncation guard: send at most the last N messages. */
 const SENT_HISTORY_LIMIT = 30;
-
-/**
- * The assistant produced a structured document (a prep summary), which means the
- * conversation reached the end of the protocol rather than trailing off. This is
- * both what reveals the Download/Print actions and what earns us the right to
- * ask "did this help?", so it is defined once.
- */
-const looksLikeDocument = (content: string) => /^##\s/m.test(content);
 
 /**
  * Chats we have already asked about, so nobody is nagged twice for the same
@@ -154,20 +149,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
   const [authNotice] = useState(() => readOAuthRedirectError());
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
   const { confirm, dialog } = useDialog();
-  // On touch devices Enter should insert a newline; sending is the button's job.
-  const [coarsePointer] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
-  );
-
-  // Grow the composer with its content (up to ~6 lines), shrink when cleared.
-  useEffect(() => {
-    const ta = inputRef.current;
-    if (!ta) return;
-    ta.style.height = 'auto';
-    ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
-  }, [input]);
 
   /**
    * Ask the SERVER what this user is allowed to do.
@@ -314,73 +296,67 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     track({ event: 'message_sent', agent, tier, message_index: userMessages });
 
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        signal: ctrl.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${active.access_token}`,
-        },
-        body: JSON.stringify({
+      const result = await streamChat({
+        accessToken: active.access_token,
+        payload: {
           agent,
           messages: next.slice(-SENT_HISTORY_LIMIT),
           // Sent on every request (it's state, not a message) so the seed
           // survives the history trim above.
           ...(contextId ? { context: contextId } : {}),
-        }),
+        },
+        signal: ctrl.signal,
+        onMeta: (meta) => {
+          if (meta.freeRemaining !== null) {
+            setGate(
+              meta.freeTier === 'anon'
+                ? { kind: 'anon', remaining: meta.freeRemaining }
+                : { kind: 'free', remaining: meta.freeRemaining }
+            );
+          }
+        },
+        onDelta: (text) => setMessages([...next, { role: 'assistant', content: text }]),
       });
 
-      if (res.status === 401) {
-        // The anonymous JWT expired; the next send mints a fresh one.
-        setGate({ kind: 'anon-idle' });
-        setMessages(next);
-        return;
+      switch (result.kind) {
+        case 'unauthorized':
+          // The anonymous JWT expired; the next send mints a fresh one.
+          setGate({ kind: 'anon-idle' });
+          setMessages(next);
+          return;
+        case 'rate_limited':
+          // Too many anonymous messages from this network today. Convert rather
+          // than scold: an account gets them going again immediately.
+          track({ event: 'free_limit_reached', tier: 'anon', agent });
+          setGate({ kind: 'anon-exhausted', rateLimited: true });
+          setMessages(next);
+          return;
+        case 'account_required':
+          // An anonymous visitor who still has free messages waiting behind an
+          // account.
+          track({ event: 'free_limit_reached', tier: 'anon', agent });
+          setGate({ kind: 'anon-exhausted', rateLimited: false });
+          setMessages(next);
+          return;
+        case 'subscription_required':
+          // A registered user out of free messages: this one needs to pay.
+          track({ event: 'free_limit_reached', tier: 'free', agent });
+          setGate({ kind: 'paywalled' });
+          setMessages(next);
+          return;
+        case 'assistant_not_found':
+          // ChatView never sends assistant_id, so this is unreachable here; be
+          // safe rather than silent if the contract ever changes.
+          setMessages(next);
+          setError('Something went wrong. Please retry.');
+          return;
+        case 'done': {
+          const finished: ChatMessage[] = [...next, { role: 'assistant', content: result.text }];
+          setMessages(finished);
+          await persist(finished);
+          return;
+        }
       }
-      if (res.status === 429) {
-        // Too many anonymous messages from this network today. Convert rather
-        // than scold: an account gets them going again immediately.
-        track({ event: 'free_limit_reached', tier: 'anon', agent });
-        setGate({ kind: 'anon-exhausted', rateLimited: true });
-        setMessages(next);
-        return;
-      }
-      if (res.status === 403) {
-        // Two different dead ends: an anonymous visitor needs an account (and
-        // still has free messages waiting); a registered user needs to pay.
-        const err = await res.json().catch(() => null);
-        const needsAccount = err?.error === 'account_required';
-        track({ event: 'free_limit_reached', tier: needsAccount ? 'anon' : 'free', agent });
-        setGate(needsAccount ? { kind: 'anon-exhausted', rateLimited: false } : { kind: 'paywalled' });
-        setMessages(next);
-        return;
-      }
-      if (!res.ok || !res.body) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.message ?? 'Something went wrong. Please try again.');
-      }
-
-      const remainingHeader = res.headers.get('X-Free-Messages-Remaining');
-      if (remainingHeader !== null) {
-        const remaining = Number(remainingHeader);
-        setGate(
-          res.headers.get('X-Free-Tier') === 'anon'
-            ? { kind: 'anon', remaining }
-            : { kind: 'free', remaining }
-        );
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let assistant = '';
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        assistant += decoder.decode(value, { stream: true });
-        setMessages([...next, { role: 'assistant', content: assistant }]);
-      }
-      const finished: ChatMessage[] = [...next, { role: 'assistant', content: assistant }];
-      setMessages(finished);
-      await persist(finished);
     } catch (err) {
       if ((err as Error).name === 'AbortError') {
         // Keep whatever streamed before Stop; persist it.
@@ -763,226 +739,16 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
           </p>
         </div>
       ) : (
-        <form
-          className="flex items-end gap-3 border-t border-slate-100 p-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            send();
-          }}
-        >
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              // Desktop: Enter sends, Shift+Enter for a newline. Touch
-              // devices: Enter is always a newline; the button sends.
-              if (e.key === 'Enter' && !e.shiftKey && !coarsePointer) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            rows={1}
-            placeholder={`Message the ${agentName}…`}
-            className="max-h-40 min-h-[2.75rem] flex-1 resize-none overflow-y-auto rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
-          />
-          {streaming ? (
-            <button
-              type="button"
-              onClick={() => abortRef.current?.abort()}
-              className="btn-secondary shrink-0"
-            >
-              Stop
-            </button>
-          ) : (
-            <button type="submit" disabled={!input.trim()} className="btn-primary shrink-0 disabled:opacity-60">
-              Send
-            </button>
-          )}
-        </form>
+        <Composer
+          value={input}
+          onChange={setInput}
+          onSend={send}
+          onStop={() => abortRef.current?.abort()}
+          streaming={streaming}
+          placeholder={`Message the ${agentName}…`}
+        />
       )}
       {dialog}
     </div>
   );
-}
-
-function MessageBubble({
-  message,
-  streaming,
-  agentName,
-}: {
-  message: ChatMessage;
-  streaming: boolean;
-  agentName: string;
-}) {
-  if (message.role === 'user') {
-    return (
-      <div className="flex justify-end">
-        <div className="max-w-[min(85%,34rem)] whitespace-pre-wrap rounded-2xl rounded-br-md bg-brand-500 px-4 py-2.5 text-sm leading-relaxed text-white">
-          {message.content}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex justify-start">
-      <div className="max-w-[min(92%,48rem)] rounded-2xl rounded-bl-md bg-slate-50 px-4 py-3 text-sm leading-relaxed text-slate-700">
-        {message.content === '' && streaming ? (
-          <span className="text-slate-400">{agentName} is thinking…</span>
-        ) : (
-          <Markdown text={message.content} />
-        )}
-        {!streaming && message.content !== '' && (
-          <MessageActions
-            content={message.content}
-            showDocumentActions={looksLikeDocument(message.content)}
-          />
-        )}
-      </div>
-    </div>
-  );
-}
-
-function MessageActions({
-  content,
-  showDocumentActions,
-}: {
-  content: string;
-  showDocumentActions: boolean;
-}) {
-  const [copied, setCopied] = useState(false);
-
-  const copy = async () => {
-    await navigator.clipboard.writeText(content);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
-  };
-
-  const download = () => {
-    const blob = new Blob([content], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'solution-seeking-summary.md';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const print = () => {
-    const w = window.open('', '_blank', 'width=720,height=900');
-    if (!w) return;
-    w.document.title = 'Solution Seeking System';
-    const body = w.document.body;
-    body.style.cssText =
-      'font-family:Georgia,serif;max-width:42rem;margin:2rem auto;padding:0 1rem;line-height:1.6;color:#1e293b';
-    const pre = w.document.createElement('pre');
-    pre.style.cssText = 'white-space:pre-wrap;font-family:inherit';
-    pre.textContent = content;
-    body.appendChild(pre);
-    w.print();
-  };
-
-  return (
-    <div className="mt-3 flex flex-wrap gap-3 border-t border-slate-200/70 pt-2 text-xs">
-      <button type="button" onClick={copy} className="font-semibold text-brand-600 hover:text-brand-700">
-        {copied ? 'Copied ✓' : 'Copy'}
-      </button>
-      {showDocumentActions && (
-        <>
-          <button type="button" onClick={download} className="font-semibold text-brand-600 hover:text-brand-700">
-            Download .md
-          </button>
-          <button type="button" onClick={print} className="font-semibold text-brand-600 hover:text-brand-700">
-            Print
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
-
-/**
- * Tiny markdown-subset renderer building React elements directly (no
- * dangerouslySetInnerHTML, so XSS-safe by construction). Covers headings,
- * bold/italic, bullet + numbered lists, blockquotes, and horizontal rules;
- * anything else renders as plain paragraphs.
- */
-function Markdown({ text }: { text: string }) {
-  const blocks: ReactNode[] = [];
-  const lines = text.split('\n');
-  let list: { ordered: boolean; items: string[] } | null = null;
-
-  const flushList = (key: number) => {
-    if (!list) return;
-    const items = list.items.map((item, i) => <li key={i}>{inline(item)}</li>);
-    blocks.push(
-      list.ordered ? (
-        <ol key={`l${key}`} className="ml-5 list-decimal space-y-1">{items}</ol>
-      ) : (
-        <ul key={`l${key}`} className="ml-5 list-disc space-y-1">{items}</ul>
-      )
-    );
-    list = null;
-  };
-
-  lines.forEach((line, i) => {
-    const bullet = /^[-*]\s+(.*)/.exec(line);
-    const numbered = /^\d+[.)]\s+(.*)/.exec(line);
-    if (bullet || numbered) {
-      const ordered = Boolean(numbered);
-      if (!list || list.ordered !== ordered) {
-        flushList(i);
-        list = { ordered, items: [] };
-      }
-      list.items.push((bullet ?? numbered)![1]);
-      return;
-    }
-    flushList(i);
-
-    if (/^\s*$/.test(line)) return;
-    const heading = /^(#{2,4})\s+(.*)/.exec(line);
-    if (heading) {
-      const cls =
-        heading[1].length === 2
-          ? 'mt-4 font-heading text-base font-bold text-ink-800'
-          : 'mt-3 font-heading text-sm font-bold text-ink-800';
-      blocks.push(
-        <p key={i} className={cls}>
-          {inline(heading[2])}
-        </p>
-      );
-      return;
-    }
-    if (/^---+\s*$/.test(line)) {
-      blocks.push(<hr key={i} className="my-3 border-slate-200" />);
-      return;
-    }
-    const quote = /^>\s?(.*)/.exec(line);
-    if (quote) {
-      blocks.push(
-        <p key={i} className="border-l-2 border-brand-200 pl-3 italic text-slate-600">
-          {inline(quote[1])}
-        </p>
-      );
-      return;
-    }
-    blocks.push(<p key={i}>{inline(line)}</p>);
-  });
-  flushList(lines.length);
-
-  return <div className="space-y-2">{blocks}</div>;
-}
-
-/** Inline **bold** and *italic* within a line. */
-function inline(text: string): ReactNode[] {
-  return text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g).map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
-    }
-    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
-      return <em key={i}>{part.slice(1, -1)}</em>;
-    }
-    return part;
-  });
 }

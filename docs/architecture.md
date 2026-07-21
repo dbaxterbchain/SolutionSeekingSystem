@@ -82,11 +82,25 @@ astro.config.mjs · tailwind.config.mjs · tsconfig.json · netlify.toml
 | `/practice/conversation-planner` | `pages/practice/conversation-planner.astro` | Conversation planner (React island) |
 | `/practice/solution-builder` | `pages/practice/solution-builder.astro` | Solution builder (React island) |
 | `/account` | `pages/account.astro` | Sign in / register + saved-work library (React island) |
+| `/dashboard` | `pages/dashboard.astro` | Subscriber workspace (`DashboardView` island); prerendered shell, `noindex`, gates client-side |
 | `/about` | `pages/about.astro` | Story + resources |
 | `404` | `pages/404.astro` | Not-found |
 
 Dynamic pages use `getStaticPaths()` to prerender one page per content entry, with
 prev/next navigation derived from the collection order.
+
+### Shared chat modules
+
+The chat UI is one core, reused by three surfaces (the public `ChatView` on
+`/practice/*`, the subscriber `DashboardView` on `/dashboard`, and later white-label
+pages). The shared pieces live in `src/components/react/chat/`
+(`Markdown` renderer, `MessageBubble` + message actions, `Composer`) and
+`src/lib/chatStream.ts` (`streamChat`, the single definition of the `POST /api/chat` wire
+contract and its streaming/response handling). Each surface keeps only its own gate logic:
+`ChatView` owns the anonymous-trial machinery and paywall; `DashboardView` owns the
+simpler subscriber gate and the sidebar launcher. Anything that must not drift between
+them (stream protocol, rendering, persistence via `chatSessions.ts`) is in the shared
+modules, not copied.
 
 ## Content model
 

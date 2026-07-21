@@ -34,7 +34,8 @@ export type CtaLocation =
   | 'paywall_card'
   | 'account_subscription'
   | 'pricing_monthly'
-  | 'pricing_annual';
+  | 'pricing_annual'
+  | 'dashboard_upsell';
 
 /** Which allowance the user is spending. */
 export type Tier = 'anon' | 'free' | 'subscriber';

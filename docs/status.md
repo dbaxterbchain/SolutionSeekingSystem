@@ -43,6 +43,26 @@ _Last updated: 2026-07-20_
       pages, all 7 demos, `/guide` and `/pricing`; `/admin` and `/account` correctly excluded).
       The GA4 link is what makes "which query led to a subscription" answerable at all.
 
+### Dashboard, documents & specialized assistants (in progress, 4 phases)
+A subscriber-only **/dashboard** that makes the whole toolset more productive, then three
+new capabilities on top. Planned in four shippable phases: **A** dashboard shell (Guide +
+Mentor, in-place mode switching, cross-agent history), **B** document uploads (PDF/docx/
+txt/md, extracted server-side, attachable to chats), **C** Specialized Assistants (base
+agent + mode + custom instructions + knowledge docs, shareable org-wide by a new `manager`
+role), **D** white-label pages at `/a/<org-id>/<slug>` (org-branded, per-user private
+history, optional customer CNAME by concierge). Full plan in the approved design.
+
+- [x] **Phase A — dashboard shell** (built, not yet deployed). The public `ChatView`'s
+      reusable core was extracted into shared modules (`src/lib/chatStream.ts`, and
+      `src/components/react/chat/{Markdown,MessageBubble,Composer}.tsx`) with public pages
+      behaving identically; `/dashboard` (`DashboardView` + `dashboard/Sidebar`) reuses them
+      for a launcher + chat surface with **in-place** mode switching (no page navigation,
+      unlike the public mode pages) and history across both agents. Subscribers only:
+      non-subscribers get an upsell (reusing the checkout flow), and a `DashboardNavLink`
+      island shows the nav link only to subscribers (fails closed). Gated the usual three
+      ways (noindex, sitemap filter, robots disallow) plus an OG card. No DB/API changes.
+- [ ] **Phase B — documents**, **C — assistants**, **D — white-label**: next up, in order.
+
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)
 - [x] Conversation Planner — `/practice/conversation-planner` (stage checklist, goals, question bank, listening reminders)

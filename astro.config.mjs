@@ -20,7 +20,10 @@ export default defineConfig({
     sitemap({
       // Auth-gated, internal, and error pages carry no search value.
       filter: (page) =>
-        !page.includes('/account') && !page.includes('/admin') && !page.includes('/404'),
+        !page.includes('/account') &&
+        !page.includes('/admin') &&
+        !page.includes('/dashboard') &&
+        !page.includes('/404'),
     }),
   ],
 });
