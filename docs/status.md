@@ -61,7 +61,19 @@ history, optional customer CNAME by concierge). Full plan in the approved design
       non-subscribers get an upsell (reusing the checkout flow), and a `DashboardNavLink`
       island shows the nav link only to subscribers (fails closed). Gated the usual three
       ways (noindex, sitemap filter, robots disallow) plus an OG card. No DB/API changes.
-- [ ] **Phase B — documents**, **C — assistants**, **D — white-label**: next up, in order.
+- [x] **Phase B — document uploads** (built, hosted migration applied). Subscribers upload
+      PDF / Word (.docx) / .txt / .md; the server extracts the text once (`unpdf` for PDF,
+      `mammoth` for docx) and stores it in a new server-only `documents` table (RLS on, no
+      client grants), with the file in a private `documents` Storage bucket (10 MB cap,
+      folder-scoped upload policy so a client can only write its own `<user_id>/` folder).
+      Up to three documents attach to any chat message: `/api/chat` resolves the referenced
+      documents (own rows only), injects their text into that user turn, and gates the whole
+      feature to subscribers. Message assembly moved into one place
+      ([chatMessages.ts](../src/lib/server/chatMessages.ts)) that also holds the cache
+      breakpoints for Phase C. Migration `0021`; advisors clean (the `documents` findings are
+      the accepted server-only-table pattern). Verified in a browser: uploaded a policy file
+      and the assistant answered a question whose answer is only in that file.
+- [ ] **Phase C — assistants**, **D — white-label**: next up, in order.
 
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)

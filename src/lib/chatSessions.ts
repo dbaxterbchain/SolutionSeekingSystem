@@ -3,9 +3,17 @@ import type { AgentId } from './server/agents';
 
 export type { AgentId };
 
+/** A document attached to a user message (id + display name; text lives server-side). */
+export interface ChatAttachment {
+  id: string;
+  name: string;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  /** Uploaded documents attached to this message (user messages only). */
+  attachments?: ChatAttachment[];
 }
 
 export interface ChatSession {

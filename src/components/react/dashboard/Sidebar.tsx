@@ -16,6 +16,7 @@ export default function Sidebar({
   agent,
   onSelectAgent,
   onNewChat,
+  onOpenDocuments,
   recents,
   activeChatId,
   onOpenChat,
@@ -24,6 +25,7 @@ export default function Sidebar({
   agent: AgentId;
   onSelectAgent: (agent: AgentId) => void;
   onNewChat: () => void;
+  onOpenDocuments: () => void;
   recents: ChatSession[] | null;
   activeChatId: string | null;
   onOpenChat: (c: ChatSession) => void;
@@ -55,9 +57,18 @@ export default function Sidebar({
         </div>
       </div>
 
-      <button type="button" onClick={onNewChat} className="btn-secondary w-full text-sm">
-        + New chat
-      </button>
+      <div className="space-y-1.5">
+        <button type="button" onClick={onNewChat} className="btn-secondary w-full text-sm">
+          + New chat
+        </button>
+        <button
+          type="button"
+          onClick={onOpenDocuments}
+          className="w-full rounded-xl px-3 py-1.5 text-left text-sm text-slate-500 hover:bg-slate-50 hover:text-ink-800"
+        >
+          📎 Documents
+        </button>
+      </div>
 
       <div className="min-h-0 flex-1">
         <p className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">

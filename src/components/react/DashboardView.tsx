@@ -17,10 +17,14 @@ import { getContextMeta, MODE_CONTEXTS } from '../../lib/contexts';
 import { track, getGaIds, type Tier } from '../../lib/analytics';
 import { getFirstTouch } from '../../lib/attribution';
 import { streamChat } from '../../lib/chatStream';
+import { listDocuments, uploadAndRegister, type DocumentMeta } from '../../lib/documents';
 import { useDialog } from './Dialog';
 import MessageBubble from './chat/MessageBubble';
 import Composer from './chat/Composer';
 import Sidebar from './dashboard/Sidebar';
+import AttachControl from './dashboard/AttachControl';
+import DocumentsPanel from './dashboard/DocumentsPanel';
+import type { ChatAttachment } from '../../lib/chatSessions';
 
 /** Client-side truncation guard: send at most the last N messages. */
 const SENT_HISTORY_LIMIT = 30;
@@ -50,6 +54,9 @@ export default function DashboardView() {
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [recents, setRecents] = useState<ChatSession[] | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [documents, setDocuments] = useState<DocumentMeta[] | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
+  const [documentsOpen, setDocumentsOpen] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -66,10 +73,17 @@ export default function DashboardView() {
       .catch(() => setRecents([]));
   };
 
-  // Load the conversation list once we know who the user is.
+  const refreshDocuments = () => {
+    listDocuments()
+      .then(setDocuments)
+      .catch(() => setDocuments([]));
+  };
+
+  // Load the conversation and document lists once we know who the user is.
   useEffect(() => {
     if (!user || !canUseDashboard) return;
     refreshRecents();
+    refreshDocuments();
   }, [user?.id, canUseDashboard]);
 
   // Resume a conversation from ?chat=<id> on first load.
@@ -126,6 +140,7 @@ export default function DashboardView() {
     setChatId(null);
     setError(null);
     setInput('');
+    setPendingAttachments([]);
     setChatUrl(null);
     setSidebarOpen(false);
   };
@@ -137,6 +152,7 @@ export default function DashboardView() {
     setMessages(saved.messages);
     setContextId(saved.context ?? null);
     setError(null);
+    setPendingAttachments([]);
     setChatUrl(saved.id);
     setSidebarOpen(false);
   };
@@ -188,14 +204,20 @@ export default function DashboardView() {
     setMessages([]);
     setChatId(null);
     setError(null);
+    setPendingAttachments([]);
     setChatUrl(null);
   };
 
   const send = () => {
     const text = input.trim();
     if (!text || streaming || !session) return;
+    const attachments = pendingAttachments;
     setInput('');
-    void deliver([...messages, { role: 'user', content: text }]);
+    setPendingAttachments([]);
+    void deliver([
+      ...messages,
+      { role: 'user', content: text, ...(attachments.length ? { attachments } : {}) },
+    ]);
   };
 
   const retry = () => {
@@ -394,6 +416,7 @@ export default function DashboardView() {
           agent={agent}
           onSelectAgent={startFresh}
           onNewChat={() => startFresh(agent)}
+          onOpenDocuments={() => setDocumentsOpen(true)}
           recents={recents}
           activeChatId={chatId}
           onOpenChat={openSaved}
@@ -492,8 +515,28 @@ export default function DashboardView() {
           onStop={() => abortRef.current?.abort()}
           streaming={streaming}
           placeholder={`Message the ${agentName}…`}
-        />
+        >
+          <AttachControl
+            documents={documents}
+            selected={pendingAttachments}
+            onChange={setPendingAttachments}
+            onUpload={async (file) => {
+              const doc = await uploadAndRegister(file);
+              refreshDocuments();
+              return doc;
+            }}
+            onManage={() => setDocumentsOpen(true)}
+            disabled={streaming}
+          />
+        </Composer>
       </div>
+
+      <DocumentsPanel
+        open={documentsOpen}
+        onClose={() => setDocumentsOpen(false)}
+        documents={documents}
+        onChanged={refreshDocuments}
+      />
       {dialog}
     </div>
   );

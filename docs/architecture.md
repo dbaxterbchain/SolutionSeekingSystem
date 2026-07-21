@@ -102,6 +102,21 @@ simpler subscriber gate and the sidebar launcher. Anything that must not drift b
 them (stream protocol, rendering, persistence via `chatSessions.ts`) is in the shared
 modules, not copied.
 
+### Documents (dashboard uploads)
+
+Subscribers upload PDF / .docx / .txt / .md in the dashboard. The file goes **straight to
+Supabase Storage** from the browser (a private `documents` bucket, folder-scoped to the
+uploader's `<user_id>/`), sidestepping the ~6 MB Netlify function body limit; then
+`POST /api/documents` downloads it with the service role, extracts the text once
+(`src/lib/server/extractText.ts` — `unpdf` for PDF, `mammoth` for docx), and stores it in
+the server-only `documents` table (RLS on, no client grants). Up to three documents attach
+to a chat message: `/api/chat` resolves the referenced rows (own rows only) and injects
+their text into that user turn. All message assembly — chat turns, attachment blocks, and
+the per-assistant cache breakpoint coming in Phase C — lives in one place,
+`src/lib/server/chatMessages.ts`, so the prompt-cache invariant has a single home. New
+server-only tables follow the `0012` pattern and are reached only through Bearer-authed API
+routes gated by `requireSubscriber` (`src/lib/server/subscriberAuth.ts`), never client RLS.
+
 ## Content model
 
 The 12 principles share an identical schema (`principles` collection), so the detail

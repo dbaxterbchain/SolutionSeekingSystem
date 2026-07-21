@@ -117,6 +117,13 @@ stale docs, no orphaned pages, no broken prompt cache.
       either fix a new finding or add it to the accepted table in
       [deployment.md](deployment.md#database-advisors--accepted-findings). Never ignore one
       silently.
+- [ ] **Storage buckets** go in the migration too (`insert into storage.buckets ...`), with a
+      folder-scoped `storage.objects` policy for any client upload
+      (`(storage.foldername(name))[1] = (select auth.uid())::text`). Keep the `storage.*` DDL
+      at the bottom of the file: if `db push` fails with "must be owner of table objects", run
+      that block once in the dashboard SQL editor and keep the migration as the record (see
+      `0021`). The server (service role) does all downloads and deletes; clients never read the
+      bucket.
 - [ ] **Verify the RLS claim rather than asserting it.** Hit the table with the *publishable*
       key and confirm the read is empty and the write is refused. Local and the hosted project
       have had different default grants, so "it's safe locally" has proven nothing.

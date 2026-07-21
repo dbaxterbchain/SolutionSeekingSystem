@@ -224,7 +224,7 @@ flagged. It stays: it is a third safety layer next to `0010`'s default-privilege
 | Finding | Where | Why it stays |
 |---|---|---|
 | `auth_allow_anonymous_sign_ins` | `chat_sessions`, `saved_sessions`, `subscriptions`, `ai_usage` | The anonymous trial depends on it: anonymous users are real `auth.users` rows carrying `role=authenticated` (see `0006`). `to authenticated` is as narrow as these policies can get. |
-| `rls_enabled_no_policy` | `rate_limit`, `team_enquiries`, `email_subscribers`, `testimonials`, `organizations`, `org_members` | Deliberate deny-all: server-write-only tables; only the service role (which bypasses RLS) touches them (`0010`, `0012`). |
+| `rls_enabled_no_policy` | `rate_limit`, `team_enquiries`, `email_subscribers`, `testimonials`, `organizations`, `org_members`, `documents` | Deliberate deny-all: server-write-only tables; only the service role (which bypasses RLS) touches them (`0010`, `0012`, `0021`). |
 | `unused_index` | `subscriptions_click_idx`, `email_subscribers_token_idx`, the four `0018` FK indexes | Young or event-driven indexes: attribution just shipped, token lookups seq-scan while the table is tiny, and the FK indexes only fire on deletions. |
 
 **Manual dashboard settings** (cannot be migrations — both set 2026-07-20; re-apply if

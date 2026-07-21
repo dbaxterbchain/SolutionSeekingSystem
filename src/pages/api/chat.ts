@@ -6,6 +6,11 @@ import { serverEnv } from '../../lib/server/env';
 import { checkEntitlement } from '../../lib/server/entitlement';
 import { buildSystem, AGENT_IDS, type AgentId } from '../../lib/server/agents';
 import {
+  buildMessages,
+  type WindowMessage,
+  type ResolvedAttachment,
+} from '../../lib/server/chatMessages';
+import {
   clientIp,
   isRateLimited,
   ANON_CHAT_PER_IP,
@@ -20,10 +25,20 @@ const getAnthropic = () => (anthropicClient ??= new Anthropic({ apiKey: serverEn
 // Server-side guards; the client also trims to its last 30 turns.
 const MAX_MESSAGES = 60;
 const MAX_CHARS_PER_MESSAGE = 8_000;
+// Document attachments (subscriber-only). Per-doc and per-request budgets keep
+// a runaway paste of long PDFs from blowing up the context (and the bill).
+const MAX_ATTACHMENTS_PER_MESSAGE = 3;
+const ATTACH_CHARS_PER_DOC = 30_000;
+const ATTACH_CHARS_PER_REQUEST = 60_000;
+
+interface AttachmentRef {
+  id: string;
+  name: string;
+}
 
 interface ChatBody {
   agent: AgentId;
-  messages: { role: 'user' | 'assistant'; content: string }[];
+  messages: { role: 'user' | 'assistant'; content: string; attachments?: AttachmentRef[] }[];
   /** Optional named-context id (src/lib/contexts.ts); unknown ids are ignored. */
   context?: string;
 }
@@ -64,10 +79,21 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   if (!body || !AGENT_IDS.includes(body.agent) || !Array.isArray(body.messages)) {
     return json({ error: 'bad_request' }, 400);
   }
-  const messages = body.messages.slice(-MAX_MESSAGES).map((m) => ({
-    role: m?.role === 'assistant' ? ('assistant' as const) : ('user' as const),
-    content: String(m?.content ?? '').slice(0, MAX_CHARS_PER_MESSAGE),
-  }));
+  const messages = body.messages.slice(-MAX_MESSAGES).map((m) => {
+    const role = m?.role === 'assistant' ? ('assistant' as const) : ('user' as const);
+    const content = String(m?.content ?? '').slice(0, MAX_CHARS_PER_MESSAGE);
+    const attachments =
+      role === 'user' && Array.isArray(m?.attachments)
+        ? m.attachments
+            .filter(
+              (a): a is AttachmentRef =>
+                !!a && typeof a.id === 'string' && typeof a.name === 'string'
+            )
+            .slice(0, MAX_ATTACHMENTS_PER_MESSAGE)
+            .map((a) => ({ id: a.id, name: a.name.slice(0, 200) }))
+        : [];
+    return { role, content, attachments };
+  });
   if (
     messages.length === 0 ||
     messages[messages.length - 1].role !== 'user' ||
@@ -86,6 +112,66 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       : json({ error: 'subscription_required', freeUsed: entitlement.used }, 403);
   }
 
+  // Attachments are a subscriber feature; a free/anonymous caller who hand-crafts
+  // an attachments payload is refused here, not silently served.
+  const attachmentRefs = messages.flatMap((m) => m.attachments);
+  if (attachmentRefs.length > 0 && entitlement.kind !== 'subscriber') {
+    return json({ error: 'subscription_required', freeUsed: entitlement.used }, 403);
+  }
+
+  // Resolve referenced documents to their extracted text (own rows only). A
+  // missing id is dropped with an inline marker rather than failing the send.
+  const docMap = new Map<string, { name: string; text: string }>();
+  if (attachmentRefs.length > 0) {
+    const ids = [...new Set(attachmentRefs.map((a) => a.id))];
+    const { data: docs, error: docErr } = await supabaseAdmin
+      .from('documents')
+      .select('id, name, extracted_text')
+      .eq('user_id', user.id)
+      .in('id', ids);
+    if (docErr) console.error('attachment lookup failed', docErr);
+    for (const d of docs ?? []) {
+      docMap.set(d.id, {
+        name: d.name,
+        text: String(d.extracted_text ?? '').slice(0, ATTACH_CHARS_PER_DOC),
+      });
+    }
+
+    // If the current turn's own documents can't fit, say so instead of silently
+    // truncating the thing the user just asked about.
+    const last = messages[messages.length - 1];
+    const lastTotal = last.attachments.reduce((sum, ref) => sum + (docMap.get(ref.id)?.text.length ?? 0), 0);
+    if (lastTotal > ATTACH_CHARS_PER_REQUEST) {
+      return json(
+        {
+          error: 'attachments_too_large',
+          message: 'Those documents are too long to send together. Attach fewer, or shorter, files.',
+        },
+        413
+      );
+    }
+  }
+
+  // Build the send window newest-first so the current turn keeps its documents;
+  // older attachments fall away (with a marker) once the request budget is spent.
+  let budget = ATTACH_CHARS_PER_REQUEST;
+  const reversed = [...messages].reverse().map((m): WindowMessage => {
+    if (m.role !== 'user' || m.attachments.length === 0) {
+      return { role: m.role, text: m.content };
+    }
+    const attachments: ResolvedAttachment[] = m.attachments.map((ref) => {
+      const doc = docMap.get(ref.id);
+      if (!doc) return { name: ref.name || 'document', text: '[Attachment unavailable]' };
+      if (doc.text.length > budget) {
+        return { name: doc.name, text: '[Attachment omitted to fit the conversation]' };
+      }
+      budget -= doc.text.length;
+      return { name: doc.name, text: doc.text };
+    });
+    return { role: 'user', text: m.content, attachments };
+  });
+  const windowMessages = reversed.reverse();
+
   const stream = getAnthropic().messages.stream({
     model: 'claude-sonnet-5',
     max_tokens: 2048,
@@ -93,7 +179,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     // pause and extra tokens we don't need for empathetic chat.
     thinking: { type: 'disabled' },
     system: await buildSystem(body.agent, typeof body.context === 'string' ? body.context : undefined),
-    messages,
+    messages: buildMessages({ window: windowMessages }),
   });
 
   // Await the first event so auth/validation/rate-limit failures surface as a

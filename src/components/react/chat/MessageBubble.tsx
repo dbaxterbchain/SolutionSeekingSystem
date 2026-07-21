@@ -22,10 +22,23 @@ export default function MessageBubble({
 }) {
   if (message.role === 'user') {
     return (
-      <div className="flex justify-end">
+      <div className="flex flex-col items-end gap-1">
         <div className="max-w-[min(85%,34rem)] whitespace-pre-wrap rounded-2xl rounded-br-md bg-brand-500 px-4 py-2.5 text-sm leading-relaxed text-white">
           {message.content}
         </div>
+        {message.attachments && message.attachments.length > 0 && (
+          <div className="flex max-w-[min(85%,34rem)] flex-wrap justify-end gap-1.5">
+            {message.attachments.map((a) => (
+              <span
+                key={a.id}
+                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600"
+              >
+                <span aria-hidden="true">📎</span>
+                <span className="max-w-[10rem] truncate">{a.name}</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
