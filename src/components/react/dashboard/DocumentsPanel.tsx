@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { uploadAndRegister, deleteDocument, type DocumentMeta } from '../../../lib/documents';
 import { useDialog } from '../Dialog';
@@ -24,6 +24,15 @@ export default function DocumentsPanel({
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { confirm, dialog } = useDialog();
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   if (!open || typeof document === 'undefined') return null;
 

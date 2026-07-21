@@ -97,10 +97,14 @@ need. Delivered in four shippable phases:
   Subscribers only, with a nav link that appears just for them.
 - **B — Documents** — upload PDF/docx/txt/md; text is extracted server-side and can be
   attached to any chat. New `documents` table + a private Supabase Storage bucket.
-- **C — Specialized Assistants** — save an assistant (base agent + mode + custom
+- **C — Specialized Assistants** _(built)_ — save an assistant (base agent + mode + custom
   instructions + up to five knowledge documents); a new `manager` role on `org_members`
-  can share one org-wide. Custom setup is injected as a cache-stable prompt prefix, never
-  into the registry `system` blocks.
+  can share one org-wide, and every member uses it with private per-user history. Custom
+  setup is injected as a deterministic, cache-stable prompt prefix, never into the registry
+  `system` blocks (verified: written once, then read from cache on every later send,
+  shared across users). Browser testing surfaced that the base personas first refused the
+  setup as an injection attempt; a byte-stable clause in the shared persona now tells them
+  to adopt a trusted `<assistant_setup>` block.
 - **D — White-label pages** — org-branded pages at `/a/<org-id>/<slug>` for any assistant
   (title, description, instructions, logo), usable by every org member with private
   per-user history, optionally served on the customer's own subdomain via a concierge

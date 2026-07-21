@@ -10,6 +10,7 @@ import {
   type WindowMessage,
   type ResolvedAttachment,
 } from '../../lib/server/chatMessages';
+import { loadAssistantForUser, buildAssistantSetup } from '../../lib/server/assistants';
 import {
   clientIp,
   isRateLimited,
@@ -41,6 +42,8 @@ interface ChatBody {
   messages: { role: 'user' | 'assistant'; content: string; attachments?: AttachmentRef[] }[];
   /** Optional named-context id (src/lib/contexts.ts); unknown ids are ignored. */
   context?: string;
+  /** Optional specialized assistant. When set, it defines the agent, mode, and setup. */
+  assistant_id?: string;
 }
 
 /**
@@ -76,7 +79,12 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   }
 
   const body = (await request.json().catch(() => null)) as ChatBody | null;
-  if (!body || !AGENT_IDS.includes(body.agent) || !Array.isArray(body.messages)) {
+  // Either a valid standard agent, or an assistant id that will supply the agent.
+  if (
+    !body ||
+    !Array.isArray(body.messages) ||
+    (!AGENT_IDS.includes(body.agent) && typeof body.assistant_id !== 'string')
+  ) {
     return json({ error: 'bad_request' }, 400);
   }
   const messages = body.messages.slice(-MAX_MESSAGES).map((m) => {
@@ -110,6 +118,26 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     return entitlement.tier === 'anon'
       ? json({ error: 'account_required', freeUsed: entitlement.used }, 403)
       : json({ error: 'subscription_required', freeUsed: entitlement.used }, 403);
+  }
+
+  // A specialized assistant (and its knowledge documents) is a subscriber feature.
+  // When present it defines the agent, mode, and the cached setup block; the
+  // body's own agent/context are ignored.
+  const assistantId = typeof body.assistant_id === 'string' ? body.assistant_id : null;
+  if (assistantId && entitlement.kind !== 'subscriber') {
+    return json({ error: 'subscription_required', freeUsed: entitlement.used }, 403);
+  }
+
+  let effectiveAgent: AgentId = AGENT_IDS.includes(body.agent) ? body.agent : 'guide';
+  let effectiveContext = typeof body.context === 'string' ? body.context : undefined;
+  let assistantSetup: string | undefined;
+  if (assistantId) {
+    const loaded = await loadAssistantForUser(assistantId, user.id);
+    // 404, not 403: an assistant the caller can't reach is not confirmed to exist.
+    if (!loaded) return json({ error: 'assistant_not_found' }, 404);
+    effectiveAgent = loaded.assistant.base_agent;
+    effectiveContext = loaded.assistant.context ?? undefined;
+    assistantSetup = buildAssistantSetup(loaded.assistant.instructions, loaded.docs);
   }
 
   // Attachments are a subscriber feature; a free/anonymous caller who hand-crafts
@@ -178,8 +206,8 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     // Omitting `thinking` on Sonnet 5 runs adaptive thinking — a silent
     // pause and extra tokens we don't need for empathetic chat.
     thinking: { type: 'disabled' },
-    system: await buildSystem(body.agent, typeof body.context === 'string' ? body.context : undefined),
-    messages: buildMessages({ window: windowMessages }),
+    system: await buildSystem(effectiveAgent, effectiveContext),
+    messages: buildMessages({ window: windowMessages, setup: assistantSetup }),
   });
 
   // Await the first event so auth/validation/rate-limit failures surface as a

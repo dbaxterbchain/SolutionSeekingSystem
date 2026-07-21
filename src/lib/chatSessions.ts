@@ -24,6 +24,8 @@ export interface ChatSession {
   messages: ChatMessage[];
   /** Named context the conversation was started with (see src/lib/contexts.ts), if any. */
   context: string | null;
+  /** The specialized assistant that drove this conversation, if any. */
+  assistant_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -61,6 +63,7 @@ export async function createChatSession(input: {
   title: string;
   messages: ChatMessage[];
   context?: string | null;
+  assistant_id?: string | null;
 }): Promise<ChatSession> {
   const {
     data: { user },
@@ -75,6 +78,7 @@ export async function createChatSession(input: {
       title: input.title.trim() || 'Untitled',
       messages: input.messages,
       context: input.context ?? null,
+      assistant_id: input.assistant_id ?? null,
     })
     .select()
     .single();

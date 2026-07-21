@@ -35,6 +35,7 @@ interface OrgMember {
   id: string;
   email: string;
   claimed: boolean;
+  role: 'member' | 'manager';
   joined_at: string | null;
 }
 
@@ -504,6 +505,19 @@ function OrgsTab({
                   <span className={`text-xs ${m.claimed ? 'text-emerald-600' : 'text-slate-400'}`}>
                     {m.claimed ? 'signed in' : 'has not signed in yet'}
                   </span>
+                  {/* Managers can share assistants org-wide and manage white-label pages. */}
+                  <select
+                    value={m.role}
+                    onChange={async (e) => {
+                      const d = await call('orgs', { action: 'set_role', id: m.id, role: e.target.value });
+                      if (d?.ok) reload();
+                    }}
+                    aria-label={`Role for ${m.email}`}
+                    className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600"
+                  >
+                    <option value="member">Member</option>
+                    <option value="manager">Manager</option>
+                  </select>
                   <button
                     type="button"
                     onClick={async () => {

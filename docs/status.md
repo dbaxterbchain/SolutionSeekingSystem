@@ -73,7 +73,22 @@ history, optional customer CNAME by concierge). Full plan in the approved design
       breakpoints for Phase C. Migration `0021`; advisors clean (the `documents` findings are
       the accepted server-only-table pattern). Verified in a browser: uploaded a policy file
       and the assistant answered a question whose answer is only in that file.
-- [ ] **Phase C — assistants**, **D — white-label**: next up, in order.
+- [x] **Phase C — specialized assistants** (built, hosted migration applied). Subscribers
+      save an assistant (base agent + optional mode + custom instructions + up to 5 knowledge
+      documents); a new `manager` role on `org_members` (set from /admin) can share one
+      org-wide, and every member with a seat can use it with private per-user history. The
+      setup (instructions + document text) is injected as one deterministic, `cache_control`'d
+      block by `buildAssistantSetup`, so the prompt cache hits after the first message and the
+      same shared assistant yields the same cached prefix for every user (verified: a 21.5k
+      prefix was written once then read from cache on every later send, including a second
+      user's). Server-only tables `assistants` + `assistant_documents` (migration `0022`);
+      access via `/api/assistants` and the `assistant_id` path in `/api/chat` (owner or org
+      member → else 404). **Caught in browser testing and fixed:** the base personas at first
+      refused the injected setup as an "injection attempt," so a byte-stable "Specialized
+      setup" clause was added to `SHARED_CONDUCT` telling them to adopt a trusted
+      `<assistant_setup>` block; after that the assistant answers from its documents. Advisors
+      clean; publishable key denied on both new tables.
+- [ ] **Phase D — white-label**: next up.
 
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)

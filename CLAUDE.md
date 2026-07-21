@@ -18,6 +18,12 @@ affects scope or status. Docs index: [docs/README.md](docs/README.md).
 - **Prompt cache**: in `src/lib/server/agents.ts`, the grounding system block stays
   byte-identical and first. System content may vary only across the fixed
   (agent, context) registry. Per-user/dynamic data goes in `messages`, never `system`.
+- **Assistant setup is the only non-registry prompt content.** It is injected into
+  `messages` (never `system`) as one `cache_control`'d text block built
+  byte-deterministically by `buildAssistantSetup` (`src/lib/server/assistants.ts`) — no
+  timestamps, documents in fixed order — so the cache hits after the first message; editing
+  an assistant intentionally rolls its cache entry. All message assembly (chat turns,
+  attachments, the setup block) lives in `src/lib/server/chatMessages.ts`.
 - **Demos are behavior specs**: if you change the assistant personas, re-check the
   transcripts in `src/content/demos/` against their frontmatter `spec`.
 - **Entitlements are server-written only** (Stripe webhook + chat endpoint via service

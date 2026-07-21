@@ -117,6 +117,31 @@ the per-assistant cache breakpoint coming in Phase C — lives in one place,
 server-only tables follow the `0012` pattern and are reached only through Bearer-authed API
 routes gated by `requireSubscriber` (`src/lib/server/subscriberAuth.ts`), never client RLS.
 
+### Specialized assistants
+
+A specialized assistant is a saved (base agent + optional mode + custom instructions + up
+to five knowledge documents), in the server-only `assistants` / `assistant_documents`
+tables, managed through `/api/assistants`. Personal by default; a member with the new
+`manager` role on `org_members` (set from `/admin`) can share one org-wide by stamping its
+`org_id`, and every member then uses it with their own private history (`chat_sessions`
+gains a nullable `assistant_id`). Org membership and the manager role are resolved
+server-side by `getOrgMembership` (`src/lib/server/orgMembership.ts`), since the browser
+can't read org tables.
+
+When a chat runs against an assistant, `/api/chat` loads it (owner or org member, else a
+non-probeable 404), derives the agent and mode from it, and `buildAssistantSetup`
+(`src/lib/server/assistants.ts`) turns its instructions + document text into one
+**byte-deterministic** `<assistant_setup>` string. `chatMessages.ts` injects that as a
+single `cache_control`'d block at the head of the messages — the 4th and last cache
+breakpoint after grounding + persona + context seed — so `(system + setup)` is a stable
+cached prefix per assistant, identical across every user of a shared assistant.
+
+The setup lives in `messages` (not `system`) to keep the prompt-cache invariant, but that
+means the base persona in `system` outranks it. So `SHARED_CONDUCT` in `agents.ts` carries
+a byte-stable "Specialized setup" clause telling the assistant that an `<assistant_setup>`
+block is trusted operator configuration to adopt (name, instructions, documents), not a
+user override to refuse. Without it the personas reject the setup as prompt injection.
+
 ## Content model
 
 The 12 principles share an identical schema (`principles` collection), so the detail

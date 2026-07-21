@@ -34,7 +34,7 @@ export const GET: APIRoute = async ({ request }) => {
       .limit(200),
     supabaseAdmin
       .from('org_members')
-      .select('id, org_id, email, user_id, joined_at, created_at')
+      .select('id, org_id, email, user_id, role, joined_at, created_at')
       .order('created_at', { ascending: true })
       .limit(1000),
   ]);
@@ -54,6 +54,7 @@ export const GET: APIRoute = async ({ request }) => {
         id: m.id,
         email: m.email,
         claimed: m.user_id !== null,
+        role: m.role ?? 'member',
         joined_at: m.joined_at,
       })),
   }));
@@ -141,6 +142,18 @@ export const POST: APIRoute = async ({ request }) => {
       const { error } = await supabaseAdmin.from('org_members').delete().eq('id', id);
       if (error) return fail('org remove_member', error);
       console.log('admin action', admin.email, 'member removed', id);
+      return adminJson({ ok: true });
+    }
+
+    case 'set_role': {
+      const id = clean(body?.id, 40);
+      const role = body?.role;
+      if (!id || (role !== 'member' && role !== 'manager')) {
+        return adminJson({ error: 'invalid' }, 400);
+      }
+      const { error } = await supabaseAdmin.from('org_members').update({ role }).eq('id', id);
+      if (error) return fail('org set_role', error);
+      console.log('admin action', admin.email, 'member', id, 'role', role);
       return adminJson({ ok: true });
     }
 
