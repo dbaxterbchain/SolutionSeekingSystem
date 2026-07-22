@@ -478,15 +478,18 @@ history kept private. The custom-domain step below is optional and concierge-onl
    (the panel's "Custom domain" note shows them this). They then contact us to activate.
 3. **We add the Netlify domain alias:** Netlify → Domain management → add the subdomain as an
    alias of the site; wait for the automatic Let's Encrypt certificate.
-4. **We add a root-only rewrite** to `netlify.toml` and deploy. Root-only on purpose — a `/*`
-   catch-all would swallow `/_astro/*` and `/api/*` on the alias host and break the page:
+4. **We add a root-only rewrite** to `netlify.toml` and deploy. The host goes in `from` as a
+   full URL — that is how Netlify matches a domain. **Do not use `conditions = { Host = ... }`**:
+   Host is not a supported redirect condition (only Country/Language/Role/Cookie are), so it is
+   silently ignored and the rule never fires. Root-only (`/`, no `/*` splat) on purpose — a
+   splat would swallow `/_astro/*` and `/api/*` on the alias host and break assets, chat, and
+   auth:
    ```toml
    [[redirects]]
-     from = "/"
+     from = "https://managers-assistant.theirco.com/"
      to = "/a/<org-id>/<slug>"
      status = 200
      force = true
-     conditions = { Host = ["managers-assistant.theirco.com"] }
    ```
 5. **We allow the host for auth:** Supabase → Authentication → URL Configuration → add
    `https://managers-assistant.theirco.com/**` to the redirect allowlist; and add the hostname

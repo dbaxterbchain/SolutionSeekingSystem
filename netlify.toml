@@ -9,15 +9,16 @@
     Cache-Control = "public, max-age=31536000, immutable"
 
 # White-label custom domain: assistant.bchain.coffee serves the Beanchain
-# "baristas-assistant" page. Root-only + Host-scoped on purpose: a /* catch-all
-# would swallow /_astro/* and /api/* on the alias and break assets, chat, and
-# auth; the Host condition keeps it off solutionseeking.com entirely.
+# "baristas-assistant" page. The host lives in `from` (a full URL) because that
+# is how Netlify matches a domain - `conditions = { Host = ... }` is NOT a
+# supported condition and is silently ignored. Root-only on purpose: a `/*`
+# splat would swallow /_astro/* and /api/* on the alias and break assets, chat,
+# and auth. Scoped to the alias host, so solutionseeking.com is untouched.
 [[redirects]]
-  from = "/"
+  from = "https://assistant.bchain.coffee/"
   to = "/a/ecb52ef5-3b83-4f50-912d-d94725f89e28/baristas-assistant"
   status = 200
   force = true
-  conditions = { Host = ["assistant.bchain.coffee"] }
 
 # Pings IndexNow (Bing/Yandex) with all sitemap URLs after production deploys.
 [[plugins]]
