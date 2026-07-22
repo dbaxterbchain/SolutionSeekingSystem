@@ -110,9 +110,12 @@ Supabase Storage** from the browser (a private `documents` bucket, folder-scoped
 uploader's `<user_id>/`), sidestepping the ~6 MB Netlify function body limit; then
 `POST /api/documents` downloads it with the service role, extracts the text once
 (`src/lib/server/extractText.ts` — `unpdf` for PDF, `mammoth` for docx), and stores it in
-the server-only `documents` table (RLS on, no client grants). Up to three documents attach
-to a chat message: `/api/chat` resolves the referenced rows (own rows only) and injects
-their text into that user turn. All message assembly — chat turns, attachment blocks, and
+the server-only `documents` table (RLS on, no client grants). Documents carry an `org_id`
+(migration `0025`, null = Personal): a document belongs to the **workspace** that was active
+when it was uploaded, and the list endpoint scopes to `?org_id=` so switching orgs never
+surfaces another workspace's files. Up to three documents attach to a chat message:
+`/api/chat` resolves the referenced rows (own rows only) and injects their text into that
+user turn. All message assembly — chat turns, attachment blocks, and
 the per-assistant cache breakpoint coming in Phase C — lives in one place,
 `src/lib/server/chatMessages.ts`, so the prompt-cache invariant has a single home. New
 server-only tables follow the `0012` pattern and are reached only through Bearer-authed API
@@ -122,18 +125,29 @@ routes gated by `requireSubscriber` (`src/lib/server/subscriberAuth.ts`), never 
 
 A specialized assistant is a saved (base agent + optional mode + custom instructions + up
 to five knowledge documents), in the server-only `assistants` / `assistant_documents`
-tables, managed through `/api/assistants`. Personal by default; a member with the
-`manager` role on `org_members` (set from `/admin`) can share one org-wide by stamping its
-`org_id`, and every member then uses it with their own private history (`chat_sessions`
-gains a nullable `assistant_id`).
+tables, managed through `/api/assistants`. Each assistant belongs to a **workspace**:
+`assistants.org_id` is the workspace it lives in (null = Personal), set at create time from
+the active workspace and changeable via a **move** action. A separate `shared` boolean
+(migration `0025`) says whether the other members of that org can see it — a private draft
+(`shared = false`) in an org workspace stays owner-only until a `manager` (role on
+`org_members`, set from `/admin`) flips it shared. Moving an assistant always resets sharing,
+so nothing is silently shared into an org. Every member then uses a shared assistant with
+their own private history (`chat_sessions` has a nullable `assistant_id`).
+
+Access splits cleanly: **use** (chat) is owner OR (`shared` AND member of `org_id`);
+**edit/delete/unshare** is owner OR (`shared` AND manager of `org_id`); **share** is owner +
+manager; **move** is owner + member of the target. `GET /api/assistants?org_id=` returns only
+the requested workspace's assistants plus the full membership list.
 
 Org membership is resolved server-side by `getOrgMemberships` (`src/lib/server/orgMembership.ts`),
 which also **claims** the user's seats — that is where a member is recognized, independent of
 whether they're entitled by a personal subscription or the org, which is what fixed the
 seat-claim bug. A person can belong to **several orgs** (migration `0024` dropped the
 global-unique-email rule); the org-scoped endpoints take an `org_id` and check membership per
-org (`isMemberOf` / `isManagerOf`), and the dashboard picks an active org via a switcher. The
-browser never reads org tables directly.
+org (`isMemberOf` / `isManagerOf`), and the dashboard picks an active **workspace** (Personal
+or an org) via a switcher, remembered in `localStorage` (`sss-active-workspace`). Assistants,
+documents, and conversation history (`chat_sessions.org_id`, migration `0025`) all follow the
+active workspace. The browser never reads org tables directly.
 
 When a chat runs against an assistant, `/api/chat` loads it (owner or org member, else a
 non-probeable 404), derives the agent and mode from it, and `buildAssistantSetup`

@@ -36,6 +36,7 @@ export default function Sidebar({
   onSelectOrg,
   mine,
   shared,
+  onToggleShare,
   orgName,
   recents,
   activeChatId,
@@ -53,10 +54,13 @@ export default function Sidebar({
   onOpenWhiteLabel: () => void;
   canManageOrg: boolean;
   memberships: OrgOption[];
+  /** The active workspace: null = Personal, else an org id. */
   activeOrgId: string | null;
-  onSelectOrg: (orgId: string) => void;
+  onSelectOrg: (orgId: string | null) => void;
   mine: Assistant[];
   shared: Assistant[];
+  /** Share / unshare an owned assistant within the active org workspace. */
+  onToggleShare: (a: Assistant) => void;
   orgName: string | null;
   recents: ChatSession[] | null;
   activeChatId: string | null;
@@ -68,31 +72,67 @@ export default function Sidebar({
 
   const assistantActive = (id: string) => selection.kind === 'assistant' && selection.id === id;
 
-  const AssistantRow = ({ a, editable }: { a: Assistant; editable: boolean }) => (
-    <div className="group relative">
-      <button
-        type="button"
-        onClick={() => onSelectAssistant(a)}
-        aria-current={assistantActive(a.id) ? 'true' : undefined}
-        className={`block w-full rounded-xl px-3 py-2 pr-8 text-left transition-colors ${
-          assistantActive(a.id) ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-ink-800'
-        }`}
-      >
-        <span className="block truncate text-sm font-semibold">{a.name}</span>
-        <span className="mt-0.5 block text-xs capitalize text-slate-400">{a.base_agent}</span>
-      </button>
-      {editable && (
+  const AssistantRow = ({ a, editable }: { a: Assistant; editable: boolean }) => {
+    // A manager can share/unshare their own assistants when an org workspace is active.
+    const canToggleShare = editable && activeOrgId !== null && canManageOrg;
+    return (
+      <div className="group relative">
         <button
           type="button"
-          onClick={() => onEditAssistant(a)}
-          aria-label={`Edit ${a.name}`}
-          className="absolute right-1.5 top-2 rounded-md px-1.5 py-1 text-xs text-slate-400 opacity-100 transition-opacity hover:bg-slate-100 hover:text-slate-600 focus:opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+          onClick={() => onSelectAssistant(a)}
+          aria-current={assistantActive(a.id) ? 'true' : undefined}
+          className={`block w-full rounded-xl px-3 py-2 ${editable ? 'pr-16' : 'pr-3'} text-left transition-colors ${
+            assistantActive(a.id) ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-ink-800'
+          }`}
         >
-          ✎
+          <span className="block truncate text-sm font-semibold">{a.name}</span>
+          <span className="mt-0.5 flex items-center gap-1.5 text-xs capitalize text-slate-400">
+            {a.base_agent}
+            {a.shared && !canToggleShare && (
+              <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[0.65rem] font-semibold normal-case text-brand-600">
+                Shared
+              </span>
+            )}
+          </span>
         </button>
-      )}
-    </div>
-  );
+        <div className="absolute right-1.5 top-1.5 flex items-center gap-0.5">
+          {canToggleShare && (
+            <button
+              type="button"
+              onClick={() => onToggleShare(a)}
+              aria-label={
+                a.shared
+                  ? `Stop sharing ${a.name}`
+                  : `Share ${a.name} with ${orgName ?? 'your organization'}`
+              }
+              title={
+                a.shared
+                  ? 'Shared with your organization. Click to stop.'
+                  : 'Share with everyone in your organization'
+              }
+              className={`rounded-md px-1.5 py-1 text-xs transition-colors ${
+                a.shared
+                  ? 'text-brand-600 hover:bg-brand-50'
+                  : 'text-slate-400 opacity-100 hover:bg-slate-100 hover:text-slate-600 focus:opacity-100 lg:opacity-0 lg:group-hover:opacity-100'
+              }`}
+            >
+              {a.shared ? '👥✓' : '👥'}
+            </button>
+          )}
+          {editable && (
+            <button
+              type="button"
+              onClick={() => onEditAssistant(a)}
+              aria-label={`Edit ${a.name}`}
+              className="rounded-md px-1.5 py-1 text-xs text-slate-400 opacity-100 transition-opacity hover:bg-slate-100 hover:text-slate-600 focus:opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+            >
+              ✎
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-hidden rounded-3xl border border-slate-100 bg-white p-4 shadow-card">
@@ -104,20 +144,21 @@ export default function Sidebar({
       >
         ✕
       </button>
-      {memberships.length >= 2 && (
+      {memberships.length >= 1 && (
         <div>
           <label
             htmlFor="org-switch"
             className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-400"
           >
-            Organization
+            Workspace
           </label>
           <select
             id="org-switch"
             value={activeOrgId ?? ''}
-            onChange={(e) => onSelectOrg(e.target.value)}
+            onChange={(e) => onSelectOrg(e.target.value || null)}
             className="mt-1 w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-ink-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
           >
+            <option value="">Personal</option>
             {memberships.map((m) => (
               <option key={m.orgId} value={m.orgId}>
                 {m.orgName}

@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import type { User } from '@supabase/supabase-js';
 import { json } from '../../lib/server/auth';
 import { requireSubscriber } from '../../lib/server/subscriberAuth';
-import { getOrgMemberships, isManagerOf } from '../../lib/server/orgMembership';
+import { getOrgMemberships, isManagerOf, isMemberOf } from '../../lib/server/orgMembership';
 import { supabaseAdmin } from '../../lib/server/supabaseAdmin';
 import { AGENT_IDS, type AgentId } from '../../lib/server/agents';
 import { getContextMeta } from '../../lib/contexts';
@@ -12,7 +12,7 @@ export const prerender = false;
 
 const MAX_ASSISTANTS_PER_USER = 20;
 const ROW_COLUMNS =
-  'id, owner_user_id, org_id, name, base_agent, context, instructions, created_at, updated_at';
+  'id, owner_user_id, org_id, shared, name, base_agent, context, instructions, created_at, updated_at';
 
 interface DocView {
   id: string;
@@ -23,6 +23,7 @@ interface AssistantRowRaw {
   id: string;
   owner_user_id: string;
   org_id: string | null;
+  shared: boolean;
   name: string;
   base_agent: AgentId;
   context: string | null;
@@ -31,7 +32,11 @@ interface AssistantRowRaw {
   updated_at: string;
 }
 
-// ── GET: the user's assistants, those shared to their org, and their membership ─
+// ── GET: the active workspace's assistants, plus the user's full membership list ─
+// The active workspace comes from ?org_id= (absent/empty = the Personal workspace).
+// Everything is scoped to that one workspace so switching orgs never leaks another
+// org's (or Personal's) assistants. `memberships` is always the full list (it drives
+// the workspace switcher).
 export const GET: APIRoute = async ({ request }) => {
   const auth = await requireSubscriber(request);
   if ('error' in auth) return json({ error: auth.error }, auth.status);
@@ -39,24 +44,31 @@ export const GET: APIRoute = async ({ request }) => {
 
   const memberships = await getOrgMemberships(user);
 
-  const { data: mineRows, error: mineErr } = await supabaseAdmin
+  // Resolve the workspace: a real org only if the caller belongs to it, else Personal.
+  const requested = new URL(request.url).searchParams.get('org_id')?.trim() || '';
+  const workspace = requested && isMemberOf(memberships, requested) ? requested : null;
+
+  // mine: the caller's own assistants in this workspace.
+  let mineQuery = supabaseAdmin
     .from('assistants')
     .select(ROW_COLUMNS)
     .eq('owner_user_id', user.id)
     .order('updated_at', { ascending: false });
+  mineQuery = workspace ? mineQuery.eq('org_id', workspace) : mineQuery.is('org_id', null);
+  const { data: mineRows, error: mineErr } = await mineQuery;
   if (mineErr) {
     console.error('assistants list failed', mineErr);
     return json({ error: 'server_error' }, 500);
   }
 
-  // Assistants shared to ANY org the user belongs to (each carries its org_id, so
-  // the client groups/filters by the active org).
+  // shared: other members' assistants shared into this org workspace (none for Personal).
   let sharedRows: AssistantRowRaw[] = [];
-  if (memberships.length > 0) {
+  if (workspace) {
     const { data } = await supabaseAdmin
       .from('assistants')
       .select(ROW_COLUMNS)
-      .in('org_id', memberships.map((m) => m.orgId))
+      .eq('org_id', workspace)
+      .eq('shared', true)
       .neq('owner_user_id', user.id)
       .order('updated_at', { ascending: false });
     sharedRows = (data ?? []) as AssistantRowRaw[];
@@ -99,6 +111,7 @@ function shape(r: AssistantRowRaw, docs: Map<string, DocView[]>) {
     context: r.context,
     instructions: r.instructions,
     org_id: r.org_id,
+    shared: r.shared,
     documents: docs.get(r.id) ?? [],
     created_at: r.created_at,
     updated_at: r.updated_at,
@@ -115,7 +128,7 @@ export const POST: APIRoute = async ({ request }) => {
 
   switch (action) {
     case 'create':
-      return createAssistant(auth.user.id, body);
+      return createAssistant(auth.user, body);
     case 'update':
       return updateAssistant(auth.user, body);
     case 'delete':
@@ -124,6 +137,8 @@ export const POST: APIRoute = async ({ request }) => {
       return shareAssistant(auth.user, body);
     case 'unshare':
       return unshareAssistant(auth.user, body);
+    case 'move':
+      return moveAssistant(auth.user, body);
     default:
       return json({ error: 'bad_request' }, 400);
   }
@@ -175,11 +190,11 @@ async function attachDocs(assistantId: string, documentIds: string[]): Promise<v
   if (error) console.error('attach docs failed', error);
 }
 
-async function createAssistant(userId: string, body: Record<string, unknown>): Promise<Response> {
+async function createAssistant(user: User, body: Record<string, unknown>): Promise<Response> {
   const { count } = await supabaseAdmin
     .from('assistants')
     .select('id', { count: 'exact', head: true })
-    .eq('owner_user_id', userId);
+    .eq('owner_user_id', user.id);
   if ((count ?? 0) >= MAX_ASSISTANTS_PER_USER) {
     return json(
       { error: 'too_many_assistants', message: `You can have up to ${MAX_ASSISTANTS_PER_USER} assistants.` },
@@ -199,12 +214,20 @@ async function createAssistant(userId: string, body: Record<string, unknown>): P
   const instructions = str(body.instructions).slice(0, 8000);
   const documentIds = idList(body.document_ids);
 
-  const budgetErr = await checkDocsBudget(userId, documentIds, instructions);
+  // The workspace the assistant is created in: an org the caller belongs to, else Personal.
+  // New assistants are never auto-shared (a manager shares afterwards).
+  const orgId = str(body.org_id).trim() || null;
+  if (orgId) {
+    const memberships = await getOrgMemberships(user);
+    if (!isMemberOf(memberships, orgId)) return json({ error: 'bad_request', field: 'org_id' }, 400);
+  }
+
+  const budgetErr = await checkDocsBudget(user.id, documentIds, instructions);
   if (budgetErr) return budgetErr;
 
   const { data: created, error } = await supabaseAdmin
     .from('assistants')
-    .insert({ owner_user_id: userId, name, base_agent: baseAgent, context, instructions })
+    .insert({ owner_user_id: user.id, org_id: orgId, name, base_agent: baseAgent, context, instructions })
     .select('id')
     .single();
   if (error || !created) {
@@ -215,19 +238,26 @@ async function createAssistant(userId: string, body: Record<string, unknown>): P
   return json({ id: created.id });
 }
 
-/** Load an assistant the user owns, or is a manager of the org it's shared to. */
+/**
+ * Load an assistant the user owns, or is a manager of the org it's SHARED to. A private
+ * draft (org_id set but shared = false) that merely lives in an org workspace stays
+ * owner-only; managers gain co-management only once it is shared.
+ */
 async function loadOwnedOrManaged(
   user: User,
   id: string
-): Promise<{ row: { id: string; owner_user_id: string; org_id: string | null; base_agent: AgentId } } | { response: Response }> {
+): Promise<
+  | { row: { id: string; owner_user_id: string; org_id: string | null; shared: boolean; base_agent: AgentId } }
+  | { response: Response }
+> {
   const { data: row } = await supabaseAdmin
     .from('assistants')
-    .select('id, owner_user_id, org_id, base_agent')
+    .select('id, owner_user_id, org_id, shared, base_agent')
     .eq('id', id)
     .maybeSingle();
   if (!row) return { response: json({ error: 'not_found' }, 404) };
   if (row.owner_user_id === user.id) return { row };
-  if (row.org_id) {
+  if (row.org_id && row.shared) {
     const memberships = await getOrgMemberships(user);
     if (isManagerOf(memberships, row.org_id)) return { row };
   }
@@ -293,25 +323,27 @@ async function deleteAssistant(user: User, body: Record<string, unknown>): Promi
   return json({ ok: true });
 }
 
+// Share flips the `shared` flag on an assistant that already lives in an org workspace
+// (its org_id was set at create or via `move`). Only the OWNER shares, and only when they
+// MANAGE that org.
 async function shareAssistant(user: User, body: Record<string, unknown>): Promise<Response> {
   const id = str(body.id);
-  const orgId = str(body.org_id);
-  if (!id || !orgId) return json({ error: 'bad_request' }, 400);
-  // Only the OWNER shares, and only into an org they MANAGE.
+  if (!id) return json({ error: 'bad_request' }, 400);
   const { data: row } = await supabaseAdmin
     .from('assistants')
-    .select('owner_user_id')
+    .select('owner_user_id, org_id')
     .eq('id', id)
     .maybeSingle();
   if (!row || row.owner_user_id !== user.id) return json({ error: 'not_found' }, 404);
+  if (!row.org_id) return json({ error: 'bad_request', field: 'org_id' }, 400); // Personal can't share
   const memberships = await getOrgMemberships(user);
-  if (!isManagerOf(memberships, orgId)) return json({ error: 'manager_required' }, 403);
-  const { error } = await supabaseAdmin.from('assistants').update({ org_id: orgId }).eq('id', id);
+  if (!isManagerOf(memberships, row.org_id)) return json({ error: 'manager_required' }, 403);
+  const { error } = await supabaseAdmin.from('assistants').update({ shared: true }).eq('id', id);
   if (error) {
     console.error('assistant share failed', error);
     return json({ error: 'server_error' }, 500);
   }
-  return json({ ok: true, orgName: memberships.find((m) => m.orgId === orgId)?.orgName });
+  return json({ ok: true, orgName: memberships.find((m) => m.orgId === row.org_id)?.orgName });
 }
 
 async function unshareAssistant(user: User, body: Record<string, unknown>): Promise<Response> {
@@ -319,9 +351,38 @@ async function unshareAssistant(user: User, body: Record<string, unknown>): Prom
   if (!id) return json({ error: 'bad_request' }, 400);
   const access = await loadOwnedOrManaged(user, id);
   if ('response' in access) return access.response;
-  const { error } = await supabaseAdmin.from('assistants').update({ org_id: null }).eq('id', id);
+  const { error } = await supabaseAdmin.from('assistants').update({ shared: false }).eq('id', id);
   if (error) {
     console.error('assistant unshare failed', error);
+    return json({ error: 'server_error' }, 500);
+  }
+  return json({ ok: true });
+}
+
+// Move an assistant to another workspace (Personal or an org the owner belongs to). Moving
+// only ever produces a PRIVATE draft (shared reset to false), so membership - not manager -
+// is enough; SHARING it afterwards is the manager-gated step. This also means an assistant
+// is never silently shared into an org it was moved to.
+async function moveAssistant(user: User, body: Record<string, unknown>): Promise<Response> {
+  const id = str(body.id);
+  if (!id) return json({ error: 'bad_request' }, 400);
+  const target = str(body.org_id).trim() || null; // null = Personal
+  const { data: row } = await supabaseAdmin
+    .from('assistants')
+    .select('owner_user_id')
+    .eq('id', id)
+    .maybeSingle();
+  if (!row || row.owner_user_id !== user.id) return json({ error: 'not_found' }, 404);
+  if (target) {
+    const memberships = await getOrgMemberships(user);
+    if (!isMemberOf(memberships, target)) return json({ error: 'bad_request', field: 'org_id' }, 400);
+  }
+  const { error } = await supabaseAdmin
+    .from('assistants')
+    .update({ org_id: target, shared: false })
+    .eq('id', id);
+  if (error) {
+    console.error('assistant move failed', error);
     return json({ error: 'server_error' }, 500);
   }
   return json({ ok: true });

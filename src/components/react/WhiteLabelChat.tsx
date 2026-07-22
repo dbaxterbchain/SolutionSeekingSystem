@@ -76,6 +76,7 @@ export default function WhiteLabelChat({
           messages: next,
           context,
           assistant_id: assistantId,
+          org_id: orgId,
         });
         setChatId(created.id);
       }
@@ -158,7 +159,7 @@ export default function WhiteLabelChat({
       return;
     }
     setShowHistory(true);
-    listChatSessions()
+    listChatSessions(orgId)
       .then((all) => setHistory(all.filter(matchesPage)))
       .catch(() => setHistory([]));
   };
@@ -208,9 +209,9 @@ export default function WhiteLabelChat({
 
   return (
     <div className="rounded-3xl border border-slate-100 bg-white shadow-card">
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-        <p className="text-sm font-semibold text-ink-800">{displayName}</p>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-slate-100 px-5 py-3">
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-800">{displayName}</p>
+        <div className="flex shrink-0 basis-full items-center justify-end gap-2 sm:basis-auto">
           {messages.length > 0 && (
             <button
               type="button"
@@ -219,12 +220,12 @@ export default function WhiteLabelChat({
                 setChatId(null);
                 setError(null);
               }}
-              className="btn-ghost text-xs"
+              className="btn-ghost whitespace-nowrap text-xs"
             >
               New conversation
             </button>
           )}
-          <button type="button" onClick={toggleHistory} className="btn-ghost text-xs">
+          <button type="button" onClick={toggleHistory} className="btn-ghost whitespace-nowrap text-xs">
             {showHistory ? 'Close history' : 'History'}
           </button>
         </div>

@@ -13,7 +13,10 @@ export interface Assistant {
   base_agent: AgentId;
   context: string | null;
   instructions: string;
+  /** The workspace it belongs to: null = Personal, else an org id. */
   org_id: string | null;
+  /** Whether other members of org_id can see it (managers share). */
+  shared: boolean;
   documents: AssistantDocRef[];
   created_at: string;
   updated_at: string;
@@ -46,8 +49,14 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function fetchAssistants(): Promise<AssistantsData> {
-  const res = await fetch('/api/assistants', { headers: await authHeaders() });
+/** '' for the Personal workspace, else `?org_id=<id>`. */
+function orgQuery(orgId: string | null): string {
+  return orgId ? `?org_id=${encodeURIComponent(orgId)}` : '';
+}
+
+/** Load the assistants in one workspace (null = Personal) plus the full membership list. */
+export async function fetchAssistants(orgId: string | null): Promise<AssistantsData> {
+  const res = await fetch(`/api/assistants${orgQuery(orgId)}`, { headers: await authHeaders() });
   if (!res.ok) throw new Error('Could not load your assistants.');
   const data = await res.json().catch(() => null);
   return {
@@ -68,8 +77,9 @@ async function post(payload: Record<string, unknown>): Promise<Record<string, un
   return data ?? {};
 }
 
-export async function createAssistant(input: AssistantInput): Promise<string> {
-  const data = await post({ action: 'create', ...input });
+/** Create in a workspace (null = Personal). New assistants are never auto-shared. */
+export async function createAssistant(input: AssistantInput, orgId: string | null): Promise<string> {
+  const data = await post({ action: 'create', ...input, org_id: orgId });
   return String(data.id ?? '');
 }
 
@@ -81,12 +91,18 @@ export async function deleteAssistant(id: string): Promise<void> {
   await post({ action: 'delete', id });
 }
 
-export async function shareAssistant(id: string, orgId: string): Promise<void> {
-  await post({ action: 'share', id, org_id: orgId });
+/** Share within the assistant's own org workspace (managers only). */
+export async function shareAssistant(id: string): Promise<void> {
+  await post({ action: 'share', id });
 }
 
 export async function unshareAssistant(id: string): Promise<void> {
   await post({ action: 'unshare', id });
+}
+
+/** Move to another workspace (null = Personal). Resets sharing; org targets need a manager. */
+export async function moveAssistant(id: string, orgId: string | null): Promise<void> {
+  await post({ action: 'move', id, org_id: orgId });
 }
 
 function assistantErrorMessage(code?: string): string {

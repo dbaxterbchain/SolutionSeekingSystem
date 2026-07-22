@@ -12,11 +12,16 @@ export default function DocumentsPanel({
   open,
   onClose,
   documents,
+  orgId,
+  orgName,
   onChanged,
 }: {
   open: boolean;
   onClose: () => void;
   documents: DocumentMeta[] | null;
+  /** The active workspace new uploads belong to: null = Personal, else an org id. */
+  orgId: string | null;
+  orgName: string | null;
   /** Refetch the list after an upload or delete. */
   onChanged: () => void;
 }) {
@@ -42,7 +47,7 @@ export default function DocumentsPanel({
     setBusy(true);
     try {
       for (const file of Array.from(files)) {
-        await uploadAndRegister(file);
+        await uploadAndRegister(file, orgId);
       }
       onChanged();
     } catch (e) {
@@ -83,14 +88,16 @@ export default function DocumentsPanel({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="font-heading text-xl font-bold text-ink-800">Your documents</h2>
+          <h2 className="font-heading text-xl font-bold text-ink-800">
+            Documents{orgName ? ` · ${orgName}` : ' · Personal'}
+          </h2>
           <button type="button" onClick={onClose} className="btn-ghost px-2" aria-label="Close">
             ✕
           </button>
         </div>
         <p className="mt-1 text-sm leading-relaxed text-slate-500">
           Upload PDF, Word (.docx), .txt, or .md. Their text becomes available to attach to any
-          chat. 10 MB per file, 50 documents.
+          chat in {orgName ?? 'your Personal workspace'}. 10 MB per file, 50 documents.
         </p>
 
         <div className="mt-4">

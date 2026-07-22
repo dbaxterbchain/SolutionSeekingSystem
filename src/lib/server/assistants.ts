@@ -12,6 +12,7 @@ export interface AssistantRow {
   id: string;
   owner_user_id: string;
   org_id: string | null;
+  shared: boolean;
   name: string;
   base_agent: AgentId;
   context: string | null;
@@ -28,8 +29,10 @@ export interface AssistantDoc {
 /**
  * Load an assistant the user is allowed to use, with its knowledge documents in
  * deterministic order. Access = owner, OR a member of the organization the
- * assistant is shared to. Returns null when the assistant doesn't exist or the
- * caller can't reach it, so the API can answer a non-probeable 404.
+ * assistant is SHARED to (org_id set and shared = true). A private draft that
+ * merely lives in an org workspace stays owner-only. Returns null when the
+ * assistant doesn't exist or the caller can't reach it, so the API can answer a
+ * non-probeable 404.
  */
 export async function loadAssistantForUser(
   assistantId: string,
@@ -37,7 +40,7 @@ export async function loadAssistantForUser(
 ): Promise<{ assistant: AssistantRow; docs: AssistantDoc[] } | null> {
   const { data: assistant, error } = await supabaseAdmin
     .from('assistants')
-    .select('id, owner_user_id, org_id, name, base_agent, context, instructions')
+    .select('id, owner_user_id, org_id, shared, name, base_agent, context, instructions')
     .eq('id', assistantId)
     .maybeSingle();
   if (error) {
@@ -48,7 +51,7 @@ export async function loadAssistantForUser(
 
   if (assistant.owner_user_id !== user.id) {
     // Not the owner: allowed only if it's shared to an org they belong to.
-    if (!assistant.org_id) return null;
+    if (!assistant.org_id || !assistant.shared) return null;
     const memberships = await getOrgMemberships(user);
     if (!isMemberOf(memberships, assistant.org_id)) return null;
   }

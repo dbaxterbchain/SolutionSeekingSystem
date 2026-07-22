@@ -480,7 +480,8 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
       return;
     }
     setShowHistory(true);
-    listChatSessions()
+    // Public practice chats live in the Personal workspace (org_id null).
+    listChatSessions(null)
       .then((all) => setHistory(all.filter((c) => c.agent === agent)))
       .catch(() => setHistory([]));
   };

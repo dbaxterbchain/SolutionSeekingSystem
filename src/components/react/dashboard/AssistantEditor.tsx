@@ -9,7 +9,9 @@ import {
   deleteAssistant,
   shareAssistant,
   unshareAssistant,
+  moveAssistant,
   type Assistant,
+  type OrgMembershipView,
 } from '../../../lib/assistantsClient';
 import { useDialog } from '../Dialog';
 
@@ -29,31 +31,23 @@ export default function AssistantEditor({
   owned,
   documents,
   onUpload,
+  memberships,
   activeOrgId,
-  activeOrgName,
-  canShare,
-  sharedOrgName,
-  canUnshare,
   onSaved,
 }: {
   open: boolean;
   onClose: () => void;
   /** The assistant being edited, or null to create a new one. */
   editing: Assistant | null;
-  /** Whether the current user owns `editing` (only owners can share). */
+  /** Whether the current user owns `editing` (only owners can move/share). */
   owned: boolean;
   documents: DocumentMeta[] | null;
   /** Upload + register a file, returning the new document (auto-selected). */
   onUpload: (file: File) => Promise<DocumentMeta>;
-  /** The active org, for the "Share with …" action. */
+  /** Every org the user belongs to (workspace targets: Personal + these). */
+  memberships: OrgMembershipView[];
+  /** The active workspace (null = Personal) — the default for a new assistant. */
   activeOrgId: string | null;
-  activeOrgName: string | null;
-  /** Whether the user manages the active org (can share to it). */
-  canShare: boolean;
-  /** The name of the org this assistant is currently shared to, or null. */
-  sharedOrgName: string | null;
-  /** Whether the user manages the org it's shared to (can unshare). */
-  canUnshare: boolean;
   onSaved: () => void;
 }) {
   const [name, setName] = useState(editing?.name ?? '');
@@ -61,11 +55,19 @@ export default function AssistantEditor({
   const [context, setContext] = useState<string>(editing?.context ?? '');
   const [instructions, setInstructions] = useState(editing?.instructions ?? '');
   const [docIds, setDocIds] = useState<string[]>(editing?.documents.map((d) => d.id) ?? []);
+  // The workspace this assistant lives in (null = Personal). New → the active workspace.
+  const [workspace, setWorkspace] = useState<string | null>(editing ? editing.org_id : activeOrgId);
+  const [shareOn, setShareOn] = useState<boolean>(editing?.shared ?? false);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const { confirm, dialog } = useDialog();
+
+  // Whether the user manages the selected workspace (only then can they share into it).
+  const canManageWorkspace =
+    workspace !== null && memberships.some((m) => m.orgId === workspace && m.role === 'manager');
+  const workspaceName = memberships.find((m) => m.orgId === workspace)?.orgName ?? null;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -115,38 +117,20 @@ export default function AssistantEditor({
         instructions,
         document_ids: docIds,
       };
-      if (editing) await updateAssistant(editing.id, input);
-      else await createAssistant(input);
-      onSaved();
-      onClose();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const share = async () => {
-    if (!editing || !activeOrgId) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await shareAssistant(editing.id, activeOrgId);
-      onSaved();
-      onClose();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const unshare = async () => {
-    if (!editing) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await unshareAssistant(editing.id);
+      if (!editing) {
+        // New assistants are created in the chosen workspace, never auto-shared.
+        await createAssistant(input, workspace);
+      } else {
+        await updateAssistant(editing.id, input);
+        // A workspace change moves the assistant (server resets sharing on a move).
+        const moved = workspace !== editing.org_id;
+        if (moved) await moveAssistant(editing.id, workspace);
+        // Reconcile sharing with the toggle: only meaningful for an org the user manages.
+        const currentlyShared = moved ? false : editing.shared;
+        const wantShared = workspace !== null && shareOn && canManageWorkspace;
+        if (wantShared && !currentlyShared) await shareAssistant(editing.id);
+        else if (!wantShared && currentlyShared) await unshareAssistant(editing.id);
+      }
       onSaved();
       onClose();
     } catch (e) {
@@ -160,7 +144,7 @@ export default function AssistantEditor({
     if (!editing) return;
     const ok = await confirm({
       title: 'Delete this assistant?',
-      message: `"${editing.name}" will be permanently removed${editing.org_id ? ' for everyone in the organization' : ''}. This cannot be undone.`,
+      message: `"${editing.name}" will be permanently removed${editing.shared ? ' for everyone in the organization' : ''}. This cannot be undone.`,
       confirmLabel: 'Delete',
       tone: 'danger',
     });
@@ -331,34 +315,57 @@ export default function AssistantEditor({
             </button>
           </div>
 
-          {/* Already shared: show where, and let a manager of that org unshare. */}
-          {editing && editing.org_id && (
-            <div className="rounded-xl border border-brand-100 bg-brand-50/60 px-3 py-2">
-              <p className="text-xs text-brand-700">
-                Shared with {sharedOrgName ?? 'the organization'} — everyone with a seat can use it.
-              </p>
-              {canUnshare && (
-                <button
-                  type="button"
-                  onClick={unshare}
-                  disabled={busy}
-                  className="mt-1 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-60"
+          {/* Workspace + sharing. Owners choose which workspace an assistant lives in;
+              a manager of that org can also share it with everyone there. */}
+          {owned && (memberships.length > 0 || workspace !== null) && (
+            <div className="space-y-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-ink-800" htmlFor="a-workspace">
+                  Workspace
+                </label>
+                <select
+                  id="a-workspace"
+                  value={workspace ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value || null;
+                    setWorkspace(v);
+                    if (v === null) setShareOn(false);
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
                 >
-                  Stop sharing
-                </button>
+                  <option value="">Personal (only you)</option>
+                  {memberships.map((m) => (
+                    <option key={m.orgId} value={m.orgId}>
+                      {m.orgName}
+                      {m.role === 'manager' ? ' (manager)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-slate-400">
+                  Only shows in this workspace. Documents you attach follow the same rule.
+                </p>
+              </div>
+              {editing && workspace !== null && (
+                <label
+                  className={`flex items-start gap-2 text-xs ${canManageWorkspace ? 'text-ink-700' : 'text-slate-400'}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={shareOn && canManageWorkspace}
+                    disabled={!canManageWorkspace}
+                    onChange={(e) => setShareOn(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    Share with everyone in {workspaceName ?? 'this organization'}
+                    {!canManageWorkspace && ' (managers only)'}
+                  </span>
+                </label>
+              )}
+              {!editing && workspace !== null && (
+                <p className="text-xs text-slate-400">You can share it with the organization after creating it.</p>
               )}
             </div>
-          )}
-          {/* Not shared: an owner who manages the active org can share it there. */}
-          {editing && owned && !editing.org_id && canShare && activeOrgId && (
-            <button
-              type="button"
-              onClick={share}
-              disabled={busy}
-              className="w-full rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-100 disabled:opacity-60"
-            >
-              Share with {activeOrgName ?? 'my organization'}
-            </button>
           )}
 
           {error && <p className="text-sm text-amber-700">{error}</p>}

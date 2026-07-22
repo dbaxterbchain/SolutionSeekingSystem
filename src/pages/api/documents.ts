@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { json } from '../../lib/server/auth';
 import { requireSubscriber } from '../../lib/server/subscriberAuth';
+import { getOrgMemberships, isMemberOf } from '../../lib/server/orgMembership';
 import { supabaseAdmin } from '../../lib/server/supabaseAdmin';
 import { extractText, UnsupportedContentError, type DocExt } from '../../lib/server/extractText';
 
@@ -11,16 +12,29 @@ const BUCKET = 'documents';
 /** Columns returned to the browser: never `extracted_text` or `storage_path`. */
 const LIST_COLUMNS = 'id, name, mime, size_bytes, char_count, truncated, created_at';
 
-/** List the subscriber's documents (metadata only, never the extracted text). */
+/**
+ * List the subscriber's documents in the active workspace (metadata only, never the
+ * extracted text). The workspace comes from ?org_id= (absent/empty = Personal), so
+ * switching orgs never surfaces another workspace's documents.
+ */
 export const GET: APIRoute = async ({ request }) => {
   const auth = await requireSubscriber(request);
   if ('error' in auth) return json({ error: auth.error }, auth.status);
 
-  const { data, error } = await supabaseAdmin
+  const requested = new URL(request.url).searchParams.get('org_id')?.trim() || '';
+  let workspace: string | null = null;
+  if (requested) {
+    const memberships = await getOrgMemberships(auth.user);
+    if (isMemberOf(memberships, requested)) workspace = requested;
+  }
+
+  let query = supabaseAdmin
     .from('documents')
     .select(LIST_COLUMNS)
     .eq('user_id', auth.user.id)
     .order('created_at', { ascending: false });
+  query = workspace ? query.eq('org_id', workspace) : query.is('org_id', null);
+  const { data, error } = await query;
   if (error) {
     console.error('documents list failed', error);
     return json({ error: 'server_error' }, 500);
@@ -38,7 +52,7 @@ export const POST: APIRoute = async ({ request }) => {
   const { user } = auth;
 
   const body = (await request.json().catch(() => null)) as
-    | { storage_path?: unknown; name?: unknown }
+    | { storage_path?: unknown; name?: unknown; org_id?: unknown }
     | null;
   const storagePath = typeof body?.storage_path === 'string' ? body.storage_path : '';
   const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 200) : '';
@@ -47,6 +61,13 @@ export const POST: APIRoute = async ({ request }) => {
   // someone else's object.
   const pathOk = new RegExp(`^${user.id}/[0-9a-fA-F-]{36}\\.(pdf|docx|txt|md)$`).test(storagePath);
   if (!pathOk || !name) return json({ error: 'bad_request' }, 400);
+
+  // The workspace this document belongs to: an org the caller belongs to, else Personal.
+  const orgId = typeof body?.org_id === 'string' && body.org_id.trim() ? body.org_id.trim() : null;
+  if (orgId) {
+    const memberships = await getOrgMemberships(user);
+    if (!isMemberOf(memberships, orgId)) return json({ error: 'bad_request', field: 'org_id' }, 400);
+  }
 
   const { count } = await supabaseAdmin
     .from('documents')
@@ -87,6 +108,7 @@ export const POST: APIRoute = async ({ request }) => {
     .from('documents')
     .insert({
       user_id: user.id,
+      org_id: orgId,
       name,
       storage_path: storagePath,
       mime: blob.type || 'application/octet-stream',

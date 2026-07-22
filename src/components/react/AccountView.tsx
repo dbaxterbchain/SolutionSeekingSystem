@@ -684,7 +684,9 @@ function ChatHistorySection({ formatDate }: { formatDate: (iso: string) => strin
   const { confirm, dialog } = useDialog();
 
   useEffect(() => {
-    listChatSessions()
+    // The account library shows the user's Personal-workspace conversations; org
+    // conversations are workspace-scoped and live in the dashboard.
+    listChatSessions(null)
       .then(setChats)
       .catch(() => setError('Could not load your conversations.'))
       .finally(() => setLoading(false));

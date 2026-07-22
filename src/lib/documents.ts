@@ -30,8 +30,14 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function listDocuments(): Promise<DocumentMeta[]> {
-  const res = await fetch('/api/documents', { headers: await authHeaders() });
+/** '' for the Personal workspace, else `?org_id=<id>`. */
+function orgQuery(orgId: string | null): string {
+  return orgId ? `?org_id=${encodeURIComponent(orgId)}` : '';
+}
+
+/** List the documents in one workspace (null = Personal). */
+export async function listDocuments(orgId: string | null): Promise<DocumentMeta[]> {
+  const res = await fetch(`/api/documents${orgQuery(orgId)}`, { headers: await authHeaders() });
   if (!res.ok) throw new Error('Could not load your documents.');
   const data = await res.json().catch(() => null);
   return (data?.rows ?? []) as DocumentMeta[];
@@ -42,7 +48,7 @@ export async function listDocuments(): Promise<DocumentMeta[]> {
  * then ask the server to register and extract it. On any server-side failure the
  * just-uploaded object is removed so nothing is orphaned.
  */
-export async function uploadAndRegister(file: File): Promise<DocumentMeta> {
+export async function uploadAndRegister(file: File, orgId: string | null): Promise<DocumentMeta> {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
   if (!EXT_MIME[ext]) {
     throw new Error('Unsupported file type. Use PDF, Word (.docx), .txt, or .md.');
@@ -71,7 +77,7 @@ export async function uploadAndRegister(file: File): Promise<DocumentMeta> {
   const res = await fetch('/api/documents', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-    body: JSON.stringify({ storage_path: path, name: file.name }),
+    body: JSON.stringify({ storage_path: path, name: file.name, org_id: orgId }),
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) {

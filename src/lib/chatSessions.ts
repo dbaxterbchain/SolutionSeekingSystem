@@ -26,6 +26,8 @@ export interface ChatSession {
   context: string | null;
   /** The specialized assistant that drove this conversation, if any. */
   assistant_id: string | null;
+  /** The workspace it belongs to: null = Personal, else an org id. */
+  org_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -36,12 +38,17 @@ export const AGENT_META: Record<AgentId, { label: string; path: string }> = {
   mentor: { label: 'Solution Seeking Mentor', path: '/practice/mentor' },
 };
 
-/** List the signed-in user's conversations, most recently updated first. */
-export async function listChatSessions(): Promise<ChatSession[]> {
-  const { data, error } = await supabase
+/**
+ * List the signed-in user's conversations in one workspace (null = Personal), most
+ * recently updated first. Scoping keeps another workspace's history out of view.
+ */
+export async function listChatSessions(orgId: string | null): Promise<ChatSession[]> {
+  let query = supabase
     .from('chat_sessions')
     .select('*')
     .order('updated_at', { ascending: false });
+  query = orgId ? query.eq('org_id', orgId) : query.is('org_id', null);
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as ChatSession[];
 }
@@ -57,13 +64,14 @@ export async function getChatSession(id: string): Promise<ChatSession | null> {
   return (data as ChatSession) ?? null;
 }
 
-/** Create a conversation for the current user. */
+/** Create a conversation for the current user in a workspace (null = Personal). */
 export async function createChatSession(input: {
   agent: AgentId;
   title: string;
   messages: ChatMessage[];
   context?: string | null;
   assistant_id?: string | null;
+  org_id?: string | null;
 }): Promise<ChatSession> {
   const {
     data: { user },
@@ -79,6 +87,7 @@ export async function createChatSession(input: {
       messages: input.messages,
       context: input.context ?? null,
       assistant_id: input.assistant_id ?? null,
+      org_id: input.org_id ?? null,
     })
     .select()
     .single();

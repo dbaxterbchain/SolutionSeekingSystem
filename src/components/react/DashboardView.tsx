@@ -19,7 +19,13 @@ import { track, getGaIds, type Tier } from '../../lib/analytics';
 import { getFirstTouch } from '../../lib/attribution';
 import { streamChat } from '../../lib/chatStream';
 import { listDocuments, uploadAndRegister, type DocumentMeta } from '../../lib/documents';
-import { fetchAssistants, type Assistant, type AssistantsData } from '../../lib/assistantsClient';
+import {
+  fetchAssistants,
+  shareAssistant,
+  unshareAssistant,
+  type Assistant,
+  type AssistantsData,
+} from '../../lib/assistantsClient';
 import { useDialog } from './Dialog';
 import MessageBubble from './chat/MessageBubble';
 import Composer from './chat/Composer';
@@ -64,7 +70,10 @@ export default function DashboardView() {
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
   const [documentsOpen, setDocumentsOpen] = useState(false);
   const [assistantsData, setAssistantsData] = useState<AssistantsData | null>(null);
+  // The active workspace: null = Personal, else an org id. Everything (assistants,
+  // documents, history) is scoped to it. Resolved from localStorage on mount.
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
+  const [workspaceResolved, setWorkspaceResolved] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Assistant | null>(null);
   const [whiteLabelOpen, setWhiteLabelOpen] = useState(false);
@@ -86,65 +95,69 @@ export default function DashboardView() {
   const memberships = assistantsData?.memberships ?? [];
   const mine = assistantsData?.mine ?? [];
   const shared = assistantsData?.shared ?? [];
-  // A person can belong to several orgs; one is "active" and drives the shared
-  // list, sharing, and the white-label panel.
+  // A person can belong to several orgs plus Personal; one workspace is "active" and
+  // the server already scoped `mine`/`shared` to it, so no client-side org filter.
   const activeOrg = memberships.find((m) => m.orgId === activeOrgId) ?? null;
   const isManagerOfActive = activeOrg?.role === 'manager';
-  const sharedInActiveOrg = shared.filter((a) => a.org_id === activeOrgId);
   const ownsSelected = Boolean(assistant && mine.some((a) => a.id === assistant.id));
   const canManageSelected =
     ownsSelected ||
     Boolean(
       assistant?.org_id &&
+        assistant?.shared &&
         memberships.some((m) => m.orgId === assistant.org_id && m.role === 'manager')
     );
 
   const refreshRecents = () => {
-    listChatSessions().then(setRecents).catch(() => setRecents([]));
+    listChatSessions(activeOrgId).then(setRecents).catch(() => setRecents([]));
   };
   const refreshDocuments = () => {
-    listDocuments().then(setDocuments).catch(() => setDocuments([]));
+    listDocuments(activeOrgId).then(setDocuments).catch(() => setDocuments([]));
   };
   const refreshAssistants = () => {
-    fetchAssistants().then(setAssistantsData).catch(() => setAssistantsData({ mine: [], shared: [], memberships: [] }));
+    fetchAssistants(activeOrgId)
+      .then(setAssistantsData)
+      .catch(() => setAssistantsData({ mine: [], shared: [], memberships: [] }));
   };
 
+  // Resolve the stored workspace once, on the client (localStorage isn't available
+  // during the prerendered shell). An org that turns out invalid is dropped below.
   useEffect(() => {
-    if (!user || !canUseDashboard) return;
-    refreshRecents();
-    refreshDocuments();
-    refreshAssistants();
-  }, [user?.id, canUseDashboard]);
-
-  // Pick / persist the active org once memberships load (keep the current one if
-  // still valid, else a stored choice, else the first).
-  useEffect(() => {
-    if (memberships.length === 0) {
-      setActiveOrgId(null);
-      return;
-    }
-    setActiveOrgId((cur) => {
-      if (cur && memberships.some((m) => m.orgId === cur)) return cur;
-      let stored: string | null = null;
-      try {
-        stored = window.localStorage.getItem('sss-active-org');
-      } catch {
-        stored = null;
-      }
-      if (stored && memberships.some((m) => m.orgId === stored)) return stored;
-      return memberships[0].orgId;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assistantsData]);
-
-  useEffect(() => {
-    if (!activeOrgId) return;
     try {
-      window.localStorage.setItem('sss-active-org', activeOrgId);
+      const stored = window.localStorage.getItem('sss-active-workspace');
+      if (stored && stored !== 'personal') setActiveOrgId(stored);
     } catch {
       // ignore
     }
-  }, [activeOrgId]);
+    setWorkspaceResolved(true);
+  }, []);
+
+  // Load everything for the active workspace, and reload whenever it changes.
+  useEffect(() => {
+    if (!user || !canUseDashboard || !workspaceResolved) return;
+    refreshRecents();
+    refreshDocuments();
+    refreshAssistants();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, canUseDashboard, workspaceResolved, activeOrgId]);
+
+  // Drop a stored org the user no longer belongs to (back to Personal).
+  useEffect(() => {
+    if (activeOrgId && assistantsData && !memberships.some((m) => m.orgId === activeOrgId)) {
+      setActiveOrgId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assistantsData]);
+
+  // Persist the workspace choice ('personal' for the Personal workspace).
+  useEffect(() => {
+    if (!workspaceResolved) return; // don't clobber the stored value before reading it
+    try {
+      window.localStorage.setItem('sss-active-workspace', activeOrgId ?? 'personal');
+    } catch {
+      // ignore
+    }
+  }, [activeOrgId, workspaceResolved]);
 
   // Keep a selected assistant in sync after edits, and fall back to its base
   // agent if it was deleted or unshared away from us.
@@ -193,6 +206,7 @@ export default function DashboardView() {
           messages: next,
           context: activeContext,
           assistant_id: assistant?.id ?? null,
+          org_id: activeOrgId,
         });
         setChatId(created.id);
         setChatUrl(created.id);
@@ -230,6 +244,29 @@ export default function DashboardView() {
   const newConversation = () => {
     if (streaming) return;
     resetConversation();
+  };
+
+  // Switch the active workspace: reset to a clean base-agent conversation so nothing
+  // from the previous workspace carries over. The load effect refetches the new
+  // workspace's assistants, documents, and history.
+  const selectWorkspace = (orgId: string | null) => {
+    setSidebarOpen(false);
+    if (orgId === activeOrgId) return;
+    setActiveOrgId(orgId);
+    setSelection({ kind: 'agent', agent });
+    setContextId(null);
+    resetConversation();
+  };
+
+  // One-click share toggle for an owned assistant in the active org workspace.
+  const toggleShare = async (a: Assistant) => {
+    try {
+      if (a.shared) await unshareAssistant(a.id);
+      else await shareAssistant(a.id);
+      refreshAssistants();
+    } catch (e) {
+      setError((e as Error).message || 'Could not update sharing. Please try again.');
+    }
   };
 
   const openSaved = (saved: ChatSession) => {
@@ -518,9 +555,10 @@ export default function DashboardView() {
           canManageOrg={isManagerOfActive}
           memberships={memberships}
           activeOrgId={activeOrgId}
-          onSelectOrg={setActiveOrgId}
+          onSelectOrg={selectWorkspace}
           mine={mine}
-          shared={sharedInActiveOrg}
+          shared={shared}
+          onToggleShare={toggleShare}
           orgName={activeOrg?.orgName ?? null}
           recents={recents}
           activeChatId={chatId}
@@ -652,7 +690,7 @@ export default function DashboardView() {
             selected={pendingAttachments}
             onChange={setPendingAttachments}
             onUpload={async (file) => {
-              const doc = await uploadAndRegister(file);
+              const doc = await uploadAndRegister(file, activeOrgId);
               refreshDocuments();
               return doc;
             }}
@@ -666,6 +704,8 @@ export default function DashboardView() {
         open={documentsOpen}
         onClose={() => setDocumentsOpen(false)}
         documents={documents}
+        orgId={activeOrgId}
+        orgName={activeOrg?.orgName ?? null}
         onChanged={refreshDocuments}
       />
       {editorOpen && (
@@ -676,29 +716,19 @@ export default function DashboardView() {
           owned={editing ? mine.some((a) => a.id === editing.id) : true}
           documents={documents}
           onUpload={async (file) => {
-            const doc = await uploadAndRegister(file);
+            const doc = await uploadAndRegister(file, activeOrgId);
             refreshDocuments();
             return doc;
           }}
+          memberships={memberships}
           activeOrgId={activeOrgId}
-          activeOrgName={activeOrg?.orgName ?? null}
-          canShare={isManagerOfActive}
-          sharedOrgName={
-            editing?.org_id
-              ? memberships.find((m) => m.orgId === editing?.org_id)?.orgName ?? 'the organization'
-              : null
-          }
-          canUnshare={
-            !!editing?.org_id &&
-            memberships.some((m) => m.orgId === editing?.org_id && m.role === 'manager')
-          }
           onSaved={refreshAssistants}
         />
       )}
       <WhiteLabelPanel
         open={whiteLabelOpen}
         onClose={() => setWhiteLabelOpen(false)}
-        assistants={[...mine, ...shared]}
+        assistants={[...mine.filter((a) => a.shared), ...shared]}
         orgId={activeOrgId}
         orgName={activeOrg?.orgName ?? null}
       />

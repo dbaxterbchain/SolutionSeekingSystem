@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-07-20_
+_Last updated: 2026-07-22_
 
 ## At a glance
 
@@ -122,6 +122,24 @@ step per customer (manual), and any tuning from real subscriber use.
       bounded mobile chat height so the composer pins, touch-visible sidebar controls, and modal
       /popover fixes. Verified in a browser incl. the exact bug repro; screenshots in
       [docs/features/multi-org-dashboard/](features/multi-org-dashboard/).
+- [x] **Prod feedback round 2: org-context workspaces, one-click share, header fix** (2026-07-22).
+      More prod testing surfaced a confidentiality gap: switching the active org still showed the
+      assistants you made under another org, and the document manager showed every document you
+      had ever uploaded. Now assistants, documents, **and** conversation history each belong to
+      the **workspace** active when they were created (Personal or a specific org), and switching
+      the workspace scopes all three. `assistants.org_id` became the workspace (null = Personal)
+      and a new `shared` boolean split "belongs to org" from "visible to members"; `documents` and
+      `chat_sessions` gained a nullable `org_id` (migration `0025`, FK covering indexes, no new
+      functions/RLS-exposed tables → advisor-safe). Owners can **move** an assistant between
+      workspaces (moving resets sharing, so nothing is silently shared). **Sharing is now
+      one-click** from the assistant's sidebar row (managers), not buried in the editor; the editor
+      gained a Workspace selector + a Share-with-members toggle. Also fixed the **white-label chat
+      header** smooshing at small widths (name truncates on its own line; the buttons drop below,
+      no mid-word wrap, no overflow). Verified end to end in a headless browser with one subscriber
+      in Personal + two orgs (manager of one, member of the other): scoping, one-click share,
+      manager-tool visibility, document scoping, and the mobile header all confirmed; screenshots in
+      [docs/features/org-workspaces/](features/org-workspaces/). Migration `0025` still to apply to
+      hosted (`npx supabase db push`).
 
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)
