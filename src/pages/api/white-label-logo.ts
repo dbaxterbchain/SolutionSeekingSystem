@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { json } from '../../lib/server/auth';
 import { requireSubscriber } from '../../lib/server/subscriberAuth';
-import { getOrgMembership } from '../../lib/server/orgMembership';
+import { getOrgMemberships, isManagerOf } from '../../lib/server/orgMembership';
 import { supabaseAdmin } from '../../lib/server/supabaseAdmin';
 
 export const prerender = false;
@@ -22,8 +22,6 @@ const MIME_EXT: Record<string, string> = {
 export const POST: APIRoute = async ({ request }) => {
   const auth = await requireSubscriber(request);
   if ('error' in auth) return json({ error: auth.error }, auth.status);
-  const org = await getOrgMembership(auth.user.id);
-  if (!org || org.role !== 'manager') return json({ error: 'manager_required' }, 403);
 
   const form = await request.formData().catch(() => null);
   const pageId = String(form?.get('page_id') ?? '');
@@ -34,15 +32,17 @@ export const POST: APIRoute = async ({ request }) => {
   if (!ext) return json({ error: 'bad_type', message: 'Use a PNG, JPG, or WebP image.' }, 415);
   if (file.size > MAX_BYTES) return json({ error: 'too_large', message: 'The logo must be under 1 MB.' }, 413);
 
-  // The page must belong to this manager's organization.
+  // The caller must manage the organization the page belongs to.
   const { data: page } = await supabaseAdmin
     .from('white_label_pages')
     .select('id, org_id, logo_path')
     .eq('id', pageId)
     .maybeSingle();
-  if (!page || page.org_id !== org.orgId) return json({ error: 'not_found' }, 404);
+  if (!page) return json({ error: 'not_found' }, 404);
+  const memberships = await getOrgMemberships(auth.user);
+  if (!isManagerOf(memberships, page.org_id)) return json({ error: 'not_found' }, 404);
 
-  const path = `${org.orgId}/${pageId}.${ext}`;
+  const path = `${page.org_id}/${pageId}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
   const { error: upErr } = await supabaseAdmin.storage
     .from(BUCKET)

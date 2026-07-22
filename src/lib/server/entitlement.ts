@@ -1,5 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 import { supabaseAdmin } from './supabaseAdmin';
+import { getOrgMemberships } from './orgMembership';
 import { FREE_ANON_MESSAGES, FREE_ACCOUNT_MESSAGES } from '../../data/pricing';
 
 /** Lifetime free messages for signed-in users without a subscription. */
@@ -61,25 +62,18 @@ export async function checkEntitlement(user: User): Promise<Entitlement> {
       return { kind: 'subscriber', via: 'stripe' };
     }
 
-    // No subscription of their own: is somebody paying for them?
+    // No subscription of their own: is any of their organizations paying?
     //
     // Access is granted by EMAIL. An org's operator adds addresses; a person
-    // claims their seat by signing in with one. `email_confirmed_at` is what
-    // makes that safe: without it, anyone could sign up as ceo@bigco.com,
-    // never confirm, and help themselves to that company's seat.
-    const email = user.email_confirmed_at ? user.email : null;
-    if (email) {
-      const { data, error: orgError } = await supabaseAdmin.rpc('claim_org_seat', {
-        p_user_id: user.id,
-        p_email: email,
-      });
-      if (orgError) console.error('org seat lookup failed', orgError);
-      const seat = Array.isArray(data) ? data[0] : null;
-      // The status vocabulary lives here, not in SQL, so ENTITLED_STATUSES stays
-      // the single definition of what "entitled" means.
-      if (seat && ENTITLED_STATUSES.includes(seat.org_status)) {
-        return { kind: 'subscriber', via: 'org', orgName: seat.org_name };
-      }
+    // claims their seat by signing in with one (getOrgMemberships does the claim,
+    // for every org they're listed in). `email_confirmed_at`, checked inside
+    // getOrgMemberships, is what makes that safe. The status vocabulary lives
+    // here, not in SQL, so ENTITLED_STATUSES stays the single definition of
+    // "entitled".
+    const memberships = await getOrgMemberships(user);
+    const entitledOrg = memberships.find((m) => ENTITLED_STATUSES.includes(m.orgStatus));
+    if (entitledOrg) {
+      return { kind: 'subscriber', via: 'org', orgName: entitledOrg.orgName };
     }
   }
 

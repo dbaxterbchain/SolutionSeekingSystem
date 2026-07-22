@@ -19,10 +19,17 @@ export interface Assistant {
   updated_at: string;
 }
 
+export interface OrgMembershipView {
+  orgId: string;
+  orgName: string;
+  role: 'member' | 'manager';
+}
+
 export interface AssistantsData {
   mine: Assistant[];
   shared: Assistant[];
-  membership: { orgName: string; role: 'member' | 'manager' } | null;
+  /** Every org the user belongs to (a person can be in several). */
+  memberships: OrgMembershipView[];
 }
 
 export interface AssistantInput {
@@ -46,7 +53,7 @@ export async function fetchAssistants(): Promise<AssistantsData> {
   return {
     mine: data?.mine ?? [],
     shared: data?.shared ?? [],
-    membership: data?.membership ?? null,
+    memberships: data?.memberships ?? [],
   };
 }
 
@@ -74,8 +81,8 @@ export async function deleteAssistant(id: string): Promise<void> {
   await post({ action: 'delete', id });
 }
 
-export async function shareAssistant(id: string): Promise<void> {
-  await post({ action: 'share', id });
+export async function shareAssistant(id: string, orgId: string): Promise<void> {
+  await post({ action: 'share', id, org_id: orgId });
 }
 
 export async function unshareAssistant(id: string): Promise<void> {

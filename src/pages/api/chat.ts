@@ -132,7 +132,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   let effectiveContext = typeof body.context === 'string' ? body.context : undefined;
   let assistantSetup: string | undefined;
   if (assistantId) {
-    const loaded = await loadAssistantForUser(assistantId, user.id);
+    const loaded = await loadAssistantForUser(assistantId, user);
     // 404, not 403: an assistant the caller can't reach is not confirmed to exist.
     if (!loaded) return json({ error: 'assistant_not_found' }, 404);
     effectiveAgent = loaded.assistant.base_agent;

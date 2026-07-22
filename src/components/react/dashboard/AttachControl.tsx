@@ -90,7 +90,7 @@ export default function AttachControl({
         </button>
 
         {open && (
-          <div className="absolute bottom-full left-0 z-20 mb-2 w-72 rounded-2xl border border-slate-100 bg-white p-2 shadow-card-hover">
+          <div className="absolute bottom-full left-0 z-20 mb-2 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-100 bg-white p-2 shadow-card-hover">
             <input
               ref={fileRef}
               type="file"

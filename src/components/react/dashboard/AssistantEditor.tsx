@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MODE_CONTEXTS } from '../../../lib/contexts';
 import type { AgentId } from '../../../lib/chatSessions';
@@ -28,8 +28,12 @@ export default function AssistantEditor({
   editing,
   owned,
   documents,
+  onUpload,
+  activeOrgId,
+  activeOrgName,
   canShare,
-  orgName,
+  sharedOrgName,
+  canUnshare,
   onSaved,
 }: {
   open: boolean;
@@ -39,8 +43,17 @@ export default function AssistantEditor({
   /** Whether the current user owns `editing` (only owners can share). */
   owned: boolean;
   documents: DocumentMeta[] | null;
+  /** Upload + register a file, returning the new document (auto-selected). */
+  onUpload: (file: File) => Promise<DocumentMeta>;
+  /** The active org, for the "Share with …" action. */
+  activeOrgId: string | null;
+  activeOrgName: string | null;
+  /** Whether the user manages the active org (can share to it). */
   canShare: boolean;
-  orgName: string | null;
+  /** The name of the org this assistant is currently shared to, or null. */
+  sharedOrgName: string | null;
+  /** Whether the user manages the org it's shared to (can unshare). */
+  canUnshare: boolean;
   onSaved: () => void;
 }) {
   const [name, setName] = useState(editing?.name ?? '');
@@ -49,7 +62,9 @@ export default function AssistantEditor({
   const [instructions, setInstructions] = useState(editing?.instructions ?? '');
   const [docIds, setDocIds] = useState<string[]>(editing?.documents.map((d) => d.id) ?? []);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const { confirm, dialog } = useDialog();
 
   useEffect(() => {
@@ -71,6 +86,21 @@ export default function AssistantEditor({
     setDocIds((cur) =>
       cur.includes(id) ? cur.filter((x) => x !== id) : cur.length < MAX_DOCS ? [...cur, id] : cur
     );
+  };
+
+  const upload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setError(null);
+    setUploading(true);
+    try {
+      const doc = await onUpload(files[0]);
+      setDocIds((cur) => (cur.includes(doc.id) || cur.length >= MAX_DOCS ? cur : [...cur, doc.id]));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
   };
 
   const save = async () => {
@@ -96,13 +126,27 @@ export default function AssistantEditor({
     }
   };
 
-  const toggleShare = async () => {
+  const share = async () => {
+    if (!editing || !activeOrgId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await shareAssistant(editing.id, activeOrgId);
+      onSaved();
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const unshare = async () => {
     if (!editing) return;
     setBusy(true);
     setError(null);
     try {
-      if (editing.org_id) await unshareAssistant(editing.id);
-      else await shareAssistant(editing.id);
+      await unshareAssistant(editing.id);
       onSaved();
       onClose();
     } catch (e) {
@@ -242,14 +286,15 @@ export default function AssistantEditor({
                 {Math.round(usedChars / 1000)}k / {SETUP_BUDGET / 1000}k chars
               </span>
             </div>
-            {documents === null ? (
-              <p className="text-sm text-slate-400">Loading…</p>
-            ) : documents.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                No documents yet. Upload some from the Documents panel first.
-              </p>
-            ) : (
-              <div className="max-h-40 space-y-0.5 overflow-y-auto rounded-xl border border-slate-100 p-1">
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf,.docx,.txt,.md"
+              className="hidden"
+              onChange={(e) => upload(e.target.files)}
+            />
+            {documents !== null && documents.length > 0 && (
+              <div className="mb-1 max-h-40 space-y-0.5 overflow-y-auto rounded-xl border border-slate-100 p-1">
                 {documents.map((d) => {
                   const on = docIds.includes(d.id);
                   const full = !on && docIds.length >= MAX_DOCS;
@@ -273,24 +318,47 @@ export default function AssistantEditor({
                 })}
               </div>
             )}
-          </div>
-
-          {editing && owned && canShare && (
+            {documents !== null && documents.length === 0 && (
+              <p className="mb-1 text-sm text-slate-500">No documents yet.</p>
+            )}
             <button
               type="button"
-              onClick={toggleShare}
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="text-xs font-semibold text-brand-600 hover:text-brand-700 disabled:opacity-50"
+            >
+              {uploading ? 'Uploading…' : '+ Upload a document'}
+            </button>
+          </div>
+
+          {/* Already shared: show where, and let a manager of that org unshare. */}
+          {editing && editing.org_id && (
+            <div className="rounded-xl border border-brand-100 bg-brand-50/60 px-3 py-2">
+              <p className="text-xs text-brand-700">
+                Shared with {sharedOrgName ?? 'the organization'} — everyone with a seat can use it.
+              </p>
+              {canUnshare && (
+                <button
+                  type="button"
+                  onClick={unshare}
+                  disabled={busy}
+                  className="mt-1 text-xs font-semibold text-slate-500 hover:text-slate-800 disabled:opacity-60"
+                >
+                  Stop sharing
+                </button>
+              )}
+            </div>
+          )}
+          {/* Not shared: an owner who manages the active org can share it there. */}
+          {editing && owned && !editing.org_id && canShare && activeOrgId && (
+            <button
+              type="button"
+              onClick={share}
               disabled={busy}
               className="w-full rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-100 disabled:opacity-60"
             >
-              {editing.org_id
-                ? `Stop sharing with ${orgName ?? 'the organization'}`
-                : `Share with ${orgName ?? 'my organization'}`}
+              Share with {activeOrgName ?? 'my organization'}
             </button>
-          )}
-          {editing && editing.org_id && (
-            <p className="text-xs text-brand-600">
-              Shared with {orgName ?? 'the organization'} — everyone with a seat can use it.
-            </p>
           )}
 
           {error && <p className="text-sm text-amber-700">{error}</p>}

@@ -1,7 +1,8 @@
 import type { APIRoute } from 'astro';
+import type { User } from '@supabase/supabase-js';
 import { json } from '../../lib/server/auth';
 import { requireSubscriber } from '../../lib/server/subscriberAuth';
-import { getOrgMembership } from '../../lib/server/orgMembership';
+import { getOrgMemberships, isManagerOf } from '../../lib/server/orgMembership';
 import { supabaseAdmin } from '../../lib/server/supabaseAdmin';
 import { AGENT_IDS, type AgentId } from '../../lib/server/agents';
 import { getContextMeta } from '../../lib/contexts';
@@ -36,7 +37,7 @@ export const GET: APIRoute = async ({ request }) => {
   if ('error' in auth) return json({ error: auth.error }, auth.status);
   const { user } = auth;
 
-  const membership = await getOrgMembership(user.id);
+  const memberships = await getOrgMemberships(user);
 
   const { data: mineRows, error: mineErr } = await supabaseAdmin
     .from('assistants')
@@ -48,12 +49,14 @@ export const GET: APIRoute = async ({ request }) => {
     return json({ error: 'server_error' }, 500);
   }
 
+  // Assistants shared to ANY org the user belongs to (each carries its org_id, so
+  // the client groups/filters by the active org).
   let sharedRows: AssistantRowRaw[] = [];
-  if (membership) {
+  if (memberships.length > 0) {
     const { data } = await supabaseAdmin
       .from('assistants')
       .select(ROW_COLUMNS)
-      .eq('org_id', membership.orgId)
+      .in('org_id', memberships.map((m) => m.orgId))
       .neq('owner_user_id', user.id)
       .order('updated_at', { ascending: false });
     sharedRows = (data ?? []) as AssistantRowRaw[];
@@ -65,7 +68,7 @@ export const GET: APIRoute = async ({ request }) => {
   return json({
     mine: mine.map((r) => shape(r, docs)),
     shared: sharedRows.map((r) => shape(r, docs)),
-    membership: membership ? { orgName: membership.orgName, role: membership.role } : null,
+    memberships: memberships.map((m) => ({ orgId: m.orgId, orgName: m.orgName, role: m.role })),
   });
 };
 
@@ -114,13 +117,13 @@ export const POST: APIRoute = async ({ request }) => {
     case 'create':
       return createAssistant(auth.user.id, body);
     case 'update':
-      return updateAssistant(auth.user.id, body);
+      return updateAssistant(auth.user, body);
     case 'delete':
-      return deleteAssistant(auth.user.id, body);
+      return deleteAssistant(auth.user, body);
     case 'share':
-      return shareAssistant(auth.user.id, body);
+      return shareAssistant(auth.user, body);
     case 'unshare':
-      return unshareAssistant(auth.user.id, body);
+      return unshareAssistant(auth.user, body);
     default:
       return json({ error: 'bad_request' }, 400);
   }
@@ -214,7 +217,7 @@ async function createAssistant(userId: string, body: Record<string, unknown>): P
 
 /** Load an assistant the user owns, or is a manager of the org it's shared to. */
 async function loadOwnedOrManaged(
-  userId: string,
+  user: User,
   id: string
 ): Promise<{ row: { id: string; owner_user_id: string; org_id: string | null; base_agent: AgentId } } | { response: Response }> {
   const { data: row } = await supabaseAdmin
@@ -223,19 +226,19 @@ async function loadOwnedOrManaged(
     .eq('id', id)
     .maybeSingle();
   if (!row) return { response: json({ error: 'not_found' }, 404) };
-  if (row.owner_user_id === userId) return { row };
+  if (row.owner_user_id === user.id) return { row };
   if (row.org_id) {
-    const m = await getOrgMembership(userId);
-    if (m && m.orgId === row.org_id && m.role === 'manager') return { row };
+    const memberships = await getOrgMemberships(user);
+    if (isManagerOf(memberships, row.org_id)) return { row };
   }
   // 404, not 403: an id the caller can't manage is not confirmed to exist.
   return { response: json({ error: 'not_found' }, 404) };
 }
 
-async function updateAssistant(userId: string, body: Record<string, unknown>): Promise<Response> {
+async function updateAssistant(user: User, body: Record<string, unknown>): Promise<Response> {
   const id = str(body.id);
   if (!id) return json({ error: 'bad_request' }, 400);
-  const access = await loadOwnedOrManaged(userId, id);
+  const access = await loadOwnedOrManaged(user, id);
   if ('response' in access) return access.response;
 
   const name = str(body.name).trim();
@@ -249,7 +252,7 @@ async function updateAssistant(userId: string, body: Record<string, unknown>): P
   const instructions = str(body.instructions).slice(0, 8000);
   const documentIds = idList(body.document_ids);
 
-  const budgetErr = await checkDocsBudget(userId, documentIds, instructions);
+  const budgetErr = await checkDocsBudget(user.id, documentIds, instructions);
   if (budgetErr) return budgetErr;
 
   const { error } = await supabaseAdmin
@@ -266,10 +269,10 @@ async function updateAssistant(userId: string, body: Record<string, unknown>): P
   return json({ ok: true });
 }
 
-async function deleteAssistant(userId: string, body: Record<string, unknown>): Promise<Response> {
+async function deleteAssistant(user: User, body: Record<string, unknown>): Promise<Response> {
   const id = str(body.id);
   if (!id) return json({ error: 'bad_request' }, 400);
-  const access = await loadOwnedOrManaged(userId, id);
+  const access = await loadOwnedOrManaged(user, id);
   if ('response' in access) return access.response;
   // A white-label page cascades away with its assistant (FK on delete cascade),
   // so warn before that happens unless the caller confirms.
@@ -290,31 +293,31 @@ async function deleteAssistant(userId: string, body: Record<string, unknown>): P
   return json({ ok: true });
 }
 
-async function shareAssistant(userId: string, body: Record<string, unknown>): Promise<Response> {
+async function shareAssistant(user: User, body: Record<string, unknown>): Promise<Response> {
   const id = str(body.id);
-  if (!id) return json({ error: 'bad_request' }, 400);
-  // Only the OWNER shares (and only a manager can). A manager can unshare/manage
-  // an already-shared assistant, but sharing your own into the org is the owner's act.
+  const orgId = str(body.org_id);
+  if (!id || !orgId) return json({ error: 'bad_request' }, 400);
+  // Only the OWNER shares, and only into an org they MANAGE.
   const { data: row } = await supabaseAdmin
     .from('assistants')
     .select('owner_user_id')
     .eq('id', id)
     .maybeSingle();
-  if (!row || row.owner_user_id !== userId) return json({ error: 'not_found' }, 404);
-  const m = await getOrgMembership(userId);
-  if (!m || m.role !== 'manager') return json({ error: 'manager_required' }, 403);
-  const { error } = await supabaseAdmin.from('assistants').update({ org_id: m.orgId }).eq('id', id);
+  if (!row || row.owner_user_id !== user.id) return json({ error: 'not_found' }, 404);
+  const memberships = await getOrgMemberships(user);
+  if (!isManagerOf(memberships, orgId)) return json({ error: 'manager_required' }, 403);
+  const { error } = await supabaseAdmin.from('assistants').update({ org_id: orgId }).eq('id', id);
   if (error) {
     console.error('assistant share failed', error);
     return json({ error: 'server_error' }, 500);
   }
-  return json({ ok: true, orgName: m.orgName });
+  return json({ ok: true, orgName: memberships.find((m) => m.orgId === orgId)?.orgName });
 }
 
-async function unshareAssistant(userId: string, body: Record<string, unknown>): Promise<Response> {
+async function unshareAssistant(user: User, body: Record<string, unknown>): Promise<Response> {
   const id = str(body.id);
   if (!id) return json({ error: 'bad_request' }, 400);
-  const access = await loadOwnedOrManaged(userId, id);
+  const access = await loadOwnedOrManaged(user, id);
   if ('response' in access) return access.response;
   const { error } = await supabaseAdmin.from('assistants').update({ org_id: null }).eq('id', id);
   if (error) {

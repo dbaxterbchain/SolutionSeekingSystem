@@ -64,6 +64,7 @@ export default function DashboardView() {
   const [pendingAttachments, setPendingAttachments] = useState<ChatAttachment[]>([]);
   const [documentsOpen, setDocumentsOpen] = useState(false);
   const [assistantsData, setAssistantsData] = useState<AssistantsData | null>(null);
+  const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Assistant | null>(null);
   const [whiteLabelOpen, setWhiteLabelOpen] = useState(false);
@@ -82,11 +83,21 @@ export default function DashboardView() {
   const agentModes = MODE_CONTEXTS.filter((m) => m.agents.includes(agent));
   const contextMeta = getContextMeta(activeContext, agent);
 
-  const membership = assistantsData?.membership ?? null;
+  const memberships = assistantsData?.memberships ?? [];
   const mine = assistantsData?.mine ?? [];
   const shared = assistantsData?.shared ?? [];
+  // A person can belong to several orgs; one is "active" and drives the shared
+  // list, sharing, and the white-label panel.
+  const activeOrg = memberships.find((m) => m.orgId === activeOrgId) ?? null;
+  const isManagerOfActive = activeOrg?.role === 'manager';
+  const sharedInActiveOrg = shared.filter((a) => a.org_id === activeOrgId);
   const ownsSelected = Boolean(assistant && mine.some((a) => a.id === assistant.id));
-  const canManageSelected = ownsSelected || (Boolean(assistant) && membership?.role === 'manager');
+  const canManageSelected =
+    ownsSelected ||
+    Boolean(
+      assistant?.org_id &&
+        memberships.some((m) => m.orgId === assistant.org_id && m.role === 'manager')
+    );
 
   const refreshRecents = () => {
     listChatSessions().then(setRecents).catch(() => setRecents([]));
@@ -95,7 +106,7 @@ export default function DashboardView() {
     listDocuments().then(setDocuments).catch(() => setDocuments([]));
   };
   const refreshAssistants = () => {
-    fetchAssistants().then(setAssistantsData).catch(() => setAssistantsData({ mine: [], shared: [], membership: null }));
+    fetchAssistants().then(setAssistantsData).catch(() => setAssistantsData({ mine: [], shared: [], memberships: [] }));
   };
 
   useEffect(() => {
@@ -104,6 +115,36 @@ export default function DashboardView() {
     refreshDocuments();
     refreshAssistants();
   }, [user?.id, canUseDashboard]);
+
+  // Pick / persist the active org once memberships load (keep the current one if
+  // still valid, else a stored choice, else the first).
+  useEffect(() => {
+    if (memberships.length === 0) {
+      setActiveOrgId(null);
+      return;
+    }
+    setActiveOrgId((cur) => {
+      if (cur && memberships.some((m) => m.orgId === cur)) return cur;
+      let stored: string | null = null;
+      try {
+        stored = window.localStorage.getItem('sss-active-org');
+      } catch {
+        stored = null;
+      }
+      if (stored && memberships.some((m) => m.orgId === stored)) return stored;
+      return memberships[0].orgId;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assistantsData]);
+
+  useEffect(() => {
+    if (!activeOrgId) return;
+    try {
+      window.localStorage.setItem('sss-active-org', activeOrgId);
+    } catch {
+      // ignore
+    }
+  }, [activeOrgId]);
 
   // Keep a selected assistant in sync after edits, and fall back to its base
   // agent if it was deleted or unshared away from us.
@@ -444,9 +485,23 @@ export default function DashboardView() {
   // ── The dashboard ───────────────────────────────────────────────────────────
 
   return (
-    <div className="grid gap-6 lg:h-[calc(100vh-8rem)] lg:grid-cols-[280px_1fr]">
-      <div className={`${sidebarOpen ? 'block' : 'hidden'} lg:block lg:min-h-0`}>
+    <div className="grid h-[calc(100dvh-6rem)] gap-6 lg:h-[calc(100vh-8rem)] lg:grid-cols-[280px_1fr]">
+      {/* Scrim behind the mobile drawer. */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-ink-800/40 lg:hidden"
+          aria-hidden="true"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      {/* Sidebar: a slide-in drawer on mobile, a static column on desktop. */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-[86%] max-w-xs p-3 transition-transform duration-200 ease-out lg:static lg:z-auto lg:min-h-0 lg:w-auto lg:max-w-none lg:p-0 lg:transition-none ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } lg:translate-x-0`}
+      >
         <Sidebar
+          onClose={() => setSidebarOpen(false)}
           selection={assistant ? { kind: 'assistant', id: assistant.id } : { kind: 'agent', agent }}
           onSelectAgent={startAgent}
           onSelectAssistant={startAssistant}
@@ -458,13 +513,15 @@ export default function DashboardView() {
             setEditing(null);
             setEditorOpen(true);
           }}
-          onNewChat={newConversation}
           onOpenDocuments={() => setDocumentsOpen(true)}
           onOpenWhiteLabel={() => setWhiteLabelOpen(true)}
-          canManageOrg={membership?.role === 'manager'}
+          canManageOrg={isManagerOfActive}
+          memberships={memberships}
+          activeOrgId={activeOrgId}
+          onSelectOrg={setActiveOrgId}
           mine={mine}
-          shared={shared}
-          orgName={membership?.orgName ?? null}
+          shared={sharedInActiveOrg}
+          orgName={activeOrg?.orgName ?? null}
           recents={recents}
           activeChatId={chatId}
           onOpenChat={openSaved}
@@ -478,11 +535,11 @@ export default function DashboardView() {
           <div className="flex items-center gap-2.5">
             <button
               type="button"
-              onClick={() => setSidebarOpen((v) => !v)}
-              className="btn-ghost px-2 text-xs lg:hidden"
-              aria-label="Toggle sidebar"
+              onClick={() => setSidebarOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:border-brand-300 hover:text-ink-800 lg:hidden"
+              aria-label="Open menu"
             >
-              ☰
+              <span aria-hidden="true">☰</span> Menu
             </button>
             <p className="text-sm font-semibold text-ink-800">{agentName}</p>
             {assistant ? (
@@ -546,7 +603,7 @@ export default function DashboardView() {
         )}
 
         {/* Transcript */}
-        <div className="min-h-[50vh] flex-1 space-y-4 overflow-y-auto px-5 py-6 lg:min-h-0">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-6">
           {messages.length === 0 && (
             <p className="text-sm leading-relaxed text-slate-500">
               {assistant
@@ -618,8 +675,23 @@ export default function DashboardView() {
           editing={editing}
           owned={editing ? mine.some((a) => a.id === editing.id) : true}
           documents={documents}
-          canShare={membership?.role === 'manager'}
-          orgName={membership?.orgName ?? null}
+          onUpload={async (file) => {
+            const doc = await uploadAndRegister(file);
+            refreshDocuments();
+            return doc;
+          }}
+          activeOrgId={activeOrgId}
+          activeOrgName={activeOrg?.orgName ?? null}
+          canShare={isManagerOfActive}
+          sharedOrgName={
+            editing?.org_id
+              ? memberships.find((m) => m.orgId === editing?.org_id)?.orgName ?? 'the organization'
+              : null
+          }
+          canUnshare={
+            !!editing?.org_id &&
+            memberships.some((m) => m.orgId === editing?.org_id && m.role === 'manager')
+          }
           onSaved={refreshAssistants}
         />
       )}
@@ -627,7 +699,8 @@ export default function DashboardView() {
         open={whiteLabelOpen}
         onClose={() => setWhiteLabelOpen(false)}
         assistants={[...mine, ...shared]}
-        orgName={membership?.orgName ?? null}
+        orgId={activeOrgId}
+        orgName={activeOrg?.orgName ?? null}
       />
       {dialog}
     </div>

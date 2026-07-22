@@ -1,5 +1,6 @@
+import type { User } from '@supabase/supabase-js';
 import { supabaseAdmin } from './supabaseAdmin';
-import { getOrgMembership } from './orgMembership';
+import { getOrgMemberships, isMemberOf } from './orgMembership';
 import type { AgentId } from './agents';
 
 /** Total setup-injection budget (~30k tokens): instructions + all knowledge docs. */
@@ -32,7 +33,7 @@ export interface AssistantDoc {
  */
 export async function loadAssistantForUser(
   assistantId: string,
-  userId: string
+  user: User
 ): Promise<{ assistant: AssistantRow; docs: AssistantDoc[] } | null> {
   const { data: assistant, error } = await supabaseAdmin
     .from('assistants')
@@ -45,10 +46,11 @@ export async function loadAssistantForUser(
   }
   if (!assistant) return null;
 
-  if (assistant.owner_user_id !== userId) {
+  if (assistant.owner_user_id !== user.id) {
+    // Not the owner: allowed only if it's shared to an org they belong to.
     if (!assistant.org_id) return null;
-    const membership = await getOrgMembership(userId);
-    if (!membership || membership.orgId !== assistant.org_id) return null;
+    const memberships = await getOrgMemberships(user);
+    if (!isMemberOf(memberships, assistant.org_id)) return null;
   }
 
   const { data: joins } = await supabaseAdmin

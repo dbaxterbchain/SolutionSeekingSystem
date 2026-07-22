@@ -122,12 +122,18 @@ routes gated by `requireSubscriber` (`src/lib/server/subscriberAuth.ts`), never 
 
 A specialized assistant is a saved (base agent + optional mode + custom instructions + up
 to five knowledge documents), in the server-only `assistants` / `assistant_documents`
-tables, managed through `/api/assistants`. Personal by default; a member with the new
+tables, managed through `/api/assistants`. Personal by default; a member with the
 `manager` role on `org_members` (set from `/admin`) can share one org-wide by stamping its
 `org_id`, and every member then uses it with their own private history (`chat_sessions`
-gains a nullable `assistant_id`). Org membership and the manager role are resolved
-server-side by `getOrgMembership` (`src/lib/server/orgMembership.ts`), since the browser
-can't read org tables.
+gains a nullable `assistant_id`).
+
+Org membership is resolved server-side by `getOrgMemberships` (`src/lib/server/orgMembership.ts`),
+which also **claims** the user's seats — that is where a member is recognized, independent of
+whether they're entitled by a personal subscription or the org, which is what fixed the
+seat-claim bug. A person can belong to **several orgs** (migration `0024` dropped the
+global-unique-email rule); the org-scoped endpoints take an `org_id` and check membership per
+org (`isMemberOf` / `isManagerOf`), and the dashboard picks an active org via a switcher. The
+browser never reads org tables directly.
 
 When a chat runs against an assistant, `/api/chat` loads it (owner or org member, else a
 non-probeable 404), derives the agent and mode from it, and `buildAssistantSetup`

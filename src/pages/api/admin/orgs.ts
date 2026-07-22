@@ -181,8 +181,7 @@ function fail(what: string, error: { code?: string; message: string }): Response
     return adminJson(
       {
         error: 'duplicate',
-        message:
-          'That email is already a member of an organization. A person can only hold one seat.',
+        message: 'That email is already a member of this organization.',
       },
       409
     );

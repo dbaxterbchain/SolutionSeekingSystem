@@ -106,6 +106,23 @@ history, optional customer CNAME by concierge). Full plan in the approved design
 **The dashboard initiative (Phases A-D) is complete.** Remaining: the custom-domain concierge
 step per customer (manual), and any tuning from real subscriber use.
 
+- [x] **Prod feedback: seat-claim bug, multi-org, and UX polish** (2026-07-21). Fixed a real
+      bug found in prod: a member who **also** had a personal subscription never claimed their
+      org seat, because `checkEntitlement` returned `subscriber via stripe` before it reached
+      the claim (so they showed "hasn't signed in", saw no shared assistants, and no manager/
+      white-label tools). Seat-claiming moved into `getOrgMemberships`
+      ([src/lib/server/orgMembership.ts](../src/lib/server/orgMembership.ts)) and runs
+      regardless of how the user is entitled, claiming **all** matching seats. On top of that,
+      **multi-org** (migration `0024`): a person can belong to several organizations and pick
+      the active one from a sidebar switcher that drives the shared-assistant list, sharing,
+      and the white-label panel; org-scoped endpoints now take an `org_id` and check membership
+      per org. Dropped the global-unique-email invariant (kept the per-org unique). Plus UX:
+      upload docs from the assistant editor, removed the redundant "New chat", renamed to
+      "Create assistant", a proper **mobile drawer** (overlay + scrim, not a push-down panel),
+      bounded mobile chat height so the composer pins, touch-visible sidebar controls, and modal
+      /popover fixes. Verified in a browser incl. the exact bug repro; screenshots in
+      [docs/features/multi-org-dashboard/](features/multi-org-dashboard/).
+
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)
 - [x] Conversation Planner — `/practice/conversation-planner` (stage checklist, goals, question bank, listening reminders)

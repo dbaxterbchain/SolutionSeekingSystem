@@ -457,6 +457,13 @@ tier on their next message.
 A manager can share assistants org-wide and manage white-label pages from their own
 dashboard. Set at least one manager per organization that wants those features.
 
+**One person, several orgs.** As of migration `0024`, an email can be a member of more than
+one organization (roles are per-org, so someone can manage org A and just belong to org B). In
+the dashboard they pick the active org from a switcher; it drives which shared assistants show
+and which org they share to or manage white-label pages for. Adding the same email to a second
+org is fine; only a duplicate within the *same* org is refused. Seats claim on the member's
+first dashboard/org-feature use, even if they also hold a personal subscription.
+
 ## White-label pages & custom domains
 
 A **manager** builds white-label pages from their dashboard (the "White-label pages" panel):

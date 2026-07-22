@@ -28,11 +28,13 @@ export default function WhiteLabelPanel({
   open,
   onClose,
   assistants,
+  orgId,
   orgName,
 }: {
   open: boolean;
   onClose: () => void;
   assistants: Assistant[];
+  orgId: string | null;
   orgName: string | null;
 }) {
   const [pages, setPages] = useState<WhiteLabelPageView[] | null>(null);
@@ -50,21 +52,27 @@ export default function WhiteLabelPanel({
   }, [open, onClose]);
 
   const reload = () => {
-    fetchPages()
+    if (!orgId) {
+      setPages([]);
+      return;
+    }
+    fetchPages(orgId)
       .then((d) => setPages(d.rows))
       .catch(() => setPages([]));
   };
 
   useEffect(() => {
     if (open) reload();
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, orgId]);
 
   if (!open || typeof document === 'undefined') return null;
 
-  // Only org-shared assistants can back a page (members must be able to use it).
-  const sharedAssistants = assistants.filter((a) => a.org_id);
+  // Only assistants shared to THIS org can back a page (members must be able to use it).
+  const sharedAssistants = assistants.filter((a) => a.org_id === orgId);
 
   const remove = async (p: WhiteLabelPageView) => {
+    if (!orgId) return;
     const ok = await confirm({
       title: 'Delete this page?',
       message: `"${p.title}" at ${p.path} will be removed. This cannot be undone.`,
@@ -73,7 +81,7 @@ export default function WhiteLabelPanel({
     });
     if (!ok) return;
     try {
-      await deletePage(p.id);
+      await deletePage(orgId, p.id);
       reload();
     } catch (e) {
       setError((e as Error).message);
@@ -81,8 +89,9 @@ export default function WhiteLabelPanel({
   };
 
   const toggleStatus = async (p: WhiteLabelPageView) => {
+    if (!orgId) return;
     try {
-      await setPageStatus(p.id, p.status === 'active' ? 'inactive' : 'active');
+      await setPageStatus(orgId, p.id, p.status === 'active' ? 'inactive' : 'active');
       reload();
     } catch (e) {
       setError((e as Error).message);
@@ -153,6 +162,7 @@ export default function WhiteLabelPanel({
         ) : (
           <PageForm
             editing={editing}
+            orgId={orgId}
             sharedAssistants={sharedAssistants}
             onCancel={() => setEditing(undefined)}
             onSaved={() => {
@@ -281,11 +291,13 @@ type TargetValue = `agent:${AgentId}` | `assistant:${string}`;
 
 function PageForm({
   editing,
+  orgId,
   sharedAssistants,
   onCancel,
   onSaved,
 }: {
   editing: WhiteLabelPageView | null;
+  orgId: string | null;
   sharedAssistants: Assistant[];
   onCancel: () => void;
   onSaved: () => void;
@@ -312,6 +324,7 @@ function PageForm({
   const modes = MODE_CONTEXTS.filter((m) => m.agents.includes(agent));
 
   const save = async () => {
+    if (!orgId) return;
     if (!title.trim() || (!editing && !/^[a-z0-9][a-z0-9-]{1,46}[a-z0-9]$/.test(slug))) {
       setError('Give the page a title and a valid address (3-48 lowercase letters, numbers, hyphens).');
       return;
@@ -327,8 +340,8 @@ function PageForm({
       context: isAgentTarget ? context || null : null,
     };
     try {
-      if (editing) await updatePage(editing.id, input);
-      else await createPage({ ...input, slug });
+      if (editing) await updatePage(orgId, editing.id, input);
+      else await createPage(orgId, { ...input, slug });
       onSaved();
     } catch (e) {
       setError((e as Error).message);

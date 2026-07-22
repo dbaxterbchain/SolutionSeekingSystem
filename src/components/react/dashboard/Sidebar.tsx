@@ -15,16 +15,25 @@ const AGENTS: { id: AgentId; label: string; blurb: string }[] = [
 
 export type Selection = { kind: 'agent'; agent: AgentId } | { kind: 'assistant'; id: string };
 
+interface OrgOption {
+  orgId: string;
+  orgName: string;
+  role: 'member' | 'manager';
+}
+
 export default function Sidebar({
+  onClose,
   selection,
   onSelectAgent,
   onSelectAssistant,
   onEditAssistant,
   onNewAssistant,
-  onNewChat,
   onOpenDocuments,
   onOpenWhiteLabel,
   canManageOrg,
+  memberships,
+  activeOrgId,
+  onSelectOrg,
   mine,
   shared,
   orgName,
@@ -33,15 +42,19 @@ export default function Sidebar({
   onOpenChat,
   onDeleteChat,
 }: {
+  /** Close the mobile drawer (no-op on desktop). */
+  onClose: () => void;
   selection: Selection;
   onSelectAgent: (agent: AgentId) => void;
   onSelectAssistant: (a: Assistant) => void;
   onEditAssistant: (a: Assistant) => void;
   onNewAssistant: () => void;
-  onNewChat: () => void;
   onOpenDocuments: () => void;
   onOpenWhiteLabel: () => void;
   canManageOrg: boolean;
+  memberships: OrgOption[];
+  activeOrgId: string | null;
+  onSelectOrg: (orgId: string) => void;
   mine: Assistant[];
   shared: Assistant[];
   orgName: string | null;
@@ -73,7 +86,7 @@ export default function Sidebar({
           type="button"
           onClick={() => onEditAssistant(a)}
           aria-label={`Edit ${a.name}`}
-          className="absolute right-1.5 top-2 rounded-md px-1.5 py-1 text-xs text-slate-400 opacity-0 transition-opacity hover:bg-slate-100 hover:text-slate-600 focus:opacity-100 group-hover:opacity-100"
+          className="absolute right-1.5 top-2 rounded-md px-1.5 py-1 text-xs text-slate-400 opacity-100 transition-opacity hover:bg-slate-100 hover:text-slate-600 focus:opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
         >
           ✎
         </button>
@@ -82,7 +95,38 @@ export default function Sidebar({
   );
 
   return (
-    <div className="flex h-full flex-col gap-4 rounded-3xl border border-slate-100 bg-white p-4 shadow-card">
+    <div className="flex h-full flex-col gap-4 overflow-hidden rounded-3xl border border-slate-100 bg-white p-4 shadow-card">
+      <button
+        type="button"
+        onClick={onClose}
+        className="self-end rounded-full px-2 py-1 text-sm text-slate-400 hover:bg-slate-100 hover:text-slate-600 lg:hidden"
+        aria-label="Close menu"
+      >
+        ✕
+      </button>
+      {memberships.length >= 2 && (
+        <div>
+          <label
+            htmlFor="org-switch"
+            className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-400"
+          >
+            Organization
+          </label>
+          <select
+            id="org-switch"
+            value={activeOrgId ?? ''}
+            onChange={(e) => onSelectOrg(e.target.value)}
+            className="mt-1 w-full cursor-pointer rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-ink-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          >
+            {memberships.map((m) => (
+              <option key={m.orgId} value={m.orgId}>
+                {m.orgName}
+                {m.role === 'manager' ? ' (manager)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
         <div>
           <p className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Assistants</p>
@@ -167,7 +211,7 @@ export default function Sidebar({
                       type="button"
                       onClick={() => onDeleteChat(c)}
                       aria-label={`Delete ${c.title}`}
-                      className="absolute right-1.5 top-1.5 rounded-md px-1.5 py-1 text-xs text-slate-400 opacity-0 transition-opacity hover:bg-slate-100 hover:text-slate-600 focus:opacity-100 group-hover:opacity-100"
+                      className="absolute right-1.5 top-1.5 rounded-md px-1.5 py-1 text-xs text-slate-400 opacity-100 transition-opacity hover:bg-slate-100 hover:text-slate-600 focus:opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
                     >
                       ✕
                     </button>
@@ -180,15 +224,12 @@ export default function Sidebar({
       </div>
 
       <div className="space-y-1.5 border-t border-slate-100 pt-3">
-        <button type="button" onClick={onNewChat} className="btn-secondary w-full text-sm">
-          + New chat
-        </button>
         <button
           type="button"
           onClick={onNewAssistant}
-          className="w-full rounded-xl px-3 py-1.5 text-left text-sm text-slate-500 hover:bg-slate-50 hover:text-ink-800"
+          className="btn-secondary w-full text-sm"
         >
-          ✨ New assistant
+          ✨ Create assistant
         </button>
         <button
           type="button"

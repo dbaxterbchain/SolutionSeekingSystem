@@ -35,8 +35,12 @@ async function authHeaders(): Promise<Record<string, string>> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-export async function fetchPages(): Promise<{ rows: WhiteLabelPageView[]; orgName: string | null }> {
-  const res = await fetch('/api/white-label', { headers: await authHeaders() });
+export async function fetchPages(
+  orgId: string
+): Promise<{ rows: WhiteLabelPageView[]; orgName: string | null }> {
+  const res = await fetch(`/api/white-label?org_id=${encodeURIComponent(orgId)}`, {
+    headers: await authHeaders(),
+  });
   if (!res.ok) throw new Error('Could not load your pages.');
   const data = await res.json().catch(() => null);
   return { rows: data?.rows ?? [], orgName: data?.orgName ?? null };
@@ -53,21 +57,28 @@ async function post(payload: Record<string, unknown>): Promise<Record<string, un
   return data ?? {};
 }
 
-export async function createPage(input: WhiteLabelInput): Promise<{ id: string; path: string }> {
-  const data = await post({ action: 'create', ...input });
+export async function createPage(
+  orgId: string,
+  input: WhiteLabelInput
+): Promise<{ id: string; path: string }> {
+  const data = await post({ action: 'create', org_id: orgId, ...input });
   return { id: String(data.id ?? ''), path: String(data.path ?? '') };
 }
 
-export async function updatePage(id: string, input: WhiteLabelInput): Promise<void> {
-  await post({ action: 'update', id, ...input });
+export async function updatePage(orgId: string, id: string, input: WhiteLabelInput): Promise<void> {
+  await post({ action: 'update', org_id: orgId, id, ...input });
 }
 
-export async function setPageStatus(id: string, status: 'active' | 'inactive'): Promise<void> {
-  await post({ action: 'set_status', id, status });
+export async function setPageStatus(
+  orgId: string,
+  id: string,
+  status: 'active' | 'inactive'
+): Promise<void> {
+  await post({ action: 'set_status', org_id: orgId, id, status });
 }
 
-export async function deletePage(id: string): Promise<void> {
-  await post({ action: 'delete', id });
+export async function deletePage(orgId: string, id: string): Promise<void> {
+  await post({ action: 'delete', org_id: orgId, id });
 }
 
 export async function uploadLogo(pageId: string, file: File): Promise<string> {

@@ -72,14 +72,14 @@ export default function DocumentsPanel({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-ink-800/50 p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-ink-800/50 p-4"
       onMouseDown={onClose}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Your documents"
-        className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-card-hover"
+        className="my-8 w-full max-w-lg rounded-3xl bg-white p-6 shadow-card-hover"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
