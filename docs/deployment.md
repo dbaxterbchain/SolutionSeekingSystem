@@ -469,46 +469,94 @@ first dashboard/org-feature use, even if they also hold a personal subscription.
 A **manager** builds white-label pages from their dashboard (the "White-label pages" panel):
 a branded chat page at `solutionseeking.com/a/<org-id>/<slug>` for a shared assistant or a
 standard Guide/Mentor. That path works immediately, with sign-in required and each member's
-history kept private. The custom-domain step below is optional and concierge-only.
+history kept private.
 
-**Putting a page on a customer's own subdomain** (e.g. `managers-assistant.theirco.com`):
+Putting a page on the customer's **own domain** (e.g. `assistant.theirco.com`) is **self-serve**
+from the same panel's "Custom domain" wizard, with no operator action. It runs on **Cloudflare
+for SaaS**: a router Worker serves the domain, a per-domain certificate is issued automatically,
+and the domain is a **walled garden** (it serves only that one assistant, nothing else on the site).
 
-1. **Prerequisite:** the page exists and works at its `/a/<org-id>/<slug>` path.
-2. **Customer adds DNS:** a `CNAME` record, their subdomain → `solutionseeking.netlify.app`
-   (the panel's "Custom domain" note shows them this). They then contact us to activate.
-3. **We add the Netlify domain alias:** Netlify → Domain management → add the subdomain as an
-   alias of the site; wait for the automatic Let's Encrypt certificate.
-4. **We add a root-only rewrite** to `netlify.toml` and deploy. Two things that are easy to get
-   wrong, both learned the hard way:
-   - **The host goes in `from` as a full URL** — that is how Netlify matches a domain. **Do not
-     use `conditions = { Host = ... }`**: Host is not a supported redirect condition (only
-     Country/Language/Role/Cookie are), so it is silently ignored and the rule never fires.
-   - **`to` is the full `solutionseeking.com` URL (a proxy), not an internal `/a/...` path.**
-     The white-label route is server-rendered (`prerender = false`), and a `status = 200`
-     rewrite to an internal path does a static-file lookup — which misses the SSR function and
-     serves the site's 404. Proxying to the full URL routes it through SSR while keeping the
-     clean root URL.
+### How it works
 
-   Root-only (`/`, no `/*` splat) on purpose — a splat would swallow `/_astro/*` and `/api/*`
-   on the alias host and break assets, chat, and auth:
-   ```toml
-   [[redirects]]
-     from = "https://managers-assistant.theirco.com/"
-     to = "https://solutionseeking.com/a/<org-id>/<slug>"
-     status = 200
-     force = true
-   ```
-5. **We allow the host for auth:** Supabase → Authentication → URL Configuration → add
-   `https://managers-assistant.theirco.com/**` to the redirect allowlist; and add the hostname
-   to the Cloudflare Turnstile widget's allowed hostnames (captcha-enforced auth fails on the
-   alias otherwise).
-6. **We record it:** set `white_label_pages.custom_domain` (bookkeeping only; routing lives in
-   `netlify.toml`).
-7. **Verify on the alias:** the page renders with CSS, password sign-in works, chat streams,
-   and the page's `<link rel="canonical">` still points at solutionseeking.com. Note for the
-   customer: sessions are per-domain, so members sign in once on their domain.
+```
+customer domain ──CNAME──▶ Cloudflare for SaaS (per-domain TLS)
+                             │  Worker `white-label-router` + KV `WL_HOSTS` (host → {org, slug})
+                             │    /                                          → proxy origin /a/<org>/<slug>
+                             │    /_astro/* /api/* /wl-callback /favicon.svg /robots.txt → proxy origin
+                             │    anything else                              → 302 to /
+                             ▼
+                         solutionseeking.com (Netlify) — unchanged SSR app
+```
 
-Rehearse the whole flow on a throwaway test subdomain before the first real customer.
+- **Routing is dynamic** (KV), so a new domain never needs a config change or a deploy. The DB
+  column `white_label_pages.custom_domain` (unique) is the source of truth; provisioning writes KV.
+- **Auth is centralized on `solutionseeking.com`** — the only host with Turnstile and the only
+  Supabase redirect entry, forever. The custom domain never renders Turnstile and is never a
+  Supabase redirect target. A branded sign-in at `/wl/signin` hands the session to the custom
+  domain via a single-use, encrypted, domain-bound code (`wl_auth_codes`, ~60s TTL) →
+  `/wl-callback` → `setSession`. Code: `src/lib/server/wlAuth.ts`, `src/pages/api/wl-auth.ts`.
+
+### One-time operator setup (Cloudflare for SaaS)
+
+Done once; nothing per-customer after this.
+
+1. A **dedicated zone** as the SaaS target (we use `solutionseekinghosting.com`), so the apex
+   `solutionseeking.com` DNS need not move to Cloudflare.
+2. **Cloudflare for SaaS** enabled; **fallback origin** → the Netlify site. `CLOUDFLARE_SAAS_TARGET`
+   is the proxied hostname customers CNAME to (we use `origin.solutionseekinghosting.com`).
+3. A **KV namespace** (`WL_HOSTS`) and the Worker `cloudflare/worker/white-label-router.js`
+   (`wrangler deploy`), bound to KV. Add a **`*/*` route in the dashboard** (Workers → Routes) —
+   the documented way to run a Worker on ALL custom-hostname traffic. A per-hostname route, or a
+   `routes` entry in `wrangler.toml`, does NOT fire for custom hostnames.
+4. A scoped **API token**: **SSL and Certificates: Edit** + **Workers KV Storage: Edit**.
+5. Secrets in Netlify + `.env` (placeholders in `.env.example`): `CLOUDFLARE_API_TOKEN`,
+   `CLOUDFLARE_ZONE_ID`, `CLOUDFLARE_ACCOUNT_ID`, `CF_KV_NAMESPACE_ID`, `CLOUDFLARE_SAAS_TARGET`,
+   `WL_AUTH_ENC_KEY` (32 bytes base64), and optional `PUBLIC_CANONICAL_ORIGIN` (defaults to
+   `https://solutionseeking.com`). Generate the key with `openssl rand -base64 32`, or on Windows
+   `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`.
+
+### Self-serve customer flow (the wizard)
+
+No operator action. In the panel's "Custom domain" wizard, the manager:
+1. enters their subdomain → the wizard shows one **CNAME** record (their host → `CLOUDFLARE_SAAS_TARGET`);
+2. adds it at their registrar and clicks **Verify** — the app confirms the CNAME over DNS-over-HTTPS,
+   then creates the Cloudflare custom hostname (**HTTP validation**, so the one CNAME is all they add)
+   and writes the KV route;
+3. watches it go **live** as the cert issues (the wizard polls). **Remove** tears it all down.
+
+Endpoints/libs: `src/pages/api/white-label-domain.ts`, `src/lib/server/cloudflare.ts`,
+`src/lib/server/dnsVerify.ts`. Screenshots: `docs/features/white-label-self-serve/`.
+
+### Migrating an EXISTING live domain (manual cutover, zero downtime)
+
+A domain already serving traffic (e.g. the old Netlify-alias model) needs care so it never goes
+dark. HTTP validation can't finish until DNS points at Cloudflare, and a long TTL on the *old*
+CNAME can leave the cert pending for up to that TTL — so use **TXT validation**, which issues the
+cert BEFORE you move the CNAME. This is exactly how `assistant.bchain.coffee` was cut over:
+
+1. Apply the migration to hosted (`npx supabase db push`; a `pg-delta ... .crt ENOENT` *warning*
+   after "Applying migration" is cosmetic — confirm with `npx supabase migration list`).
+2. Pre-provision on Cloudflare: create the custom hostname with **`ssl.method: 'txt'`** and write
+   the KV entry `host → {org, slug}`. No live impact (DNS still on the old target).
+3. Add the returned **`_acme-challenge.<host>` TXT record**; wait for the cert to go `active`
+   (fast — a brand-new TXT record has no stale cache).
+4. Set the DB row: `custom_domain = '<host>'`, `domain_status = 'active'`.
+5. **Move the CNAME** to `CLOUDFLARE_SAAS_TARGET`. The cert is already active, so the switch is
+   seamless; traffic on the old target keeps working until each resolver's cache expires.
+6. Verify: `/` serves the assistant; `/practice` `/system` `/dashboard` `/a/<other>` all 302 → `/`;
+   `/_astro/*` `/api/*` `/wl-callback` pass through; a real sign-in round-trips through the branded
+   `/wl/signin` and lands back on the custom domain, signed in.
+7. After public DNS fully converges, **remove the old `netlify.toml` white-label rewrite** (while
+   any resolver still points at Netlify, that rule is what serves the host's `/`).
+
+### Gotchas (learned the hard way)
+
+- **`*/*` Worker route via the dashboard** — not a `wrangler.toml` `routes` entry, not per-hostname.
+- **Cut over a live domain with TXT DCV**, not HTTP DCV, to avoid a validation gap behind a long TTL.
+- **`/wl-callback` gets a trailing-slash 301** (`→ /wl-callback/`); the Worker passes the
+  trailing-slash form through and the `?t=` code survives. Keep both passing through.
+- The self-serve wizard uses **HTTP DCV** (one CNAME) — right for customers; the manual live cutover
+  uses TXT. Rehearse on a throwaway subdomain (we used `wltest.bchain.coffee`) before a real customer.
 
 ## Search Console & Bing verification
 

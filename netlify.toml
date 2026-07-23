@@ -8,20 +8,9 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# White-label custom domain: assistant.bchain.coffee serves the Beanchain
-# "baristas-assistant" page, at the clean root URL. The host lives in `from`
-# (a full URL) because that is how Netlify matches a domain -
-# `conditions = { Host = ... }` is NOT a supported condition and is ignored.
-# `to` is the full solutionseeking.com URL (a PROXY), not an internal path,
-# because /a/<org>/<slug> is server-rendered (prerender = false): a 200 rewrite
-# to an internal path does a static-file lookup, finds nothing, and serves the
-# 404. Proxying routes it through the SSR function. Root-only so /_astro/* and
-# /api/* on the alias still pass straight through (assets, chat, auth).
-[[redirects]]
-  from = "https://assistant.bchain.coffee/"
-  to = "https://solutionseeking.com/a/ecb52ef5-3b83-4f50-912d-d94725f89e28/baristas-assistant"
-  status = 200
-  force = true
+# NOTE: white-label custom domains are no longer routed here. They run on Cloudflare
+# for SaaS (a router Worker + KV map host -> page); assistant.bchain.coffee was cut over
+# on 2026-07-23. See docs/deployment.md "White-label pages & custom domains".
 
 # Pings IndexNow (Bing/Yandex) with all sitemap URLs after production deploys.
 [[plugins]]

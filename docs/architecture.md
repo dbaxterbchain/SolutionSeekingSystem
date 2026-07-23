@@ -172,9 +172,18 @@ the page up per request by (org id, slug) with the service role, 404s on anythin
 inactive, and renders a bare `WhiteLabelLayout` (noindex, no site header/analytics, canonical
 always pointing at solutionseeking.com). Chatting requires sign-in (no anonymous trial); for a
 specialized-assistant page, `/api/chat`'s existing org-membership check is the access gate.
-Managers manage pages from a dashboard panel (`WhiteLabelPanel`); custom domains are a
-concierge step (Netlify alias + a root-only `netlify.toml` rewrite), documented in
-deployment.md. The org id is in the URL so slugs are unique per org, never globally.
+Managers manage pages from a dashboard panel (`WhiteLabelPanel`). The org id is in the URL so
+slugs are unique per org, never globally.
+
+**Custom domains run on Cloudflare for SaaS** (self-serve, no operator action). A router Worker
+(`cloudflare/worker/white-label-router.js`) reads `Host` → KV (`host → {org, slug}`) and proxies
+`/` to the origin's `/a/<org>/<slug>` while 302ing every other path back to `/` — a walled garden
+so the domain serves only that one assistant. Routing is dynamic (KV), so a new domain needs no
+deploy. Auth stays centralized on `solutionseeking.com` (the only Turnstile / Supabase-redirect
+host): a branded `/wl/signin` hands the session to the custom domain with a single-use, encrypted,
+domain-bound code (`wl_auth_codes`) → `/wl-callback` → `setSession`. The dashboard wizard
+(`/api/white-label-domain` + `cloudflare.ts` + `dnsVerify.ts`) provisions the custom hostname and
+KV route and polls the cert to live. Full runbook in deployment.md.
 
 ## Content model
 

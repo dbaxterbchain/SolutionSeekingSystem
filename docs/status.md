@@ -138,10 +138,10 @@ step per customer (manual), and any tuning from real subscriber use.
       no mid-word wrap, no overflow). Verified end to end in a headless browser with one subscriber
       in Personal + two orgs (manager of one, member of the other): scoping, one-click share,
       manager-tool visibility, document scoping, and the mobile header all confirmed; screenshots in
-      [docs/features/org-workspaces/](features/org-workspaces/). Migration `0025` still to apply to
-      hosted (`npx supabase db push`).
-- [~] **White-label custom domains: walled garden + branded SSO + self-serve wizard** (2026-07-23,
-      on branch `white-label-saas`, not yet merged). Setting up the first real custom domain
+      [docs/features/org-workspaces/](features/org-workspaces/). Migrations `0025` + `0026` applied to
+      hosted (confirmed via `npx supabase migration list`).
+- [x] **White-label custom domains: walled garden + branded SSO + self-serve wizard** (2026-07-23,
+      shipped + `assistant.bchain.coffee` cut over). Setting up the first real custom domain
       exposed that the old model could not scale: the domain was a Netlify alias of the whole
       site (so `/practice`, `/dashboard`, other orgs' pages all resolved on it), sign-in bounced
       through the main site chrome, every domain needed a hand-edited `netlify.toml` rule plus
@@ -162,10 +162,11 @@ step per customer (manual), and any tuning from real subscriber use.
       origins), and the wizard driven in a real browser with provisioning hitting the **live
       Cloudflare account** (all of create/find/delete custom hostname + KV put/delete exercised
       with the real token, then torn down); screenshots in
-      [docs/features/white-label-self-serve/](features/white-label-self-serve/). **Remaining:**
-      apply `0026` to hosted, cut `assistant.bchain.coffee` over to Cloudflare for SaaS and remove
-      the `netlify.toml` rule, rewrite the deployment runbook + architecture doc, merge, and rotate
-      the Cloudflare API token.
+      [docs/features/white-label-self-serve/](features/white-label-self-serve/). **Shipped:** merged
+      to main + deployed; `0026` applied to hosted; `assistant.bchain.coffee` cut over to Cloudflare
+      for SaaS (TXT-DCV, zero downtime) and its walled garden + branded SSO verified in production;
+      runbook + architecture doc rewritten. **Follow-ups:** remove the now-inert `netlify.toml`
+      white-label rewrite once public DNS fully converges, and rotate the Cloudflare API token.
 
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)
