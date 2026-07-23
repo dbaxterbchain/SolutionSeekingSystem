@@ -13,10 +13,16 @@ import {
   type WhiteLabelPageView,
   type WhiteLabelInput,
 } from '../../../lib/whiteLabelClient';
+import {
+  setDomain as apiSetDomain,
+  verifyDomain,
+  domainStatus,
+  removeDomain,
+  type DomainState,
+  type DomainStatus,
+} from '../../../lib/whiteLabelDomainClient';
 import { useDialog } from '../Dialog';
 
-/** CNAME target for a customer subdomain (the Netlify site). */
-const CNAME_TARGET = 'solutionseeking.netlify.app';
 const ORIGIN = 'https://solutionseeking.com';
 
 /**
@@ -150,10 +156,11 @@ export default function WhiteLabelPanel({
                   <PageRow
                     key={p.id}
                     page={p}
+                    orgId={orgId}
                     onEdit={() => setEditing(p)}
                     onDelete={() => remove(p)}
                     onToggle={() => toggleStatus(p)}
-                    onLogo={reload}
+                    onReload={reload}
                   />
                 ))
               )}
@@ -180,19 +187,21 @@ export default function WhiteLabelPanel({
 
 function PageRow({
   page,
+  orgId,
   onEdit,
   onDelete,
   onToggle,
-  onLogo,
+  onReload,
 }: {
   page: WhiteLabelPageView;
+  orgId: string | null;
   onEdit: () => void;
   onDelete: () => void;
   onToggle: () => void;
-  onLogo: () => void;
+  onReload: () => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const [showDns, setShowDns] = useState(false);
+  const [showDomain, setShowDomain] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const url = `${ORIGIN}${page.path}`;
@@ -208,7 +217,7 @@ function PageRow({
     setBusy(true);
     try {
       await uploadLogo(page.id, files[0]);
-      onLogo();
+      onReload();
     } catch {
       // surfaced on the panel-level error otherwise; keep the row quiet
     } finally {
@@ -261,28 +270,15 @@ function PageRow({
         <button type="button" onClick={onToggle} className="text-slate-500 hover:text-ink-800">
           {page.status === 'active' ? 'Deactivate' : 'Activate'}
         </button>
-        <button type="button" onClick={() => setShowDns((v) => !v)} className="text-slate-500 hover:text-ink-800">
-          Custom domain
+        <button type="button" onClick={() => setShowDomain((v) => !v)} className="text-slate-500 hover:text-ink-800">
+          {page.domain_status === 'active' ? '🔗 Live domain' : 'Custom domain'}
         </button>
         <button type="button" onClick={onDelete} className="text-slate-400 hover:text-red-600">
           Delete
         </button>
       </div>
 
-      {showDns && (
-        <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-600">
-          To serve this at your own address (e.g. <code>assistant.yourcompany.com</code>):
-          <ol className="ml-4 mt-1 list-decimal space-y-0.5">
-            <li>
-              Add a DNS <strong>CNAME</strong> record: your subdomain → <code>{CNAME_TARGET}</code>
-            </li>
-            <li>
-              Then <a href="/pricing#team" className="font-semibold text-brand-600">contact us to activate it</a> — we add the domain and point it at this page (HTTPS included).
-            </li>
-          </ol>
-          <p className="mt-1 text-slate-400">The link above always works in the meantime.</p>
-        </div>
-      )}
+      {showDomain && orgId && <DomainWizard page={page} orgId={orgId} onReload={onReload} />}
     </div>
   );
 }
@@ -458,6 +454,237 @@ function PageForm({
         <button type="button" onClick={save} disabled={busy} className="btn-primary disabled:opacity-60">
           {busy ? 'Saving…' : editing ? 'Save' : 'Create page'}
         </button>
+      </div>
+    </div>
+  );
+}
+
+const SSL_LABEL: Record<string, string> = {
+  pending_validation: 'validating domain',
+  pending_issuance: 'issuing certificate',
+  pending_deployment: 'deploying certificate',
+  active: 'active',
+};
+const prettySsl = (s?: string | null): string => (s ? (SSL_LABEL[s] ?? s.replace(/_/g, ' ')) : '');
+
+/**
+ * Self-serve custom-domain wizard for one page. Walks the manager through
+ * none → pending (enter domain, add the CNAME) → verifying (cert issuing, polled)
+ * → active, with Remove available throughout. All state comes from
+ * /api/white-label-domain; nothing here needs an operator.
+ */
+function DomainWizard({
+  page,
+  orgId,
+  onReload,
+}: {
+  page: WhiteLabelPageView;
+  orgId: string;
+  onReload: () => void;
+}) {
+  const [state, setState] = useState<DomainState>({
+    status: (page.domain_status as DomainStatus) || 'none',
+    domain: page.custom_domain,
+    cname_target: null,
+  });
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const status = state.status;
+
+  // On open: hydrate the CNAME target + live cert state for an already-set domain.
+  useEffect(() => {
+    if (status === 'none') return;
+    let cancelled = false;
+    domainStatus(orgId, page.id)
+      .then((s) => !cancelled && setState(s))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // While the certificate issues, poll until it goes live (or errors).
+  useEffect(() => {
+    if (status !== 'verifying') return;
+    const iv = window.setInterval(() => {
+      domainStatus(orgId, page.id)
+        .then((s) => {
+          setState(s);
+          if (s.status !== 'verifying') onReload();
+        })
+        .catch(() => {});
+    }, 6000);
+    return () => window.clearInterval(iv);
+  }, [status, orgId, page.id, onReload]);
+
+  const act = async (fn: () => Promise<DomainState>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      setState(await fn());
+      onReload();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const removeBtn = (
+    <button
+      type="button"
+      onClick={() => act(() => removeDomain(orgId, page.id))}
+      disabled={busy}
+      className="text-slate-400 hover:text-red-600 disabled:opacity-50"
+    >
+      Remove domain
+    </button>
+  );
+
+  return (
+    <div className="mt-2 rounded-xl bg-slate-50 px-3 py-3 text-xs leading-relaxed text-slate-600">
+      {status === 'none' && (
+        <div className="space-y-2">
+          <p>
+            Serve this page on your own address (e.g. <code>assistant.yourcompany.com</code>). It shows only
+            this assistant, on your domain, with HTTPS. You add one DNS record; we handle the rest.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value.toLowerCase().replace(/[^a-z0-9.-]/g, ''))}
+              placeholder="assistant.yourcompany.com"
+              className="min-w-0 flex-1 rounded-lg border border-slate-200 px-2.5 py-1.5 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+            />
+            <button
+              type="button"
+              onClick={() => act(() => apiSetDomain(orgId, page.id, input.trim()))}
+              disabled={busy || !input.trim()}
+              className="btn-secondary shrink-0 px-3 py-1.5 text-xs disabled:opacity-60"
+            >
+              {busy ? 'Saving…' : 'Connect domain'}
+            </button>
+          </div>
+          <p className="text-slate-400">
+            The <code>{page.path}</code> link always works too.
+          </p>
+        </div>
+      )}
+
+      {status === 'pending' && (
+        <div className="space-y-2">
+          <p className="font-semibold text-ink-800">Add this DNS record at your registrar</p>
+          <DnsRecord host={state.domain} target={state.cname_target} />
+          {state.dns_ok === false &&
+            (state.observed ? (
+              <p className="text-amber-700">
+                Right now it points at <code>{state.observed}</code>. Update the record, then verify again.
+              </p>
+            ) : (
+              <p className="text-amber-700">Not detected yet. DNS can take a few minutes to propagate.</p>
+            ))}
+          <div className="flex items-center gap-3 pt-0.5">
+            <button
+              type="button"
+              onClick={() => act(() => verifyDomain(orgId, page.id))}
+              disabled={busy}
+              className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-60"
+            >
+              {busy ? 'Checking…' : 'Verify DNS'}
+            </button>
+            {removeBtn}
+          </div>
+        </div>
+      )}
+
+      {status === 'verifying' && (
+        <div className="space-y-2">
+          <p className="font-semibold text-emerald-600">DNS verified.</p>
+          <p className="animate-pulse text-slate-500">
+            Issuing your HTTPS certificate{state.ssl_status ? ` (${prettySsl(state.ssl_status)})` : ''}… This
+            usually takes a minute or two.
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => act(() => domainStatus(orgId, page.id))}
+              disabled={busy}
+              className="text-slate-500 hover:text-ink-800 disabled:opacity-50"
+            >
+              Check now
+            </button>
+            {removeBtn}
+          </div>
+        </div>
+      )}
+
+      {status === 'active' && state.domain && (
+        <div className="space-y-2">
+          <p className="font-semibold text-emerald-600">✓ Live on your domain</p>
+          <a
+            href={`https://${state.domain}`}
+            target="_blank"
+            rel="noopener"
+            className="inline-block font-semibold text-brand-600 hover:text-brand-700"
+          >
+            https://{state.domain} ↗
+          </a>
+          <div className="pt-0.5">{removeBtn}</div>
+        </div>
+      )}
+
+      {status === 'error' && (
+        <div className="space-y-2">
+          <p className="text-amber-700">
+            We couldn't finish setting up this domain. Try verifying again, or remove it and start over.
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => act(() => verifyDomain(orgId, page.id))}
+              disabled={busy}
+              className="btn-secondary px-3 py-1.5 text-xs disabled:opacity-60"
+            >
+              {busy ? 'Retrying…' : 'Try again'}
+            </button>
+            {removeBtn}
+          </div>
+        </div>
+      )}
+
+      {error && <p className="mt-2 text-amber-700">{error}</p>}
+    </div>
+  );
+}
+
+/** The one CNAME record a customer adds, with the value copyable. */
+function DnsRecord({ host, target }: { host: string | null; target: string | null }) {
+  const [copied, setCopied] = useState(false);
+  const value = target ?? '';
+  const copy = async () => {
+    if (!value) return;
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-[11px] text-ink-800">
+      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5">
+        <span className="text-slate-400">Type</span>
+        <span>CNAME</span>
+        <span className="text-slate-400">Name</span>
+        <span className="break-all">{host ?? 'your subdomain'}</span>
+        <span className="text-slate-400">Value</span>
+        <span className="flex items-center gap-2 break-all">
+          {value || '…'}
+          {value && (
+            <button type="button" onClick={copy} className="shrink-0 font-sans text-brand-600 hover:text-brand-700">
+              {copied ? 'Copied ✓' : 'Copy'}
+            </button>
+          )}
+        </span>
       </div>
     </div>
   );

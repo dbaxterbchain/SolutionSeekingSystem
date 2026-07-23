@@ -34,7 +34,7 @@ export const GET: APIRoute = async ({ request }) => {
   const { data, error } = await supabaseAdmin
     .from('white_label_pages')
     .select(
-      'id, org_id, slug, assistant_id, agent, context, title, description, display_instructions, logo_path, status, custom_domain, created_at'
+      'id, org_id, slug, assistant_id, agent, context, title, description, display_instructions, logo_path, status, custom_domain, domain_status, created_at'
     )
     .eq('org_id', orgId)
     .order('created_at', { ascending: false });

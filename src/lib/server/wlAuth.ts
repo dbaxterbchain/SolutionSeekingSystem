@@ -49,7 +49,7 @@ function decryptSession(enc: string): Session {
 }
 
 /** Normalize a host for comparison (lowercase, strip a default port). */
-function normalizeDomain(d: string): string {
+export function normalizeDomain(d: string): string {
   return d.trim().toLowerCase().replace(/:(80|443)$/, '');
 }
 

@@ -140,6 +140,32 @@ step per customer (manual), and any tuning from real subscriber use.
       manager-tool visibility, document scoping, and the mobile header all confirmed; screenshots in
       [docs/features/org-workspaces/](features/org-workspaces/). Migration `0025` still to apply to
       hosted (`npx supabase db push`).
+- [~] **White-label custom domains: walled garden + branded SSO + self-serve wizard** (2026-07-23,
+      on branch `white-label-saas`, not yet merged). Setting up the first real custom domain
+      exposed that the old model could not scale: the domain was a Netlify alias of the whole
+      site (so `/practice`, `/dashboard`, other orgs' pages all resolved on it), sign-in bounced
+      through the main site chrome, every domain needed a hand-edited `netlify.toml` rule plus
+      per-host entries in Turnstile (a ~10-host cap) and Supabase's redirect allowlist, and setup
+      was 100% concierge. Re-architected onto **Cloudflare for SaaS**: a router **Worker** reads
+      `Host` from **KV** (`host -> {org, slug}`) and proxies only `/` to the page (walled garden;
+      everything else 302s to `/`), so routing is dynamic with no per-domain config. Auth is
+      centralized on the canonical host (the only Turnstile / Supabase-redirect host, forever):
+      a branded sign-in on `solutionseeking.com/wl/signin` hands the session to the custom domain
+      via a single-use, AES-256-GCM-encrypted, domain-bound code (`wl_auth_codes`, ~60s TTL) →
+      `/wl-callback` → `setSession`, so the customer never sees the main site and no domain needs
+      an allowlist entry. A **self-serve wizard** in the dashboard (`/api/white-label-domain` +
+      `WhiteLabelPanel`) provisions everything with no operator action: enter a subdomain → add one
+      CNAME → **Verify** (DoH CNAME check) → Cloudflare custom hostname (HTTP DCV) + KV write →
+      cert polling → **live**, with Remove for teardown. Lifecycle on
+      `white_label_pages.domain_status` (`none→pending→verifying→active|error`); migration `0026`
+      also makes `custom_domain` unique. Verified locally end to end: the SSO hand-off (two
+      origins), and the wizard driven in a real browser with provisioning hitting the **live
+      Cloudflare account** (all of create/find/delete custom hostname + KV put/delete exercised
+      with the real token, then torn down); screenshots in
+      [docs/features/white-label-self-serve/](features/white-label-self-serve/). **Remaining:**
+      apply `0026` to hosted, cut `assistant.bchain.coffee` over to Cloudflare for SaaS and remove
+      the `netlify.toml` rule, rewrite the deployment runbook + architecture doc, merge, and rotate
+      the Cloudflare API token.
 
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)

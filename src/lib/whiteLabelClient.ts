@@ -15,6 +15,7 @@ export interface WhiteLabelPageView {
   logo_url: string | null;
   status: string;
   custom_domain: string | null;
+  domain_status: string;
   path: string;
   created_at: string;
 }
