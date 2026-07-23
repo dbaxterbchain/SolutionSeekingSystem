@@ -1,0 +1,17 @@
+name = "white-label-router"
+main = "worker/white-label-router.js"
+compatibility_date = "2024-11-01"
+
+# host -> {"org":"<uuid>","slug":"<slug>"} JSON, one entry per live custom domain.
+# The provisioning API (src/lib/server/cloudflare.ts) writes/removes these via the
+# Cloudflare API. Create the namespace once and paste its id here:
+#   npx wrangler kv namespace create WL_HOSTS
+[[kv_namespaces]]
+binding = "WL_HOSTS"
+id = "a11d621e6b59448fa64044637d03b0c1"
+
+# Routes are managed in the Cloudflare DASHBOARD (Workers Routes), NOT here. A single
+# `*/*` route on the SaaS zone runs this Worker for all custom-hostname traffic (one
+# route covers every current and future customer domain; per-hostname routes are not
+# needed). Declaring routes here made `wrangler deploy` take over route management and
+# the `*/*` route stopped firing, so we keep wrangler out of routing.
