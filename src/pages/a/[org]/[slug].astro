@@ -46,7 +46,7 @@ const assistantName = await pageAssistantName(page.assistant_id);
     <div class="mx-auto mt-8 max-w-2xl">
       <WhiteLabelChat
         client:load
-        slug={page.slug}
+        pageId={page.id}
         orgId={page.org_id}
         assistantId={page.assistant_id}
         agent={page.agent}

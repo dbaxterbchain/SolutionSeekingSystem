@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSession } from '../../lib/useSession';
 import { isSupabaseConfigured } from '../../lib/supabase';
-import { accountLink } from '../../lib/accountLink';
+import { CANONICAL_ORIGIN } from '../../lib/canonical';
 import { streamChat } from '../../lib/chatStream';
 import {
   createChatSession,
@@ -17,7 +17,7 @@ import Composer from './chat/Composer';
 const SENT_HISTORY_LIMIT = 30;
 
 interface Props {
-  slug: string;
+  pageId: string;
   orgId: string;
   assistantId: string | null;
   agent: AgentId | null;
@@ -32,7 +32,7 @@ interface Props {
  * signed-in user's own (chat_sessions RLS), filtered to this page.
  */
 export default function WhiteLabelChat({
-  slug,
+  pageId,
   orgId,
   assistantId,
   agent,
@@ -186,7 +186,10 @@ export default function WhiteLabelChat({
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600">
           Sign in with the email your organization gave you. Your conversations stay private to you.
         </p>
-        <a href={accountLink({ next: `/a/${orgId}/${slug}` })} className="btn-primary mt-4 inline-block">
+        <a
+          href={`${CANONICAL_ORIGIN}/wl/signin?page=${encodeURIComponent(pageId)}`}
+          className="btn-primary mt-4 inline-block"
+        >
           Sign in
         </a>
       </Card>

@@ -1,0 +1,36 @@
+---
+// Branded white-label sign-in, on the CANONICAL host (solutionseeking.com). This is
+// the only host with Turnstile + Supabase configured, so every custom domain sends
+// users here to sign in — then the session is handed back to the custom domain. The
+// page wears the org's branding in the bare white-label layout: no main-site chrome.
+export const prerender = false;
+
+import WhiteLabelLayout from '../../layouts/WhiteLabelLayout.astro';
+import WlSignIn from '../../components/react/WlSignIn.tsx';
+import { getPageForAuth, logoUrl, pagePath } from '../../lib/server/whiteLabel';
+
+const pageId = Astro.url.searchParams.get('page') ?? '';
+const page = pageId ? await getPageForAuth(pageId) : null;
+if (!page) return new Response('Not found', { status: 404 });
+
+const logo = logoUrl(page.logo_path);
+const returnPath = pagePath(page);
+---
+
+<WhiteLabelLayout title={`Sign in · ${page.title}`} ogImage={logo} canonicalPath={returnPath}>
+  <div class="container-page max-w-md py-16 sm:py-24">
+    <div class="text-center">
+      {logo && (
+        <img src={logo} alt={page.title} class="mx-auto mb-5 h-16 w-auto object-contain" />
+      )}
+      <h1 class="font-heading text-2xl font-bold text-ink-800 sm:text-3xl">{page.title}</h1>
+      <p class="mt-2 text-sm text-slate-500">Sign in to continue.</p>
+    </div>
+    <WlSignIn
+      client:load
+      customDomain={page.custom_domain}
+      returnPath={returnPath}
+      orgLabel={page.title}
+    />
+  </div>
+</WhiteLabelLayout>

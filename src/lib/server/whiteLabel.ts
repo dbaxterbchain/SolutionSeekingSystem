@@ -57,6 +57,23 @@ export async function getActivePage(orgId: string, slug: string): Promise<WhiteL
   return (data as WhiteLabelPage) ?? null;
 }
 
+/**
+ * Load an active page by id, for the branded sign-in flow: its branding (title, logo)
+ * and its `custom_domain` (the only host we'll hand a session back to). Service role.
+ */
+export async function getPageForAuth(
+  id: string
+): Promise<Pick<WhiteLabelPage, 'id' | 'org_id' | 'slug' | 'title' | 'logo_path' | 'custom_domain'> | null> {
+  if (!isUuid(id)) return null;
+  const { data } = await supabaseAdmin
+    .from('white_label_pages')
+    .select('id, org_id, slug, title, logo_path, custom_domain')
+    .eq('id', id)
+    .eq('status', 'active')
+    .maybeSingle();
+  return (data as Pick<WhiteLabelPage, 'id' | 'org_id' | 'slug' | 'title' | 'logo_path' | 'custom_domain'>) ?? null;
+}
+
 /** The display name of a page's specialized assistant, if any. */
 export async function pageAssistantName(assistantId: string | null): Promise<string | null> {
   if (!assistantId) return null;

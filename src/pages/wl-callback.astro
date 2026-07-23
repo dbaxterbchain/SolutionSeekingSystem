@@ -1,0 +1,13 @@
+---
+// Served on the CUSTOM domain (the Worker passes /wl-callback through to the origin).
+// A tiny page that redeems the sign-in code and drops the user back on the assistant.
+// Static shell + a client island; noindex via the bare white-label layout.
+import WhiteLabelLayout from '../layouts/WhiteLabelLayout.astro';
+import WlCallback from '../components/react/WlCallback.tsx';
+---
+
+<WhiteLabelLayout title="Signing you in…" canonicalPath="/">
+  <div class="container-page max-w-md">
+    <WlCallback client:load />
+  </div>
+</WhiteLabelLayout>
