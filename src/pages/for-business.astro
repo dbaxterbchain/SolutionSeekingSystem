@@ -1,0 +1,129 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHero from '../components/PageHero.astro';
+import { breadcrumbs, organization } from '../lib/schema';
+
+const site = Astro.site ?? Astro.url;
+
+const title = 'For Business';
+const description =
+  'A shared dashboard, specialized AI agents grounded in your own documents, and white-label assistant pages on your own domain.';
+
+const sections = [
+  {
+    id: 'dashboard',
+    eyebrow: 'Team dashboard',
+    heading: 'One workspace for your whole team',
+    body: 'Give your team a shared home for their AI assistants, conversations, and documents. Everyone works in the same place, and each person keeps their own private history.',
+    points: [
+      'The Guide and Mentor, plus your own assistants, in one workspace',
+      'Conversations and uploads scoped to the organization, private per person',
+      'Switch between your personal space and a team workspace in a click',
+    ],
+    image: '/marketing/dashboard.png',
+    alt: 'The subscriber dashboard: a team workspace with assistants in the sidebar and a live assistant reply.',
+  },
+  {
+    id: 'specialized-agents',
+    eyebrow: 'Specialized agents',
+    heading: 'Assistants that know your business',
+    body: 'Upload your playbooks, policies, and product docs, then build assistants that answer from them. Share them across the organization so everyone gets the same trusted answers.',
+    points: [
+      'Ground an assistant in your own documents',
+      'Share it organization-wide, or keep it personal',
+      'Every member gets consistent, on-brand answers',
+    ],
+    image: '/marketing/specialized-agent.png',
+    alt: 'A specialized assistant answering a question using an uploaded company document.',
+  },
+  {
+    id: 'white-label',
+    eyebrow: 'White-label',
+    heading: 'Your assistant, on your own domain',
+    body: 'Put a branded assistant on your own subdomain, with your logo and a sign-in that never leaves your brand. Set it up yourself in minutes, with no engineering required.',
+    points: [
+      'Your domain, your logo, your branded sign-in',
+      'Serves only your assistant, nothing else on the site',
+      'Self-serve setup with automatic HTTPS',
+    ],
+    image: '/marketing/white-label.png',
+    alt: 'A branded white-label assistant page served on a company subdomain.',
+  },
+];
+
+const schemas = [
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'For Business', path: '/for-business' },
+  ]),
+  organization(site),
+];
+---
+
+<BaseLayout title={title} description={description} schemas={schemas}>
+  <PageHero
+    eyebrow="For business"
+    title="Bring the Solution Seeking System to your team"
+    intro="The same Guide and Mentor your people already trust, plus a shared dashboard, assistants grounded in your own documents, and white-label pages on your own domain."
+  >
+    <div class="mt-8 flex flex-wrap gap-3">
+      <a
+        href="/pricing#team"
+        class="btn-primary"
+        data-track-cta="for-business"
+        data-track-label="Talk to us (hero)"
+      >
+        Talk to us
+      </a>
+      <a href="/pricing" class="btn-secondary">See pricing</a>
+    </div>
+  </PageHero>
+
+  <div class="container-page space-y-20 py-16 sm:space-y-28 sm:py-20">
+    {
+      sections.map((s, i) => (
+        <section id={s.id} class="grid items-center gap-8 lg:grid-cols-2 lg:gap-12">
+          <div class={i % 2 === 1 ? 'lg:order-2' : ''}>
+            <p class="eyebrow">{s.eyebrow}</p>
+            <h2 class="mt-2 font-heading text-3xl font-bold text-ink-800">{s.heading}</h2>
+            <p class="mt-4 text-lg leading-relaxed text-slate-600">{s.body}</p>
+            <ul class="mt-5 space-y-2.5 text-slate-700">
+              {s.points.map((p) => (
+                <li class="relative pl-6">
+                  <span class="absolute left-0 top-2 h-1.5 w-1.5 rounded-full bg-brand-400" />
+                  {p}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div class={i % 2 === 1 ? 'lg:order-1' : ''}>
+            <img
+              src={s.image}
+              alt={s.alt}
+              loading="lazy"
+              class="w-full rounded-2xl border border-slate-100 shadow-card-hover"
+            />
+          </div>
+        </section>
+      ))
+    }
+  </div>
+
+  <section class="border-t border-slate-100 bg-brand-50/50">
+    <div class="container-page py-16 text-center sm:py-20">
+      <h2 class="font-heading text-3xl font-bold text-ink-800">Ready to bring it to your team?</h2>
+      <p class="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-slate-600">
+        Tell us about your team and we will get you set up, from seats to a white-label page on
+        your own domain.
+      </p>
+      <a
+        href="/pricing#team"
+        class="btn-primary mt-8 inline-block"
+        data-track-cta="for-business"
+        data-track-label="Talk to us (footer)"
+      >
+        Talk to us
+      </a>
+    </div>
+  </section>
+</BaseLayout>

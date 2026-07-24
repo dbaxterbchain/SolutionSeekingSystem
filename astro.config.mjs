@@ -23,6 +23,7 @@ export default defineConfig({
         !page.includes('/account') &&
         !page.includes('/admin') &&
         !page.includes('/dashboard') &&
+        !page.includes('/saved') &&
         !page.includes('/404'),
     }),
   ],

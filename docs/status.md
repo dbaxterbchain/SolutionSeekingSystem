@@ -179,6 +179,21 @@ step per customer (manual), and any tuning from real subscriber use.
       (`signOut({ scope: 'local' })`). Verified end to end in a headless browser (two origins):
       methods render, register reaches "check inbox", forgot sends, password sign-in hands off, and
       sign-out clears the session; screenshots in [docs/features/white-label-auth/](features/white-label-auth/).
+- [x] **Nav CTA, account/saved split, and a For Business page** (2026-07-23). Three touch-ups:
+      (1) the primary nav button now reads **Dashboard** for subscribers and stays "Talk to the Guide"
+      for everyone else, via a new `NavCta` island (`useEntitlement`); the old subscriber-only
+      `DashboardNavLink` was absorbed and removed, so there is one Dashboard entry, not two.
+      (2) **/account** is now account-only: a new Profile section (editable display name in
+      `user_metadata`, read-only email) plus the existing password and subscription/billing. The
+      redundant AI chat history was removed (it lives in the dashboard), and saved practice-tool work
+      moved to a new **/saved** page (`SavedWorkView`, reusing `savedSessions` + `useLoadSaved`),
+      reachable from the user-icon menu; `/saved` is `noindex` + sitemap-excluded like `/account`.
+      (3) A single **/for-business** marketing page (team dashboard, specialized agents, white-label)
+      with freshly captured screenshots, JSON-LD + OG card + llms.txt, linked from the footer; the
+      pricing team section gained an `id="team"` anchor for the page's CTAs. Verified end to end in a
+      browser (subscriber sees Dashboard, signed-out sees Talk to the Guide, account/saved split,
+      all marketing images load) and `npm run build`; screenshots in
+      [docs/features/for-business/](features/for-business/).
 
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)

@@ -75,6 +75,7 @@ export const GET: APIRoute = async ({ site }) => {
     '## Optional',
     '',
     `- [Pricing](${abs('/pricing')}): what is free forever, and what the subscription costs`,
+    `- [For Business](${abs('/for-business')}): the team dashboard, specialized agents, and white-label pages for organizations`,
     `- [About / origin story](${abs('/about')}): why Beanchain Coffee built the system`,
     `- [Complete Guide (PDF)](${abs('/solution-seeking-complete-guide.pdf')}): the full source guide as a free download (a human-facing page about it, with an email option, is at ${abs('/guide')})`,
     `- [Full methodology as one file](${abs('/llms-full.txt')})`,

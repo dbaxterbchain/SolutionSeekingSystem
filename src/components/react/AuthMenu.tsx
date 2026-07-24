@@ -69,6 +69,12 @@ export default function AuthMenu({ variant = 'desktop' }: { variant?: 'desktop' 
         >
           My account
         </a>
+        <a
+          href="/saved"
+          className="rounded-xl px-4 py-3 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
+        >
+          Saved work
+        </a>
         <button
           type="button"
           onClick={signOut}
@@ -119,6 +125,13 @@ export default function AuthMenu({ variant = 'desktop' }: { variant?: 'desktop' 
               className="block px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
               My account
+            </a>
+            <a
+              href="/saved"
+              role="menuitem"
+              className="block px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              Saved work
             </a>
             <button
               type="button"

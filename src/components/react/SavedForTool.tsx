@@ -43,10 +43,10 @@ export default function SavedForTool({ tool }: { tool: ToolType }) {
         ))}
       </ul>
       <a
-        href="/account"
+        href="/saved"
         className="mt-3 inline-block text-xs font-semibold text-brand-600 hover:text-brand-700"
       >
-        Manage all saved work in your account →
+        See all your saved work →
       </a>
     </section>
   );

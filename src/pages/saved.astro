@@ -1,28 +1,28 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import AccountView from '../components/react/AccountView.tsx';
+import SavedWorkView from '../components/react/SavedWorkView.tsx';
 ---
 
 <BaseLayout
-  title="Account"
-  description="Sign in or create a free account to save and revisit your introspections, conversation plans, and solution checks."
+  title="Saved work"
+  description="Your saved introspections, conversation plans, and solution checks."
   noindex
 >
   <section class="border-b border-slate-100 bg-gradient-to-b from-brand-50/70 to-white">
     <div class="container-page py-12 sm:py-16">
-      <p class="eyebrow mt-2">Account</p>
+      <p class="eyebrow mt-2">Saved work</p>
       <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-ink-800 sm:text-5xl">
-        Your account
+        Your saved work
       </h1>
       <p class="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
-        Manage your profile, password, and subscription.
+        Everything you have saved from the practice tools, ready to reopen and continue.
       </p>
     </div>
   </section>
 
   <div class="container-page py-12">
     <div class="mx-auto max-w-3xl">
-      <AccountView client:load />
+      <SavedWorkView client:load />
     </div>
   </div>
 </BaseLayout>

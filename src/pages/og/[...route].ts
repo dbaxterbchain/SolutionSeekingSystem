@@ -25,6 +25,11 @@ const pages: Record<string, OgPage> = {
     description:
       'A free framework for democratic problem solving, leadership, and communication.',
   },
+  'for-business': {
+    title: 'For Business',
+    description:
+      'A shared dashboard, specialized AI agents grounded in your documents, and white-label assistant pages on your own domain.',
+  },
   system: {
     title: 'The System',
     description: systemDefinition,
