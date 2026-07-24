@@ -91,6 +91,8 @@ const bingVerification = import.meta.env.PUBLIC_BING_SITE_VERIFICATION;
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content={fullTitle} />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImageUrl} />
 
     {schemas.map((schema) => <JsonLd schema={schema} />)}

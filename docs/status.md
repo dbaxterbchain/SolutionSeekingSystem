@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-07-22_
+_Last updated: 2026-07-23_
 
 ## At a glance
 
@@ -194,6 +194,20 @@ step per customer (manual), and any tuning from real subscriber use.
       browser (subscriber sees Dashboard, signed-out sees Talk to the Guide, account/saved split,
       all marketing images load) and `npm run build`; screenshots in
       [docs/features/for-business/](features/for-business/).
+- [x] **SEO / GEO / AEO gap-closing pass** (2026-07-23). The site was already well-instrumented
+      (broad JSON-LD, llms.txt + llms-full.txt, per-page `.md` variants, an AI-friendly robots
+      route, per-page OG cards); this closed the remaining gaps. **Structured data**: `author`
+      (David & Shannon Baxter) on every `learningArticle`, new reusable `collectionPage`
+      (`CollectionPage` + `ItemList`) applied to the principles/tools/practice/demos/modes hub
+      pages, and a generic `howTo` marking the "adapt the protocol" steps on `/tools`. **GEO**: new
+      `.md` variants for `/system`, `/protocol`, and each demo (serializers in `src/lib/llms.ts`),
+      wired via `markdownAlt` and pointed to from llms.txt. **AEO**: a new **/faq** answer hub with
+      `FAQPage` JSON-LD, its questions/prices sourced from `src/data/faq.ts` + `pricing.ts` so they
+      cannot drift (footer + llms.txt + OG card). **Perf**: for-business marketing images moved to
+      `src/assets/` and rendered with `astro:assets` `<Image>` (responsive srcset, AVIF/WebP, no
+      CLS; the repo's first `astro:assets` use), home hero marked `fetchpriority="high"`. Small
+      fixes: `robots.txt` disallows `/saved`; `twitter:title`/`twitter:description` added. Deferred:
+      font self-hosting, `Course`/`Review` schema. Screenshots in [docs/features/faq/](features/faq/).
 
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)

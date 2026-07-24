@@ -73,6 +73,11 @@ const pages: Record<string, OgPage> = {
     description:
       'Most of the system is free forever. Unlimited conversations with the Guide and Mentor are $5 a month, or $50 a year.',
   },
+  faq: {
+    title: 'Frequently asked questions',
+    description:
+      'What the Solution Seeking System is, what is free, how the Guide and Mentor AI assistants work, pricing, privacy, and using it with your team.',
+  },
   'practice/modes': {
     title: 'Who is the conversation with?',
     description:

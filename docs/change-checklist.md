@@ -42,6 +42,10 @@ stale docs, no orphaned pages, no broken prompt cache.
       (`src/components/Footer.astro`), a section index, or a parent page. No orphans.
 - [ ] **llms.txt**: if it's content an LLM should discover, add it to
       `src/pages/llms.txt.ts`.
+- [ ] **Markdown variant (GEO)**: for a substantive content page, add a token-cheap
+      `.md` route (serialize via `src/lib/llms.ts`, end with `attributionFooter`) and pass
+      `markdownAlt` to BaseLayout so the HTML page advertises it. Point the llms.txt link at
+      the `.md`. See `system.md.ts` / `protocol.md.ts` / the per-collection `[…].md.ts`.
 - [ ] **Title/description**: unique `title` + `description` props to BaseLayout.
 
 ## Content collection changes
@@ -50,7 +54,8 @@ stale docs, no orphaned pages, no broken prompt cache.
       places that *feature* subsets (e.g. `/practice` shows the first 3 demos by `order`;
       home shows 6 principles).
 - [ ] New collection: schema in `src/content/config.ts` → register in `collections`
-      export; OG spread; llms.txt section; authoring section in
+      export; OG spread; llms.txt section; a `.md` serializer + `[…].md.ts` route +
+      `markdownAlt` (GEO, see above); authoring section in
       [content-guide.md](content-guide.md); gallery/detail pages with `getStaticPaths`.
 - [ ] Renamed slug/id: it's a live URL — check inbound links across the site, `llms.txt`,
       OG route keys, and anything that hardcodes the id (e.g. demo `context` frontmatter,

@@ -3,15 +3,32 @@ import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageHero from '../../components/PageHero.astro';
 import PrincipleCard from '../../components/PrincipleCard.astro';
+import { breadcrumbs, collectionPage } from '../../lib/schema';
 
 const principles = (await getCollection('principles')).sort(
   (a, b) => a.data.order - b.data.order
 );
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Wisdom Principles', path: '/principles' },
+  ]),
+  collectionPage(site, {
+    name: 'The 12 Wisdom Principles',
+    description:
+      'The 12 Wisdom Principles: the ethical and behavioral foundations that make the Communication Protocol work.',
+    path: '/principles',
+    items: principles.map((p) => ({ name: p.data.title, path: `/principles/${p.id}` })),
+  }),
+];
 ---
 
 <BaseLayout
   title="Wisdom Principles"
   description="The 12 Wisdom Principles: the ethical and behavioral foundations that make the Communication Protocol work."
+  schemas={schemas}
 >
   <PageHero
     eyebrow="Wisdom Principles"

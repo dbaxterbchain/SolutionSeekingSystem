@@ -2,6 +2,7 @@
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageHero from '../../components/PageHero.astro';
+import { breadcrumbs, collectionPage, howTo } from '../../lib/schema';
 
 const tools = (await getCollection('tools')).sort((a, b) => a.data.order - b.data.order);
 
@@ -10,11 +11,33 @@ const buildSteps = [
   'Determine which parts of the Communication Protocol could be used within that tool, and make a note of it.',
   'Use best practices from the protocol in your tools, and keep track of the Solutions created so your system can grow as more are found.',
 ];
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Leadership Tools', path: '/tools' },
+  ]),
+  collectionPage(site, {
+    name: 'The 4 Leadership Tools',
+    description:
+      'Real practices that apply the Communication Protocol: One-on-Ones, Feedback, Targeted Conversations, and Solution Seeking Sessions.',
+    path: '/tools',
+    items: tools.map((t) => ({ name: t.data.title, path: `/tools/${t.id}` })),
+  }),
+  howTo({
+    name: 'Adapt the Communication Protocol into your existing tools',
+    description:
+      'Build the Communication Protocol into the leadership tools your organization already uses.',
+    steps: buildSteps.map((text, i) => ({ name: `Step ${i + 1}`, text })),
+  }),
+];
 ---
 
 <BaseLayout
   title="Leadership Tools"
   description="Real practices that apply the Communication Protocol: One-on-Ones, Feedback, Targeted Conversations, and Solution Seeking Sessions."
+  schemas={schemas}
 >
   <PageHero
     eyebrow="Leadership Tools"

@@ -3,7 +3,7 @@ import { getCollection } from 'astro:content';
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import PageHero from '../../../components/PageHero.astro';
 import DemoDisclaimer from '../../../components/demo/DemoDisclaimer.astro';
-import { breadcrumbs } from '../../../lib/schema';
+import { breadcrumbs, collectionPage } from '../../../lib/schema';
 
 const demos = (await getCollection('demos')).sort((a, b) => a.data.order - b.data.order);
 
@@ -19,6 +19,13 @@ const schemas = [
     { name: 'Practice', path: '/practice' },
     { name: 'Demos', path: '/practice/demos' },
   ]),
+  collectionPage(site, {
+    name: 'Example conversations',
+    description:
+      'Annotated example conversations showing what people walk away with after using the Solution Seeking Guide and Mentor.',
+    path: '/practice/demos',
+    items: demos.map((d) => ({ name: d.data.title, path: `/practice/demos/${d.id}` })),
+  }),
 ];
 ---
 
