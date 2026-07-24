@@ -167,6 +167,18 @@ step per customer (manual), and any tuning from real subscriber use.
       for SaaS (TXT-DCV, zero downtime) and its walled garden + branded SSO verified in production;
       runbook + architecture doc rewritten. **Follow-ups:** remove the now-inert `netlify.toml`
       white-label rewrite once public DNS fully converges, and rotate the Cloudflare API token.
+- [x] **White-label branded auth: full methods + sign-out** (2026-07-23). The branded `/wl/signin`
+      only did email+password, so anyone who used Google, forgot their password, or had no account
+      got bounced to the main site. It now offers the same methods as `/account` (Google,
+      email+password, register, forgot-password/recovery), minus the anonymous-trial machinery, with
+      one unifying rule: the instant a session exists on the branded page (from any method, a
+      returning OAuth/reset redirect, or an already-signed-in canonical session), it is handed to the
+      custom domain. Every redirect stays on `solutionseeking.com/wl/signin?page=…`, so it is still
+      one centralized auth host (a single `https://solutionseeking.com/**` redirect-allowlist entry
+      covers every custom domain). Added a **Sign out** control to the white-label chat
+      (`signOut({ scope: 'local' })`). Verified end to end in a headless browser (two origins):
+      methods render, register reaches "check inbox", forgot sends, password sign-in hands off, and
+      sign-out clears the session; screenshots in [docs/features/white-label-auth/](features/white-label-auth/).
 
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)

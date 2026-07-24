@@ -147,6 +147,10 @@ origin and add every origin the app signs in from under **Redirect URLs** (the a
 - `http://localhost:4321` (local dev)
 - `https://solution-seeking-system.netlify.app` (and any deploy-preview pattern you use)
 - `https://solutionseeking.com` (the live domain — required for sign-in/OAuth on production)
+- `https://solutionseeking.com/**` (wildcard — **required** for the branded white-label auth at
+  `/wl/signin`: Google, password-reset, and email-confirmation links all round-trip back there,
+  and without a matching entry they bounce back blocked). This one wildcard covers every custom
+  domain, since all white-label auth happens on this one host.
 
 Missing entries here are the usual cause of a sign-in that bounces back signed-out.
 
@@ -492,9 +496,12 @@ customer domain ──CNAME──▶ Cloudflare for SaaS (per-domain TLS)
   column `white_label_pages.custom_domain` (unique) is the source of truth; provisioning writes KV.
 - **Auth is centralized on `solutionseeking.com`** — the only host with Turnstile and the only
   Supabase redirect entry, forever. The custom domain never renders Turnstile and is never a
-  Supabase redirect target. A branded sign-in at `/wl/signin` hands the session to the custom
-  domain via a single-use, encrypted, domain-bound code (`wl_auth_codes`, ~60s TTL) →
-  `/wl-callback` → `setSession`. Code: `src/lib/server/wlAuth.ts`, `src/pages/api/wl-auth.ts`.
+  Supabase redirect target. A branded sign-in at `/wl/signin` offers the full set of methods
+  (Google, email+password, register, forgot-password/recovery) and, the moment any of them yields
+  a session, hands it to the custom domain via a single-use, encrypted, domain-bound code
+  (`wl_auth_codes`, ~60s TTL) → `/wl-callback` → `setSession`. Users sign out from the page itself
+  (`WhiteLabelChat`, `signOut({ scope: 'local' })`). Code: `src/lib/server/wlAuth.ts`,
+  `src/pages/api/wl-auth.ts`, `src/components/react/WlSignIn.tsx`.
 
 ### One-time operator setup (Cloudflare for SaaS)
 

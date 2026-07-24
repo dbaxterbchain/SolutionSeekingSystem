@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSession } from '../../lib/useSession';
-import { isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { CANONICAL_ORIGIN } from '../../lib/canonical';
 import { streamChat } from '../../lib/chatStream';
 import {
@@ -172,6 +172,17 @@ export default function WhiteLabelChat({
     setError(null);
   };
 
+  // Sign out of THIS origin only (scope: 'local'): the user leaves the custom
+  // domain without touching any session they may have elsewhere. useSession then
+  // flips this view back to the signed-out sign-in card.
+  const signOut = async () => {
+    try {
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch {
+      // Best-effort; onAuthStateChange still clears the local session.
+    }
+  };
+
   if (loading) {
     return <Card>Loading…</Card>;
   }
@@ -230,6 +241,13 @@ export default function WhiteLabelChat({
           )}
           <button type="button" onClick={toggleHistory} className="btn-ghost whitespace-nowrap text-xs">
             {showHistory ? 'Close history' : 'History'}
+          </button>
+          <button
+            type="button"
+            onClick={signOut}
+            className="btn-ghost whitespace-nowrap text-xs text-slate-500 hover:text-red-600"
+          >
+            Sign out
           </button>
         </div>
       </div>

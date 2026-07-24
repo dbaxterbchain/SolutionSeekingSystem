@@ -28,6 +28,7 @@ const returnPath = pagePath(page);
     </div>
     <WlSignIn
       client:load
+      pageId={page.id}
       customDomain={page.custom_domain}
       returnPath={returnPath}
       orgLabel={page.title}
