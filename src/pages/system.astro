@@ -1,8 +1,10 @@
 ---
+import { Image } from 'astro:assets';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
 import { pillars, glossary, systemDefinition } from '../data/concepts';
 import { glossaryTermSet, learningArticle } from '../lib/schema';
+import livingSystemLoop from '../assets/living-system-loop.png';
 
 const site = Astro.site ?? Astro.url;
 const schemas = [
@@ -139,6 +141,31 @@ const aims = [
           ))
         }
       </dl>
+    </section>
+
+    <!-- The Living System Loop -->
+    <section class="mt-20">
+      <div class="max-w-2xl">
+        <p class="eyebrow mb-3">The Living System Loop</p>
+        <h2 class="text-3xl font-bold text-ink-800">Problems become continuous improvement</h2>
+        <p class="mt-3 text-slate-600">
+          The system is more than a conversation technique. Every problem or piece of feedback runs
+          through the Communication Protocol into a real solution, and each solution feeds back to
+          improve the system that created it.
+        </p>
+      </div>
+      <figure class="mt-10">
+        <Image
+          src={livingSystemLoop}
+          alt="The Living System Loop: a problem or feedback enters the Communication Protocol (Introspection, Mutual Understanding, Solution Seeking), which creates a solution that is implemented, measured, adjusted, and improves the system, before the cycle begins again."
+          widths={[600, 900, 1448]}
+          sizes="(min-width: 1024px) 900px, 100vw"
+          class="mx-auto w-full max-w-4xl rounded-2xl border border-slate-100 shadow-card"
+        />
+        <figcaption class="mt-4 text-center text-sm text-slate-500">
+          The repeatable cycle for collaborative learning and system improvement.
+        </figcaption>
+      </figure>
     </section>
   </div>
 </BaseLayout>
