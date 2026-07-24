@@ -5,7 +5,7 @@ import { usePasswordRecovery } from '../../lib/usePasswordRecovery';
 import { friendlyAuthError, readOAuthRedirectError, MIN_PASSWORD_LENGTH } from '../../lib/authErrors';
 import { PasswordInput, PasswordChecklist } from './PasswordInput';
 import { NewPasswordForm } from './AuthPanel';
-import { getCaptchaToken } from '../../lib/turnstile';
+import { getCaptchaToken, prewarmCaptcha } from '../../lib/turnstile';
 
 /**
  * Branded white-label auth, rendered on the CANONICAL host (the only host with
@@ -56,7 +56,14 @@ export default function WlSignIn({
   const [notice, setNotice] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const [handing, setHanding] = useState(false);
+  const [forgotBusy, setForgotBusy] = useState(false);
   const handed = useRef(false);
+
+  // Solve a captcha token ahead of time so the first click (sign in, forgot password,
+  // register) isn't stuck behind a cold Turnstile load with no visible feedback.
+  useEffect(() => {
+    prewarmCaptcha();
+  }, []);
 
   const brandedRedirect =
     typeof window !== 'undefined'
@@ -132,25 +139,29 @@ export default function WlSignIn({
   };
 
   const forgot = async () => {
+    if (forgotBusy) return; // ignore repeat clicks while a request is in flight
     if (!email.trim()) {
       setError('Enter your email above first, then tap Forgot password.');
       return;
     }
     setError(null);
     setNotice(null);
+    setForgotBusy(true); // immediate feedback: the button reads "Sending…" and disables
     let captchaToken: string | undefined;
     try {
       captchaToken = await getCaptchaToken();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The captcha failed. Please try again.');
+      setForgotBusy(false);
       return;
     }
     const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: brandedRedirect,
       captchaToken,
     });
+    setForgotBusy(false);
     if (resetErr) setError(friendlyAuthError(resetErr).message);
-    else setNotice('If that email has an account, a reset link is on its way.');
+    else setNotice(`If ${email.trim()} has an account, a reset link is on its way. Check your inbox, including spam.`);
   };
 
   const resend = async () => {
@@ -336,7 +347,7 @@ export default function WlSignIn({
         )}
 
         {error && <p className="text-sm text-amber-700">{error}</p>}
-        {notice && <p className="text-sm text-brand-700">{notice}</p>}
+        {notice && <p className="rounded-xl bg-brand-50 px-4 py-2.5 text-sm text-brand-700">{notice}</p>}
 
         <button type="submit" disabled={busy} className="btn-primary w-full disabled:opacity-60">
           {busy ? 'Working…' : mode === 'signin' ? `Sign in to ${orgLabel}` : 'Create account'}
@@ -352,8 +363,13 @@ export default function WlSignIn({
           {mode === 'signin' ? 'Create an account' : 'I already have an account'}
         </button>
         {mode === 'signin' && (
-          <button type="button" onClick={forgot} className="text-slate-500 hover:text-ink-800">
-            Forgot password?
+          <button
+            type="button"
+            onClick={forgot}
+            disabled={forgotBusy}
+            className="text-slate-500 hover:text-ink-800 disabled:opacity-50"
+          >
+            {forgotBusy ? 'Sending…' : 'Forgot password?'}
           </button>
         )}
       </div>

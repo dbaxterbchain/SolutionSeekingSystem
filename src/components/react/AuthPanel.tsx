@@ -10,7 +10,7 @@ import { PasswordInput, PasswordChecklist } from './PasswordInput';
 import { markSignupStarted } from '../../lib/analytics';
 import { stashTrialSession } from '../../lib/trialClaim';
 import { FREE_MESSAGES_AFTER_SIGNUP } from '../../data/pricing';
-import { getCaptchaToken } from '../../lib/turnstile';
+import { getCaptchaToken, prewarmCaptcha } from '../../lib/turnstile';
 
 /**
  * Signed-out auth panel for /account: sign in, register (with confirmation
@@ -66,12 +66,19 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
   );
   const [notice, setNotice] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
+  const [forgotBusy, setForgotBusy] = useState(false);
 
   useEffect(() => {
     if (cooldown <= 0) return;
     const t = window.setTimeout(() => setCooldown((c) => c - 1), 1000);
     return () => window.clearTimeout(t);
   }, [cooldown]);
+
+  // Pre-solve a captcha token so the first click (sign in, forgot, register) isn't
+  // stuck behind a cold Turnstile load with no feedback.
+  useEffect(() => {
+    prewarmCaptcha();
+  }, []);
 
   /**
    * A trial user signing in to an account they already have. Their conversation
@@ -243,24 +250,29 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
   };
 
   const forgot = async () => {
+    if (forgotBusy) return; // ignore repeat clicks while a request is in flight
     if (!email) {
       setError('Enter your email above first, then tap “Forgot password”.');
       return;
     }
     setError(null);
+    setNotice(null);
+    setForgotBusy(true); // immediate feedback: the button reads "Sending…" and disables
     let captchaToken: string | undefined;
     try {
       captchaToken = await getCaptchaToken();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'The captcha failed. Please try again.');
+      setForgotBusy(false);
       return;
     }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo,
       captchaToken,
     });
+    setForgotBusy(false);
     if (error) setError(friendlyAuthError(error).message);
-    else setNotice('If that email has an account, a reset link is on its way.');
+    else setNotice(`If ${email} has an account, a reset link is on its way. Check your inbox, including spam.`);
   };
 
   if (mode === 'verify') {
@@ -389,7 +401,7 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
             trial comes with you.
           </p>
         )}
-        {notice && <p className="text-sm text-brand-700">{notice}</p>}
+        {notice && <p className="rounded-xl bg-brand-50 px-4 py-2.5 text-sm text-brand-700">{notice}</p>}
 
         <button type="submit" disabled={busy} className="btn-primary w-full disabled:opacity-50">
           {busy ? 'Working…' : mode === 'signin' ? 'Sign in' : 'Create account'}
@@ -405,8 +417,13 @@ export default function AuthPanel({ linkExpired = false }: { linkExpired?: boole
           {mode === 'signin' ? 'Create an account' : 'I already have an account'}
         </button>
         {mode === 'signin' && (
-          <button type="button" onClick={forgot} className="text-slate-500 hover:text-ink-800">
-            Forgot password?
+          <button
+            type="button"
+            onClick={forgot}
+            disabled={forgotBusy}
+            className="text-slate-500 hover:text-ink-800 disabled:opacity-50"
+          >
+            {forgotBusy ? 'Sending…' : 'Forgot password?'}
           </button>
         )}
       </div>

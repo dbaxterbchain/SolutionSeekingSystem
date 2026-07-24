@@ -22,8 +22,11 @@ domain, played by `127.0.0.1:4321`).
    Forgot password, and Create an account.
 2. **2-create-account.png** — The register form (branded), for members who do not have an account
    yet: password + confirm + live checklist.
-3. **3-forgot-password.png** — Forgot password sends a reset link from the branded page; the link
-   returns here to set a new password, then hands off. No detour to the main site.
+3. **3-forgot-password.png** — Forgot password. The button shows "Sending…" (disabled) while the
+   request runs, then a prominent callout confirms the reset link was sent (with the email echoed
+   back and a spam reminder). Previously there was no feedback during the on-production Turnstile
+   solve, so users re-clicked thinking nothing happened; the page now also pre-warms the captcha on
+   mount to cut that lag. The link returns here to set a new password, then hands off.
 4. **4-signed-in-sign-out.png** — After a successful hand-off, the user is signed in on the custom
    domain and the chat header shows a **Sign out** control.
 5. **5-signed-out.png** — After Sign out, the page reverts to the signed-out card.
