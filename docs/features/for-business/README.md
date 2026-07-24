@@ -7,8 +7,9 @@ CTAs point at the team-enquiry form (`/pricing#team`).
 
 The screenshots are freshly captured against seeded demo data (a "Beanchain Coffee" org with a
 subscriber, a shared "Barista Assistant", sample conversations, and a branded white-label page),
-with the Astro dev toolbar hidden. They are served from `public/marketing/` and referenced by the
-page; curated copies are kept here.
+with the Astro dev toolbar hidden. As of the 2026-07-23 SEO/perf pass they live in
+`src/assets/marketing/` and are rendered through `astro:assets` `<Image>` (responsive srcset +
+AVIF/WebP, intrinsic dimensions so there is no layout shift); curated copies are kept here.
 
 ## Screenshots
 

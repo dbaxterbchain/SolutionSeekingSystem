@@ -60,7 +60,13 @@ const schemas = [
 ];
 ---
 
-<BaseLayout title={d.title} description={d.scenario} schemas={schemas} type="article">
+<BaseLayout
+  title={d.title}
+  description={d.scenario}
+  schemas={schemas}
+  type="article"
+  markdownAlt={`/practice/demos/${entry.id}.md`}
+>
   <section class="border-b border-slate-100 bg-gradient-to-b from-brand-50/70 to-white">
     <div class="container-page py-12 sm:py-16">
       <a href="/practice/demos" class="text-sm font-semibold text-brand-600 hover:text-brand-700">

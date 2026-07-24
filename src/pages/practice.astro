@@ -6,6 +6,7 @@ import PricingLine from '../components/react/PricingLine.tsx';
 
 import { MODES } from '../data/modes';
 import { priceCopy } from '../data/pricing';
+import { breadcrumbs, collectionPage } from '../lib/schema';
 
 const allDemos = (await getCollection('demos')).sort((a, b) => a.data.order - b.data.order);
 const featuredDemos = allDemos.slice(0, 3);
@@ -53,11 +54,30 @@ const tools = [
     available: true,
   },
 ];
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Practice', path: '/practice' },
+  ]),
+  collectionPage(site, {
+    name: 'Practice the Solution Seeking System',
+    description:
+      'Use the Solution Seeking System for yourself, with our Guide and Mentor assistants, and interactive tools.',
+    path: '/practice',
+    items: [
+      ...assistants.map((a) => ({ name: a.name, path: a.href })),
+      ...tools.map((t) => ({ name: t.title, path: t.href })),
+    ],
+  }),
+];
 ---
 
 <BaseLayout
   title="Practice"
   description="Use the Solution Seeking System for yourself, with our Guide and Mentor assistants, and interactive tools."
+  schemas={schemas}
 >
   <PageHero
     eyebrow="Practice"

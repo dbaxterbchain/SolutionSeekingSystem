@@ -1,7 +1,11 @@
 ---
+import { Image } from 'astro:assets';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
 import { breadcrumbs, organization } from '../lib/schema';
+import dashboardImg from '../assets/marketing/dashboard.png';
+import specializedAgentImg from '../assets/marketing/specialized-agent.png';
+import whiteLabelImg from '../assets/marketing/white-label.png';
 
 const site = Astro.site ?? Astro.url;
 
@@ -20,7 +24,7 @@ const sections = [
       'Conversations and uploads scoped to the organization, private per person',
       'Switch between your personal space and a team workspace in a click',
     ],
-    image: '/marketing/dashboard.png',
+    image: dashboardImg,
     alt: 'The subscriber dashboard: a team workspace with assistants in the sidebar and a live assistant reply.',
   },
   {
@@ -33,7 +37,7 @@ const sections = [
       'Share it organization-wide, or keep it personal',
       'Every member gets consistent, on-brand answers',
     ],
-    image: '/marketing/specialized-agent.png',
+    image: specializedAgentImg,
     alt: 'A specialized assistant answering a question using an uploaded company document.',
   },
   {
@@ -46,7 +50,7 @@ const sections = [
       'Serves only your assistant, nothing else on the site',
       'Self-serve setup with automatic HTTPS',
     ],
-    image: '/marketing/white-label.png',
+    image: whiteLabelImg,
     alt: 'A branded white-label assistant page served on a company subdomain.',
   },
 ];
@@ -97,9 +101,11 @@ const schemas = [
             </ul>
           </div>
           <div class={i % 2 === 1 ? 'lg:order-1' : ''}>
-            <img
+            <Image
               src={s.image}
               alt={s.alt}
+              widths={[480, 800, 1200]}
+              sizes="(min-width: 1024px) 45vw, 100vw"
               loading="lazy"
               class="w-full rounded-2xl border border-slate-100 shadow-card-hover"
             />

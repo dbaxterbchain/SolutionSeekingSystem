@@ -15,6 +15,12 @@ const CONTEXT = 'https://schema.org';
 
 const orgId = (site: URL) => new URL('/#organization', site).href;
 
+/** The system's authors, reused as the `author` of every teaching article. */
+const AUTHORS = [
+  { '@type': 'Person', name: 'David Baxter' },
+  { '@type': 'Person', name: 'Shannon Baxter' },
+];
+
 export function organization(site: URL): Schema {
   return {
     '@context': CONTEXT,
@@ -69,8 +75,64 @@ export function learningArticle(
     ...(opts.teaches ? { teaches: opts.teaches } : {}),
     isAccessibleForFree: true,
     inLanguage: 'en',
+    author: AUTHORS,
     isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: site.href },
     publisher: { '@id': orgId(site) },
+  };
+}
+
+/**
+ * A listing/hub page (e.g. the principles index) as a CollectionPage whose
+ * mainEntity is an ItemList linking to each item in order.
+ */
+export function collectionPage(
+  site: URL,
+  opts: {
+    name: string;
+    description: string;
+    path: string;
+    items: { name: string; path: string }[];
+  }
+): Schema {
+  return {
+    '@context': CONTEXT,
+    '@type': 'CollectionPage',
+    name: opts.name,
+    description: opts.description,
+    url: new URL(opts.path, site).href,
+    isPartOf: { '@type': 'WebSite', name: SITE_NAME, url: site.href },
+    publisher: { '@id': orgId(site) },
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: opts.items.length,
+      itemListElement: opts.items.map((item, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name: item.name,
+        url: new URL(item.path, site).href,
+      })),
+    },
+  };
+}
+
+/** A generic HowTo for any ordered list of steps. */
+export function howTo(opts: {
+  name: string;
+  description: string;
+  steps: { name: string; text: string; url?: string }[];
+}): Schema {
+  return {
+    '@context': CONTEXT,
+    '@type': 'HowTo',
+    name: opts.name,
+    description: opts.description,
+    step: opts.steps.map((s, i) => ({
+      '@type': 'HowToStep',
+      position: i + 1,
+      name: s.name,
+      text: s.text,
+      ...(s.url ? { url: s.url } : {}),
+    })),
   };
 }
 

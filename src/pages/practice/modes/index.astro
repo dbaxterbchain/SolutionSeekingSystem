@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import PageHero from '../../../components/PageHero.astro';
-import { breadcrumbs } from '../../../lib/schema';
+import { breadcrumbs, collectionPage } from '../../../lib/schema';
 import { MODES } from '../../../data/modes';
 
 const site = Astro.site ?? Astro.url;
@@ -11,6 +11,13 @@ const schemas = [
     { name: 'Practice', path: '/practice' },
     { name: 'Modes', path: '/practice/modes' },
   ]),
+  collectionPage(site, {
+    name: 'Conversation modes',
+    description:
+      'The Solution Seeking Guide adapts to the relationship: parent, teacher, partner, family, friend, manager, co-worker, or organizer.',
+    path: '/practice/modes',
+    items: MODES.map((m) => ({ name: `${m.name} mode`, path: `/practice/modes/${m.id}` })),
+  }),
 ];
 ---
 

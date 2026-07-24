@@ -96,6 +96,66 @@ export function toolToMarkdown(entry: CollectionEntry<'tools'>): string {
 }
 
 /**
+ * The Communication Protocol overview (the /protocol index) as standalone
+ * markdown: the three-step intro plus each step's one-line and link.
+ */
+export function protocolOverviewToMarkdown(
+  entries: CollectionEntry<'protocol'>[],
+  site: URL | undefined
+): string {
+  const origin = site?.origin ?? 'https://solutionseeking.com';
+  const steps = [...entries].sort((a, b) => a.data.step - b.data.step);
+  return [
+    '# The Communication Protocol',
+    '',
+    '> The repeatable three-step communication pattern at the core of the Solution Seeking System.',
+    '',
+    'Worked in order, the steps replace reactive, adversarial conversations with a structured,',
+    'respectful path from conflict to understanding to actionable results.',
+    '',
+    '## The three steps',
+    '',
+    ...steps.map(
+      (s) =>
+        `${s.data.step}. **${s.data.title}**: ${s.data.oneLine} (${origin}/protocol/${s.id})`
+    ),
+  ].join('\n');
+}
+
+/**
+ * A demo conversation as citable markdown: the setup, before/after, and expected
+ * behavior from the frontmatter, with a link to the full annotated transcript.
+ * The transcript body is MDX with custom components, so we emit the clean
+ * summary rather than the raw MDX source.
+ */
+export function demoToMarkdown(entry: CollectionEntry<'demos'>, site: URL | undefined): string {
+  const d = entry.data;
+  const origin = site?.origin ?? 'https://solutionseeking.com';
+  const agentName = d.agent === 'guide' ? 'Solution Seeking Guide' : 'Solution Seeking Mentor';
+  return [
+    `# ${d.title}`,
+    '',
+    `> ${d.scenario}`,
+    '',
+    `A fictional, annotated example conversation with the ${agentName}.`,
+    '',
+    '## Where the person started',
+    '',
+    d.before,
+    '',
+    '## What they walked away with',
+    '',
+    ...d.after.map((a) => `- ${a}`),
+    '',
+    '## What the assistant is expected to do',
+    '',
+    ...d.spec.expected.map((e) => `- ${e}`),
+    '',
+    `The full annotated transcript is at ${origin}/practice/demos/${entry.id}`,
+  ].join('\n');
+}
+
+/**
  * The entire methodology as one coherent markdown document, in teaching order.
  * Shared by /llms-full.txt and the AI assistants' grounding context.
  */
