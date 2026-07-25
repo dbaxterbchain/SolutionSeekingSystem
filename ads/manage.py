@@ -3,8 +3,9 @@
 Safety contract:
 - DRY-RUN BY DEFAULT: prints exactly what would change. Add --apply to execute.
 - SCOPE GUARD: refuses to touch any campaign whose name does not start with
-  "SSS" (the Beanchain shop campaigns share this account). Override requires
-  --allow-any-campaign, which should essentially never be used.
+  "SSS"/"Solution Seeking". The two Beanchain shop campaigns share this account
+  and are reachable ONLY via --beanchain, passed when the owner explicitly asks
+  for Beanchain work in the current session. Anything else is always refused.
 
 Usage:
     uv run manage.py pause --campaign "SSS Consumer" [--apply]
@@ -20,17 +21,13 @@ from __future__ import annotations
 import argparse
 import sys
 
-from _common import make_client, default_customer_id, micros
+from google.protobuf import field_mask_pb2
 
-SCOPE_PREFIXES = ("SSS", "Solution Seeking")
+from _common import make_client, default_customer_id, micros, check_campaign_scope
 
 
-def find_campaign(client, customer_id: str, name: str, allow_any: bool):
-    if not name.startswith(SCOPE_PREFIXES) and not allow_any:
-        sys.exit(
-            f"Scope guard: '{name}' does not start with one of {SCOPE_PREFIXES}. The Beanchain "
-            "shop campaigns share this account and are off limits. (--allow-any-campaign overrides.)"
-        )
+def find_campaign(client, customer_id: str, name: str, beanchain: bool):
+    check_campaign_scope(name, beanchain)
     ga = client.get_service("GoogleAdsService")
     query = (
         "SELECT campaign.id, campaign.name, campaign.status, campaign.campaign_budget, "
@@ -61,13 +58,13 @@ def main() -> None:
     parser.add_argument("--keyword", help="Negative keyword text")
     parser.add_argument("--match", default="BROAD", choices=["BROAD", "PHRASE", "EXACT"])
     parser.add_argument("--apply", action="store_true", help="Execute (default is dry run)")
-    parser.add_argument("--allow-any-campaign", action="store_true")
+    parser.add_argument("--beanchain", action="store_true", help="Unlock the Beanchain campaign allowlist (explicit owner request only)")
     parser.add_argument("--customer", help="Customer id override")
     args = parser.parse_args()
 
     client = make_client()
     customer_id = (args.customer or default_customer_id()).replace("-", "")
-    campaign = find_campaign(client, customer_id, args.campaign, args.allow_any_campaign)
+    campaign = find_campaign(client, customer_id, args.campaign, args.beanchain)
 
     if args.action in ("pause", "enable"):
         status = client.enums.CampaignStatusEnum.PAUSED if args.action == "pause" else client.enums.CampaignStatusEnum.ENABLED
@@ -77,7 +74,7 @@ def main() -> None:
             op = client.get_type("CampaignOperation")
             op.update.resource_name = client.get_service("CampaignService").campaign_path(customer_id, campaign.id)
             op.update.status = status
-            client.copy_from(op.update_mask, client.get_type("FieldMask")(paths=["status"]))
+            client.copy_from(op.update_mask, field_mask_pb2.FieldMask(paths=["status"]))
             return svc.mutate_campaigns(customer_id=customer_id, operations=[op])
 
         apply_or_print(args, f"{args.action} campaign '{campaign.name}' (currently {campaign.status.name})", run)
@@ -91,7 +88,7 @@ def main() -> None:
             op = client.get_type("CampaignBudgetOperation")
             op.update.resource_name = campaign.campaign_budget
             op.update.amount_micros = micros(args.amount)
-            client.copy_from(op.update_mask, client.get_type("FieldMask")(paths=["amount_micros"]))
+            client.copy_from(op.update_mask, field_mask_pb2.FieldMask(paths=["amount_micros"]))
             return svc.mutate_campaign_budgets(customer_id=customer_id, operations=[op])
 
         apply_or_print(args, f"set '{campaign.name}' daily budget to ${args.amount:.2f}", run)
@@ -105,7 +102,7 @@ def main() -> None:
             op = client.get_type("CampaignOperation")
             op.update.resource_name = svc.campaign_path(customer_id, campaign.id)
             op.update.target_spend.cpc_bid_ceiling_micros = micros(args.cap)
-            client.copy_from(op.update_mask, client.get_type("FieldMask")(paths=["target_spend.cpc_bid_ceiling_micros"]))
+            client.copy_from(op.update_mask, field_mask_pb2.FieldMask(paths=["target_spend.cpc_bid_ceiling_micros"]))
             return svc.mutate_campaigns(customer_id=customer_id, operations=[op])
 
         apply_or_print(args, f"set '{campaign.name}' Maximize Clicks CPC ceiling to ${args.cap:.2f}", run)

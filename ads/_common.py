@@ -58,6 +58,30 @@ def default_customer_id() -> str:
     return cid
 
 
+SCOPE_PREFIXES = ("SSS", "Solution Seeking")
+# The owner's coffee-shop campaigns. Off limits by default; each command that
+# touches them requires the explicit --beanchain flag, passed only when the
+# owner asked for Beanchain work in the current session.
+BEANCHAIN_CAMPAIGNS = ("Coffee Shop For You", "Get People into Shop")
+
+
+def check_campaign_scope(name: str, beanchain: bool = False) -> None:
+    """Exit unless `name` is an SSS campaign, or a Beanchain campaign explicitly unlocked."""
+    if name.startswith(SCOPE_PREFIXES):
+        return
+    if name in BEANCHAIN_CAMPAIGNS:
+        if beanchain:
+            return
+        sys.exit(
+            f"Scope guard: '{name}' is a Beanchain shop campaign. Add --beanchain only "
+            "when the owner has explicitly asked for Beanchain changes this session."
+        )
+    sys.exit(
+        f"Scope guard: '{name}' matches neither the SSS prefixes {SCOPE_PREFIXES} nor "
+        f"the Beanchain allowlist {BEANCHAIN_CAMPAIGNS}; refusing."
+    )
+
+
 def micros(dollars: float) -> int:
     return round(dollars * 1_000_000)
 

@@ -3,4 +3,4 @@ name = "sss-ads-toolkit"
 version = "0.1.0"
 description = "Google Ads analysis + campaign management toolkit for solutionseeking.com"
 requires-python = ">=3.10"
-dependencies = ["google-ads>=25.0.0"]
+dependencies = ["google-ads>=25.0.0", "pillow>=10.0.0"]

@@ -513,6 +513,16 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       are a one-time owner setup per [docs/ads-api-setup.md](ads-api-setup.md); nothing enters
       git. New tokens often auto-upgrade to Explorer access (production campaign management,
       2,880 ops/day, no application), with Basic as the fallback path.
+      **Update (2026-07-25, owner-requested Beanchain pass):** the toolkit gained `assets.py`
+      (PMax asset-group image prep/upload/link/unlink, campaign callouts and structured
+      snippets) and the scope guard now exposes the two Beanchain shop campaigns as a named
+      allowlist behind `--beanchain` (explicit owner request only; everything else still
+      refused). Used it to refresh both PMax asset groups (10 stale 2020-era images replaced
+      with fresh 2023-24 photos), add 7 verified callouts + a menu snippet, raise budgets
+      (PMax $32 to $40/day, Smart $5.80 to $10/day), and fix account conversion hygiene
+      (`fix_conversion_goals.py`: GA4 traffic events like page_view/session_start and
+      checkout_abandoned demoted to secondary; signup_completed promoted to primary, which
+      cleans the SSS campaigns' Conversions column).
 - [x] **Consumer price: $5 to $8 per month, annual $50 to $80** (2026-07-25). Same reasoning
       and mechanics as the team raise below: comparable AI coaching tools run $10-30/month, and
       "unlimited" conversations carry real per-message API cost. Annual keeps its two-months-free

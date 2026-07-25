@@ -10,8 +10,11 @@ Campaign structure source of truth: [campaigns.json](campaigns.json), which mirr
 
 - **Dry run by default.** Every write command prints what it would do; `--apply` executes.
 - **Everything created starts PAUSED.** Enabling is always an explicit human-approved step.
-- **Scope guard.** Write commands refuse campaigns not named `SSS ...` — the Beanchain shop
-  campaigns share this account and are off limits to tooling. Reads are account-wide.
+- **Scope guard.** Write commands refuse campaigns not named `SSS ...` by default. The two
+  Beanchain shop campaigns ("Coffee Shop For You", "Get People into Shop") are a named
+  allowlist unlocked only by `--beanchain`, which is passed only when the owner explicitly
+  asks for Beanchain work in the current session. Anything else is always refused.
+  Reads are account-wide.
 - Budgets and bids change only through explicit `manage.py` invocations, never automatically.
 
 ## Commands (run from `ads/`)
@@ -32,7 +35,21 @@ uv run manage.py set-budget --campaign "SSS Consumer" --amount 15 --apply
 uv run manage.py set-cpc-cap --campaign "SSS Consumer" --cap 10 --apply
 uv run manage.py add-negative --campaign "SSS Consumer" --keyword "..." --apply
 uv run manage.py remove-negative --campaign "SSS Consumer" --keyword "..." --apply
+
+# Asset management (PMax asset groups + campaign-level callouts/snippets)
+uv run assets.py list --campaign "..."                    # full asset inventory
+uv run assets.py list-images                              # account image library
+uv run assets.py prep --file photo.jpg --out-dir crops    # center-crop to 1.91:1 / 1:1 / 4:5
+uv run assets.py upload-image --file crops/x.jpg --name "..." --apply
+uv run assets.py link-image --asset-group <id> --asset customers/X/assets/Y --field SQUARE_MARKETING_IMAGE --apply
+uv run assets.py unlink --asset-group <id> --asset customers/X/assets/Y --apply
+uv run assets.py add-callout --campaign "..." --text "..." --apply
+uv run assets.py add-snippet --campaign "..." --header Types --values "a,b,c" --apply
 ```
+
+`prep` is local-only (no API call). `unlink` refuses to remove the last asset of a field
+type (PMax minimums). `fix_conversion_goals.py` is the one-off that made GA4 traffic events
+secondary and signup_completed primary (2026-07-25).
 
 ## Also in this folder
 
