@@ -23,3 +23,9 @@ dist/
 
 # scratch (intermediate PDF text extraction)
 sss-full.txt
+
+# Google Ads toolkit (ads/) — credentials never enter git; uv venv is local
+google-ads.yaml
+ads/.venv/
+ads/uv.lock
+ads/__pycache__/

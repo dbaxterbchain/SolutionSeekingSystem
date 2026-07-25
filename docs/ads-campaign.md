@@ -3,6 +3,11 @@
 Everything needed to build (and fix) the Search test, in the order the Ads UI asks for it.
 Every asset below is inside Google's character limits (headlines <= 30, descriptions <= 90).
 
+**Tooling:** this structure is executable. `ads/editor-import/` holds Ads Editor CSVs of these
+campaigns (zero-credential bulk import), and the `ads/` toolkit + the google-ads MCP server give
+Claude direct API access for analysis and edits once [docs/ads-api-setup.md](ads-api-setup.md)
+is done. `ads/campaigns.json` mirrors this sheet; keep them in step.
+
 **Read this first:** the consumer test **buys data, not customers**. At $8/month the CAC maths does
 not close, and **zero to two subscriptions from $300 to $500 is the expected outcome**. Judge it on
 **cost per started conversation**. The **business (B2B) campaign is different**: a team is worth far

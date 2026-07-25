@@ -12,6 +12,7 @@ Project documentation for the **Solution Seeking System** website.
 | [deployment.md](deployment.md) | Hosting on Netlify, continuous deploys, and the custom domain. |
 | [change-checklist.md](change-checklist.md) | **The standard for shipping changes** — touchpoints to check per change type (pages, content, AI/prompts, database, env vars, deploys). |
 | [ads-campaign.md](ads-campaign.md) | The Google Ads build sheet: settings, keywords, ad copy, negatives, and the decision rule for the paid test. |
+| [ads-api-setup.md](ads-api-setup.md) | One-time Google Ads API credential setup (MCC, developer token, OAuth, refresh token) powering the `ads/` toolkit and the google-ads MCP server. |
 
 ## Quick links
 

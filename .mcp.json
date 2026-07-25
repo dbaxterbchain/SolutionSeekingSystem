@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "google-ads": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/googleads/google-ads-mcp.git",
+        "google-ads-mcp"
+      ],
+      "env": {
+        "GOOGLE_ADS_CONFIGURATION_FILE_PATH": "${USERPROFILE}/.google-ads.yaml"
+      }
+    }
+  }
+}
