@@ -256,7 +256,7 @@ the endpoints support streaming responses.
 | `ANTHROPIC_API_KEY` | console.anthropic.com → API keys |
 | `STRIPE_SECRET_KEY` | Stripe dashboard → prefer a **restricted key** (`rk_...`) with: Checkout Sessions (write), Billing Portal (write), Customers (write), Subscriptions (**write** — the org seat editor updates the subscription item quantity) |
 | `STRIPE_WEBHOOK_SECRET` | The webhook endpoint's signing secret (below); locally, the `whsec_` printed by `stripe listen` |
-| `STRIPE_PRICE_ID` | The $5/month recurring price (below). Annual: `STRIPE_PRICE_ID_ANNUAL`. Teams per-seat ($4/seat/month): `STRIPE_PRICE_ID_TEAM` |
+| `STRIPE_PRICE_ID` | The $8/month recurring price (below). Annual ($80/year): `STRIPE_PRICE_ID_ANNUAL`. Teams per-seat ($8/seat/month): `STRIPE_PRICE_ID_TEAM` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API keys → secret key. Bypasses RLS — server only |
 
 ### Database
@@ -270,7 +270,7 @@ revokes the default PUBLIC execute grant).
 ### Stripe setup (test mode first, then repeat in live mode)
 
 1. **Product/price:** Product catalog → Add product — "Solution Seeking AI Assistants",
-   recurring **$5.00/month USD** → copy the `price_...` id → `STRIPE_PRICE_ID`.
+   recurring **$8.00/month USD** → copy the `price_...` id → `STRIPE_PRICE_ID`.
 2. **Restricted key:** Developers → API keys → Create restricted key (permissions above)
    → `STRIPE_SECRET_KEY`.
 3. **Webhook:** Developers → Webhooks → Add endpoint
@@ -290,7 +290,7 @@ revokes the default PUBLIC execute grant).
 ### How gating works
 
 Signed-in users get **10 lifetime free messages** (`ai_usage`, incremented server-side),
-then a $5/month subscription (status `active`/`trialing`/`past_due` in `subscriptions`)
+then an $8/month subscription (status `active`/`trialing`/`past_due` in `subscriptions`)
 is required. The Stripe webhook is the only writer of subscription state. A portal
 cancel sets `cancel_at_period_end` while access continues until the period ends.
 
@@ -456,7 +456,8 @@ The enquiry form stays on `/pricing` behind "Prefer to talk first". Fulfilment i
 ten-minute `/admin` job as before:
 
 1. The enquiry arrives by email (also in `/admin` → Enquiries).
-2. Reply, agree seats and price ("From $4/person/month, 5 seat minimum" is the listed rate).
+2. Reply, agree seats and price ("From $8/person/month, 5 seat minimum" is the listed rate;
+   white-label pages are included, which is the incentive to name in the reply).
 3. Bill them by hand: a Stripe subscription you create in the dashboard, or an invoice. If
    Stripe, paste the `stripe_customer_id` onto the org row so the webhook keeps status in
    step. If invoice, the status you set by hand is the truth.
@@ -617,9 +618,16 @@ hardcoded in ten places, which meant changing the Stripe price would silently le
 of the site lying to customers and to Google.
 
 **Stripe setup for the annual plan** (one time):
-1. Stripe dashboard → the existing product → **Add another price** → recurring, **$50 /
+1. Stripe dashboard → the existing product → **Add another price** → recurring, **$80 /
    year**. Copy the `price_...` id.
 2. Netlify → environment variables → `STRIPE_PRICE_ID_ANNUAL` → redeploy.
+
+**Price changes** (like the 2026-07-25 move to $8/$80/$8-per-seat): create the NEW price in
+Stripe (never edit the old one), swap the env var in Netlify, then deploy the matching
+`pricing.ts` labels in the same window. Existing subscribers keep the price they signed up
+at (their subscription references the old price id), so raises never touch current
+customers. Note the org seat editor verifies the team price id, so orgs grandfathered on an
+old team price get "contact us" instead of self-serve seat changes.
 
 If the amounts in Stripe ever change, update the labels in `src/data/pricing.ts` to match.
 Nothing reads the price back from Stripe, so these are the two places that must agree.
@@ -829,7 +837,7 @@ Use **GTM Preview** alongside **GA4 → Admin → DebugView**:
 
 ## Google Ads
 
-A small Search test, run to **buy data, not customers**. At $5/month the CAC maths does not
+A small Search test, run to **buy data, not customers**. At $8/month the CAC maths does not
 close, and roughly zero to two subscriptions from a $300 budget is the *expected* outcome.
 Judge the consumer test on **cost per started conversation**, never on subscriptions. A separate
 **B2B campaign** points at `/for-business` and is judged on `team_enquiry_submitted` (a seated team

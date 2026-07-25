@@ -3,7 +3,7 @@
 Everything needed to build (and fix) the Search test, in the order the Ads UI asks for it.
 Every asset below is inside Google's character limits (headlines <= 30, descriptions <= 90).
 
-**Read this first:** the consumer test **buys data, not customers**. At $5/month the CAC maths does
+**Read this first:** the consumer test **buys data, not customers**. At $8/month the CAC maths does
 not close, and **zero to two subscriptions from $300 to $500 is the expected outcome**. Judge it on
 **cost per started conversation**. The **business (B2B) campaign is different**: a team is worth far
 more (5+ seats, recurring, plus white-label), so that one is allowed to chase leads. See the decision

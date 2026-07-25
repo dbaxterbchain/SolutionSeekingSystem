@@ -1,7 +1,7 @@
 # Solution Seeking System — solutionseeking.com
 
 Astro 5 (static-first, Netlify adapter) + Tailwind + React islands + Supabase (auth,
-persistence) + Stripe ($5/mo subscription) + Anthropic API (Guide/Mentor chat assistants).
+persistence) + Stripe ($8/mo subscription) + Anthropic API (Guide/Mentor chat assistants).
 
 ## Before shipping any change
 

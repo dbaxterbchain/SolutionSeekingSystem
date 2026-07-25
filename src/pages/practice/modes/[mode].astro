@@ -8,7 +8,7 @@ import ProvenanceBand from '../../../components/ProvenanceBand.astro';
 import { breadcrumbs, webApplication } from '../../../lib/schema';
 import { CHAT_CONTEXTS } from '../../../lib/contexts';
 import { MODES } from '../../../data/modes';
-import { priceCopy } from '../../../data/pricing';
+import { PLANS, priceCopy } from '../../../data/pricing';
 import { getApprovedTestimonials } from '../../../lib/server/testimonials';
 
 export async function getStaticPaths() {
@@ -62,7 +62,7 @@ const schemas = [
     name: `Solution Seeking Guide (${mode.name} mode)`,
     description: mode.metaDescription,
     path: `/practice/modes/${mode.id}`,
-    offer: { price: '5.00' },
+    offer: { price: PLANS.monthly.priceAmount },
   }),
   breadcrumbs(site, [
     { name: 'Home', path: '/' },

@@ -2,6 +2,7 @@ import { getCollection } from 'astro:content';
 import { OGImageRoute } from 'astro-og-canvas';
 import { protocolSteps, systemDefinition } from '../../data/concepts';
 import { MODES } from '../../data/modes';
+import { PLANS } from '../../data/pricing';
 
 /**
  * Generated 1200×630 social-share cards, one per page. Route keys mirror page
@@ -70,8 +71,7 @@ const pages: Record<string, OgPage> = {
   },
   pricing: {
     title: 'Pricing',
-    description:
-      'Most of the system is free forever. Unlimited conversations with the Guide and Mentor are $5 a month, or $50 a year.',
+    description: `Most of the system is free forever. Unlimited conversations with the Guide and Mentor are ${PLANS.monthly.priceLabel} a month, or ${PLANS.annual.priceLabel} a year.`,
   },
   faq: {
     title: 'Frequently asked questions',
