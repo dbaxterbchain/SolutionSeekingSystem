@@ -92,14 +92,16 @@ export const PLANS: Record<PlanId, Plan> = {
   team: {
     id: 'team',
     name: 'Teams',
-    priceLabel: 'From $4',
-    priceAmount: '4.00',
+    priceLabel: 'From $8',
+    priceAmount: '8.00',
     currency: 'USD',
     cadence: 'per person, per month',
     note: '5 seat minimum',
     selfServe: false,
     features: [
       'Everything in Annual, for everyone on the team',
+      'A shared dashboard with assistants grounded in your own documents',
+      'White-label assistant pages on your own domain, included',
       'Help adapting the Leadership Tools to how your organization actually works',
       'For co-ops, schools, nonprofits, and small companies',
     ],

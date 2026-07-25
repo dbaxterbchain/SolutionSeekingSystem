@@ -456,7 +456,8 @@ The enquiry form stays on `/pricing` behind "Prefer to talk first". Fulfilment i
 ten-minute `/admin` job as before:
 
 1. The enquiry arrives by email (also in `/admin` → Enquiries).
-2. Reply, agree seats and price ("From $4/person/month, 5 seat minimum" is the listed rate).
+2. Reply, agree seats and price ("From $8/person/month, 5 seat minimum" is the listed rate;
+   white-label pages are included, which is the incentive to name in the reply).
 3. Bill them by hand: a Stripe subscription you create in the dashboard, or an invoice. If
    Stripe, paste the `stripe_customer_id` onto the org row so the webhook keeps status in
    step. If invoice, the status you set by hand is the truth.

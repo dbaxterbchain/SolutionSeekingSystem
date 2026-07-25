@@ -498,6 +498,17 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       and a friendly seats-below-members 409. Manually billed orgs keep working unchanged
       (`billing='manual'`, seat editor disabled with an invoice notice). Enquiry form stays for
       custom deals, collapsed behind the new self-serve `TeamCheckout` on /pricing.
+- [x] **Teams price: $4 to $8 per seat** (2026-07-25). The team seat was priced below an
+      individual subscription ($4 < $5) while including strictly more (shared dashboard,
+      document-grounded assistants, white-label pages on the org's own domain). Raised to
+      **$8/seat/month** (still roughly half of comparable per-seat communication tools);
+      **white-label stays included** as the differentiator and is now named on the Teams card.
+      Consumer stays $5/month as a deliberate mission/positioning choice. Existing team
+      subscriptions are grandfathered automatically (they keep their old Stripe price; only new
+      checkouts see the new one). All copy derives from `PLANS.team` in `src/data/pricing.ts`
+      (FAQ, checkout stepper, pricing card, JSON-LD), so the change is one constant plus the
+      deployment runbook line. Requires the live $8 price in `STRIPE_PRICE_ID_TEAM` on Netlify
+      BEFORE this deploys (otherwise the UI shows $8 while Stripe bills $4).
 - [ ] Then: SEO/community/AEO channels. The paid test is now live and corrected (see above);
       re-evaluate at day 7 / day 21 against the decision rules in the build sheet.
 
