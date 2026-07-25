@@ -46,6 +46,10 @@ npm run build    # production build; locally set placeholder PUBLIC_SUPABASE_* v
 Migrations: `supabase/migrations/000N_name.sql`, apply with `npx supabase db push`,
 verify with `npx supabase migration list`. See [docs/deployment.md](docs/deployment.md).
 
+Google Ads work uses the global **adkit** CLI (private repo `dbaxterbchain/adkit`), e.g.
+`adkit report --client sss --preset perf`; the campaign spec lives in that repo at
+`clients/sss/campaigns.json`. See [docs/ads-api-setup.md](docs/ads-api-setup.md).
+
 ## Verifying features in the browser
 
 After building or changing a user-facing feature, verify it end to end in a real browser,

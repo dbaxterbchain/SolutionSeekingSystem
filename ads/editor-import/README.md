@@ -1,5 +1,9 @@
 # Ads Editor import files
 
+> **Historical artifact (2026-07):** the campaigns were built via the API and are now managed
+> by the global `adkit` CLI (private repo dbaxterbchain/adkit, client `sss`). These CSVs are
+> the zero-credential fallback only.
+
 The corrected two-campaign build from [docs/ads-campaign.md](../../docs/ads-campaign.md) as
 Google Ads Editor CSVs, so the campaigns can be rebuilt cleanly without API credentials.
 Both campaigns import **Paused**; enable them only after the post-import checklist below.
