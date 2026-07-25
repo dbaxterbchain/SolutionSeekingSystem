@@ -2,7 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
 import PricingPlans from '../components/react/PricingPlans.tsx';
-import TeamEnquiryForm from '../components/react/TeamEnquiryForm.tsx';
+import TeamCheckout from '../components/react/TeamCheckout.tsx';
 import Testimonials from '../components/Testimonials.astro';
 import { breadcrumbs, faqPage, subscriptionProduct } from '../lib/schema';
 import { PLANS, FREE_ANON_MESSAGES, FREE_ACCOUNT_MESSAGES } from '../data/pricing';
@@ -152,7 +152,7 @@ const schemas = [
         </p>
       </div>
       <div>
-        <TeamEnquiryForm client:visible />
+        <TeamCheckout client:visible />
       </div>
     </section>
 

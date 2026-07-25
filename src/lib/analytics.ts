@@ -35,6 +35,7 @@ export type CtaLocation =
   | 'account_subscription'
   | 'pricing_monthly'
   | 'pricing_annual'
+  | 'pricing_team'
   | 'dashboard_upsell';
 
 /** Which allowance the user is spending. */

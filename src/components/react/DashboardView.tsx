@@ -34,6 +34,7 @@ import AttachControl from './dashboard/AttachControl';
 import DocumentsPanel from './dashboard/DocumentsPanel';
 import AssistantEditor from './dashboard/AssistantEditor';
 import WhiteLabelPanel from './dashboard/WhiteLabelPanel';
+import OrgPanel from './dashboard/OrgPanel';
 
 /** Client-side truncation guard: send at most the last N messages. */
 const SENT_HISTORY_LIMIT = 30;
@@ -77,6 +78,10 @@ export default function DashboardView() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Assistant | null>(null);
   const [whiteLabelOpen, setWhiteLabelOpen] = useState(false);
+  const [orgPanelOpen, setOrgPanelOpen] = useState(false);
+  // Post-Teams-checkout hand-off: 'pending' while we wait for the webhook to
+  // create the org, 'ready' once its workspace is live, 'slow' on timeout.
+  const [orgSetup, setOrgSetup] = useState<'pending' | 'ready' | 'slow' | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -257,6 +262,66 @@ export default function DashboardView() {
     setContextId(null);
     resetConversation();
   };
+
+  /*
+   * Arriving from a Teams checkout (?org_checkout=success): the org is created
+   * by the Stripe webhook, which may land a few seconds after the redirect.
+   * Poll memberships until the new org appears, then switch into it. Polls
+   * /api/assistants (memberships are the signal; useEntitlement has no
+   * refetch). The URL is cleaned immediately so a refresh doesn't re-poll.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user || !canUseDashboard) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('org_checkout') !== 'success') return;
+    params.delete('org_checkout');
+    window.history.replaceState(
+      null,
+      '',
+      `${window.location.pathname}${params.toString() ? `?${params}` : ''}`
+    );
+    setOrgSetup('pending');
+
+    let cancelled = false;
+    let baseline: string[] | null = null;
+    let tries = 0;
+    const arrived = (orgId: string) => {
+      if (cancelled) return;
+      setOrgSetup('ready');
+      setActiveOrgId(orgId);
+      setSelection({ kind: 'agent', agent: 'guide' });
+      setContextId(null);
+    };
+    const tick = async () => {
+      if (cancelled) return;
+      tries += 1;
+      try {
+        const data = await fetchAssistants(null);
+        const managed = data.memberships.filter((m) => m.role === 'manager');
+        if (baseline === null) {
+          baseline = data.memberships.map((m) => m.orgId);
+          // The webhook can beat the redirect. A single managed org on first
+          // look is the one just bought (the common brand-new-buyer case).
+          if (managed.length === 1) return arrived(managed[0].orgId);
+        } else {
+          const fresh = managed.find((m) => !baseline!.includes(m.orgId));
+          if (fresh) return arrived(fresh.orgId);
+        }
+      } catch {
+        // transient; keep polling
+      }
+      if (tries >= 12) {
+        if (!cancelled) setOrgSetup('slow');
+        return;
+      }
+      setTimeout(tick, 1500);
+    };
+    tick();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, canUseDashboard]);
 
   // One-click share toggle for an owned assistant in the active org workspace.
   const toggleShare = async (a: Assistant) => {
@@ -523,6 +588,37 @@ export default function DashboardView() {
 
   return (
     <div className="grid h-[calc(100dvh-6rem)] gap-6 lg:h-[calc(100vh-8rem)] lg:grid-cols-[280px_1fr]">
+      {/* Post-Teams-checkout status, floating so the layout never shifts. */}
+      {orgSetup && (
+        <div
+          className={`fixed left-1/2 top-20 z-[60] -translate-x-1/2 rounded-full px-5 py-2.5 text-sm font-semibold shadow-card-hover ${
+            orgSetup === 'ready'
+              ? 'bg-emerald-50 text-emerald-800'
+              : orgSetup === 'slow'
+                ? 'bg-amber-50 text-amber-800'
+                : 'bg-white text-slate-600'
+          }`}
+          role="status"
+        >
+          {orgSetup === 'pending' && 'Setting up your organization…'}
+          {orgSetup === 'ready' && (
+            <>
+              Your organization is ready. Add your team below.{' '}
+              <button
+                type="button"
+                className="ml-1 underline"
+                onClick={() => {
+                  setOrgSetup(null);
+                  setOrgPanelOpen(true);
+                }}
+              >
+                Open settings
+              </button>
+            </>
+          )}
+          {orgSetup === 'slow' && 'This is taking a little longer than usual. Refresh in a minute.'}
+        </div>
+      )}
       {/* Scrim behind the mobile drawer. */}
       {sidebarOpen && (
         <div
@@ -552,6 +648,7 @@ export default function DashboardView() {
           }}
           onOpenDocuments={() => setDocumentsOpen(true)}
           onOpenWhiteLabel={() => setWhiteLabelOpen(true)}
+          onOpenOrgSettings={() => setOrgPanelOpen(true)}
           canManageOrg={isManagerOfActive}
           memberships={memberships}
           activeOrgId={activeOrgId}
@@ -731,6 +828,12 @@ export default function DashboardView() {
         assistants={[...mine.filter((a) => a.shared), ...shared]}
         orgId={activeOrgId}
         orgName={activeOrg?.orgName ?? null}
+      />
+      <OrgPanel
+        open={orgPanelOpen}
+        onClose={() => setOrgPanelOpen(false)}
+        orgId={activeOrgId}
+        onOrgRenamed={refreshAssistants}
       />
       {dialog}
     </div>

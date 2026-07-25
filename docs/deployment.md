@@ -254,9 +254,9 @@ the endpoints support streaming responses.
 | Var | Where it comes from |
 |---|---|
 | `ANTHROPIC_API_KEY` | console.anthropic.com → API keys |
-| `STRIPE_SECRET_KEY` | Stripe dashboard → prefer a **restricted key** (`rk_...`) with: Checkout Sessions (write), Billing Portal (write), Customers (write), Subscriptions (read) |
+| `STRIPE_SECRET_KEY` | Stripe dashboard → prefer a **restricted key** (`rk_...`) with: Checkout Sessions (write), Billing Portal (write), Customers (write), Subscriptions (**write** — the org seat editor updates the subscription item quantity) |
 | `STRIPE_WEBHOOK_SECRET` | The webhook endpoint's signing secret (below); locally, the `whsec_` printed by `stripe listen` |
-| `STRIPE_PRICE_ID` | The $5/month recurring price (below) |
+| `STRIPE_PRICE_ID` | The $5/month recurring price (below). Annual: `STRIPE_PRICE_ID_ANNUAL`. Teams per-seat ($4/seat/month): `STRIPE_PRICE_ID_TEAM` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API keys → secret key. Bypasses RLS — server only |
 
 ### Database
@@ -425,41 +425,62 @@ that drill once before you need it.
 A row can only be approved if the person ticked the consent box and actually wrote
 something. The database enforces it, so the Approve button does not appear otherwise.
 
-## Teams: how to onboard an organization
+## Teams: how organizations come into existence
 
-Self-serve seats are **not** built, on purpose (see `PLANS.team.selfServe = false`). The
-enquiry form on `/pricing` is the front door, and fulfilment is a ten-minute job in `/admin`.
+**Self-serve is the default path** (since migration `0027`). A buyer on `/pricing` names
+their organization, picks a seat count (5 minimum), and pays through Stripe Checkout
+(`/api/team-checkout`, per-seat price `STRIPE_PRICE_ID_TEAM`, quantity = seats). The Stripe
+webhook then creates the `organizations` row (`billing = 'stripe'`) and seats the buyer as
+its **first manager**, bound immediately. They land on `/dashboard?org_checkout=success`,
+which polls until the workspace appears and switches into it. No operator action at all.
 
-1. **The enquiry arrives by email** (from `/api/team-enquiry`). It is also in `/admin` under
-   Enquiries.
-2. **Reply and agree seats and price.** The listed rate is "From $4/person/month, 5 seat
-   minimum".
-3. **Bill them.** Either a Stripe subscription you create by hand in the dashboard, or an
-   invoice outside Stripe. If you use Stripe, **paste the `stripe_customer_id` onto the
-   organization row**: the webhook uses it to keep the status in step, so a lapsed
-   organization actually loses access instead of keeping it forever. If you bill by invoice
-   there are no webhooks, and the status you set by hand is the truth.
-4. **`/admin` → Organizations → New organization.** Name and seat count.
-5. **Add their members' email addresses.**
-6. **Tell them which address to use.** This is the step people forget. Access is granted by
-   signing in with a listed address; somebody who signs up with a different one gets nothing.
-   They do not need an invite link, and there is no code to enter: they just sign in.
-7. Members get unlimited access immediately. The seat is claimed on their first message, and
-   the admin list then shows them as "signed in".
+From there, **managers run the org themselves** from the dashboard's "Organization
+settings" panel (`/api/org`): rename it, add and remove members by email, promote and
+demote managers, change the seat count (which updates the Stripe subscription quantity
+with proration), and open the org's own Stripe billing portal.
 
-**Renewals.** If billed through Stripe, the webhook updates the status automatically. If
-billed by invoice, update `current_period_end` by hand; the admin panel highlights a renewal
-inside 14 days. Setting an organization to `canceled` drops every member back to the free
-tier on their next message.
-
-**Rules the database enforces**, so you cannot get them wrong quietly:
-- A member cannot be added beyond the seat count. Raise the seats first.
-- One person holds one seat: the same address cannot be on two organizations.
+Rules the server (and database) enforce for self-serve managers:
+- **Last manager**: the only manager cannot be removed or demoted. `/admin` is exempt so
+  any weird state stays repairable.
+- **Seat floor**: seats can never drop below the current member count (friendly 409 in the
+  UI, trigger `enforce_seat_floor` as the backstop). Remove members first.
+- **Seat cap**: a member cannot be added beyond the seat count. Increase seats first.
 - An unconfirmed email address can never claim a seat.
+- Seat changes only work for `billing = 'stripe'` orgs whose subscription item is the team
+  price; anything else gets "contact us" (per-seat quantity math against a custom
+  subscription would corrupt real invoices).
 
-**Managers.** In `/admin → Organizations`, each member has a role select (member / manager).
-A manager can share assistants org-wide and manage white-label pages from their own
-dashboard. Set at least one manager per organization that wants those features.
+### The manual path (custom deals) still exists
+
+The enquiry form stays on `/pricing` behind "Prefer to talk first". Fulfilment is the same
+ten-minute `/admin` job as before:
+
+1. The enquiry arrives by email (also in `/admin` → Enquiries).
+2. Reply, agree seats and price ("From $4/person/month, 5 seat minimum" is the listed rate).
+3. Bill them by hand: a Stripe subscription you create in the dashboard, or an invoice. If
+   Stripe, paste the `stripe_customer_id` onto the org row so the webhook keeps status in
+   step. If invoice, the status you set by hand is the truth.
+4. `/admin` → Organizations → New organization; add member emails; tell them which address
+   to sign in with (the address IS the credential; no invite link exists).
+
+Manually created orgs default to `billing = 'manual'`: their managers can run members and
+roles but the seat editor shows "billed by invoice, contact us". Only flip an org to
+"self-serve" in `/admin` if its Stripe subscription really is the per-seat team price.
+
+**Renewals.** Stripe-billed orgs (both kinds) update automatically via the webhook, which
+also syncs seats from the subscription quantity for team-price subscriptions (clamped to
+the member count, loudly logged if they conflict). Invoice-billed orgs are updated by
+hand; the admin panel highlights a renewal inside 14 days. Setting an organization to
+`canceled` drops every member back to the free tier on their next message.
+
+**Stripe customer portal note.** In the Stripe dashboard's portal configuration, do NOT
+enable plan/quantity updates for the team price: seat changes should go through the org
+panel so the member-count floor applies first. The webhook clamps and logs if a portal
+quantity edit happens anyway.
+
+**Managers.** Set from the org panel by any existing manager, or in `/admin → Organizations`
+(role select per member). A manager can share assistants org-wide, manage white-label pages,
+and run the organization panel. Every self-serve org starts with its buyer as manager.
 
 **One person, several orgs.** As of migration `0024`, an email can be a member of more than
 one organization (roles are per-org, so someone can manage org A and just belong to org B). In

@@ -40,6 +40,16 @@ export const POST: APIRoute = async ({ request }) => {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
+
+        // A Teams purchase: create the organization and its first manager.
+        // This branch runs FIRST because team sessions carry no user_id at
+        // all (deliberately, see /api/team-checkout) and must never fall
+        // through to the personal-subscription path below.
+        if (session.metadata?.org_intent === 'create') {
+          await handleOrgCheckout(session);
+          break;
+        }
+
         const userId = session.client_reference_id ?? session.metadata?.user_id;
         if (!userId || !session.subscription) {
           console.warn('checkout.session.completed missing user_id or subscription', session.id);
@@ -112,16 +122,124 @@ async function lookupUserByCustomer(
 }
 
 /**
+ * A completed Teams checkout: create the organization and seat its buyer as
+ * the first manager. The one place self-serve orgs come into existence.
+ *
+ * Idempotent by the UNIQUE stripe_customer_id: a Stripe retry (or a duplicate
+ * delivery) finds the org already created and just re-syncs the billing
+ * columns. Any Supabase error throws, the handler 500s, and Stripe retries
+ * into that same idempotency.
+ */
+async function handleOrgCheckout(session: Stripe.Checkout.Session) {
+  const creatorUserId = session.metadata?.creator_user_id;
+  if (!creatorUserId || !session.subscription || !session.customer) {
+    console.warn('org checkout missing creator, subscription, or customer', session.id);
+    return;
+  }
+
+  const sub = await getStripe().subscriptions.retrieve(
+    typeof session.subscription === 'string' ? session.subscription : session.subscription.id
+  );
+  const customerId = typeof session.customer === 'string' ? session.customer : session.customer.id;
+  const item = sub.items.data[0];
+  // The item quantity is authoritative (it is what Stripe bills); the metadata
+  // copy is only a fallback for a malformed retrieval.
+  const metadataSeats = Number(session.metadata?.seats);
+  const seats = Math.max(
+    item?.quantity ?? (Number.isFinite(metadataSeats) ? metadataSeats : 1),
+    1
+  );
+  const periodEnd =
+    item?.current_period_end ??
+    (sub as unknown as { current_period_end?: number }).current_period_end ??
+    null;
+
+  // Retry / duplicate delivery: the org exists, keep its billing columns fresh.
+  const { data: existing } = await supabaseAdmin
+    .from('organizations')
+    .select('id')
+    .eq('stripe_customer_id', customerId)
+    .maybeSingle();
+  if (existing) {
+    await syncOrgSubscription(sub);
+    return;
+  }
+
+  // The buyer's email is fetched authoritatively rather than trusted from
+  // metadata: it becomes the seat credential (org_members.email).
+  const { data: creator, error: creatorError } =
+    await supabaseAdmin.auth.admin.getUserById(creatorUserId);
+  if (creatorError || !creator?.user?.email) {
+    console.error('org checkout: could not resolve creator', creatorUserId, creatorError);
+    throw new Error('org checkout: creator lookup failed');
+  }
+
+  const { data: org, error: orgError } = await supabaseAdmin
+    .from('organizations')
+    .insert({
+      name: session.metadata?.org_name || `${creator.user.email}'s team`,
+      seats,
+      status: sub.status,
+      stripe_customer_id: customerId,
+      stripe_subscription_id: sub.id,
+      current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+      billing: 'stripe',
+      created_by: creatorUserId,
+    })
+    .select('id, name')
+    .single();
+  if (orgError) {
+    console.error('org checkout: organization insert failed', orgError);
+    throw new Error(`org checkout: organization insert failed: ${orgError.message}`);
+  }
+
+  // Seat 1: the buyer, bound immediately (no claim step), as manager.
+  const { error: memberError } = await supabaseAdmin.from('org_members').insert({
+    org_id: org.id,
+    email: creator.user.email.toLowerCase(),
+    user_id: creatorUserId,
+    role: 'manager',
+    joined_at: new Date().toISOString(),
+  });
+  // 23505 = the member row already exists (a retry that died between the two
+  // inserts). Fine: the org is whole.
+  if (memberError && memberError.code !== '23505') {
+    console.error('org checkout: manager insert failed', memberError);
+    throw new Error(`org checkout: manager insert failed: ${memberError.message}`);
+  }
+
+  // The conversion of record for a team sale; amount_total already reflects
+  // seats x unit price. Same dedupe (transaction_id = session id) as personal.
+  await trackSubscriptionCompleted({
+    clientId: session.metadata?.ga_client_id || creatorUserId,
+    sessionId: session.metadata?.ga_session_id || undefined,
+    plan: 'team',
+    value: (session.amount_total ?? 0) / 100,
+    currency: (session.currency ?? 'usd').toUpperCase(),
+    transactionId: session.id,
+  });
+
+  console.log(`organization ${org.name} (${org.id}) created: ${seats} seats, manager ${creatorUserId}`);
+}
+
+/**
  * Keep an ORGANIZATION's status in step with Stripe. Returns true if this
  * subscription belonged to one.
  *
- * Deliberately only ever UPDATES a row the operator already created and stamped
- * with a `stripe_customer_id`. It never inserts, so a stray Stripe customer can
+ * Deliberately only ever UPDATES a row that already exists (created by an
+ * operator in /admin, or by handleOrgCheckout above) and carries this
+ * `stripe_customer_id`. It never inserts, so a stray Stripe customer can
  * never conjure entitlement for an organization that does not exist.
  *
  * If an org is billed by hand (an invoice rather than a Stripe subscription)
  * there are no events at all, and the status the operator set in /admin stands.
  * That is expected, and it is why the admin panel flags a renewal date coming up.
+ *
+ * For self-serve orgs on the per-seat team price, the item QUANTITY is the
+ * seat count, so a quantity change (from /api/org's set_seats, or a portal
+ * edit) syncs `seats` too — clamped to the member count, because billing can
+ * say "3 seats" but three existing members cannot be unseated by a webhook.
+ * The clamp conflict is logged loudly for an admin to resolve.
  */
 async function syncOrgSubscription(sub: Stripe.Subscription): Promise<boolean> {
   const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
@@ -138,12 +256,33 @@ async function syncOrgSubscription(sub: Stripe.Subscription): Promise<boolean> {
     (sub as unknown as { current_period_end?: number }).current_period_end ??
     null;
 
+  // Seat sync, ONLY for the per-seat team price. Any other price (a hand-made
+  // subscription an admin stamped onto a manual org) must never drive seats.
+  let seatColumns: { seats?: number } = {};
+  const teamPriceId = serverEnv('STRIPE_PRICE_ID_TEAM');
+  if (teamPriceId && item?.price.id === teamPriceId && typeof item.quantity === 'number') {
+    const { count } = await supabaseAdmin
+      .from('org_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', org.id);
+    const memberCount = count ?? 0;
+    if (item.quantity < memberCount) {
+      console.error(
+        `organization ${org.name} (${org.id}): Stripe quantity ${item.quantity} is below ` +
+          `member count ${memberCount}; clamping seats to ${memberCount}. ` +
+          'Billing and membership disagree; resolve in /admin.'
+      );
+    }
+    seatColumns = { seats: Math.max(item.quantity, memberCount) };
+  }
+
   const { error } = await supabaseAdmin
     .from('organizations')
     .update({
       status: sub.status,
       stripe_subscription_id: sub.id,
       current_period_end: periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
+      ...seatColumns,
     })
     .eq('id', org.id);
 

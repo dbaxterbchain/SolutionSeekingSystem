@@ -29,7 +29,9 @@ export const GET: APIRoute = async ({ request }) => {
   const [orgs, members] = await Promise.all([
     supabaseAdmin
       .from('organizations')
-      .select('id, name, seats, status, stripe_customer_id, current_period_end, note, created_at')
+      .select(
+        'id, name, seats, status, billing, stripe_customer_id, stripe_subscription_id, created_by, current_period_end, note, created_at'
+      )
       .order('created_at', { ascending: false })
       .limit(200),
     supabaseAdmin
@@ -102,11 +104,34 @@ export const POST: APIRoute = async ({ request }) => {
       if (body?.seats !== undefined) {
         const seats = Number(body.seats);
         if (!Number.isInteger(seats) || seats < 1) return adminJson({ error: 'invalid' }, 400);
+        // Pre-check the 0027 seat floor so the operator gets the real story
+        // instead of fail()'s "no free seats" message (same errcode, 23514).
+        const { count } = await supabaseAdmin
+          .from('org_members')
+          .select('id', { count: 'exact', head: true })
+          .eq('org_id', id);
+        if (seats < (count ?? 0)) {
+          return adminJson(
+            {
+              error: 'seats_below_members',
+              message: `Seat count is below the current member count (${count}). Remove members first.`,
+            },
+            409
+          );
+        }
         patch.seats = seats;
       }
       if (typeof body?.status === 'string') {
         if (!STATUSES.includes(body.status)) return adminJson({ error: 'invalid' }, 400);
         patch.status = body.status;
+      }
+      if (typeof body?.billing === 'string') {
+        // 'stripe' means "the per-seat team subscription drives seats". Only
+        // set it when that is actually true; see migration 0027.
+        if (body.billing !== 'manual' && body.billing !== 'stripe') {
+          return adminJson({ error: 'invalid' }, 400);
+        }
+        patch.billing = body.billing;
       }
       if (body?.stripe_customer_id !== undefined) {
         patch.stripe_customer_id = clean(body.stripe_customer_id, 60) || null;

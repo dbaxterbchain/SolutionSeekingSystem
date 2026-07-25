@@ -44,6 +44,7 @@ interface OrgRow {
   name: string;
   seats: number;
   status: string;
+  billing: 'manual' | 'stripe';
   stripe_customer_id: string | null;
   current_period_end: string | null;
   note: string | null;
@@ -482,6 +483,20 @@ function OrgsTab({
             >
               {o.status}
             </span>
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                o.billing === 'stripe'
+                  ? 'bg-brand-50 text-brand-700'
+                  : 'bg-slate-100 text-slate-500'
+              }`}
+              title={
+                o.billing === 'stripe'
+                  ? 'Self-serve per-seat subscription; seats follow the Stripe quantity.'
+                  : 'Billed by hand (invoice or a hand-run Stripe subscription).'
+              }
+            >
+              {o.billing === 'stripe' ? 'self-serve' : 'manual billing'}
+            </span>
             <span className="text-xs text-slate-500">
               {o.members.length} of {o.seats} seats
             </span>
@@ -491,6 +506,16 @@ function OrgsTab({
               >
                 Renews {date(o.current_period_end)}
               </span>
+            )}
+            {o.stripe_customer_id && (
+              <a
+                href={`https://dashboard.stripe.com/customers/${o.stripe_customer_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-medium text-brand-600 hover:text-brand-700"
+              >
+                Stripe ↗
+              </a>
             )}
           </div>
 
@@ -563,6 +588,21 @@ function OrgsTab({
                 Set {s}
               </button>
             ))}
+            <button
+              type="button"
+              title="Flip only when the org really runs on the per-seat team subscription: 'self-serve' lets its managers change seats, and the webhook drives the seat count from the Stripe quantity."
+              onClick={async () => {
+                const d = await call('orgs', {
+                  action: 'update',
+                  id: o.id,
+                  billing: o.billing === 'stripe' ? 'manual' : 'stripe',
+                });
+                if (d?.ok) reload();
+              }}
+              className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
+            >
+              Make {o.billing === 'stripe' ? 'manual billing' : 'self-serve'}
+            </button>
           </div>
         </div>
       ))}

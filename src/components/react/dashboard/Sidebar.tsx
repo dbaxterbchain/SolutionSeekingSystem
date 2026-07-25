@@ -30,6 +30,7 @@ export default function Sidebar({
   onNewAssistant,
   onOpenDocuments,
   onOpenWhiteLabel,
+  onOpenOrgSettings,
   canManageOrg,
   memberships,
   activeOrgId,
@@ -52,6 +53,7 @@ export default function Sidebar({
   onNewAssistant: () => void;
   onOpenDocuments: () => void;
   onOpenWhiteLabel: () => void;
+  onOpenOrgSettings: () => void;
   canManageOrg: boolean;
   memberships: OrgOption[];
   /** The active workspace: null = Personal, else an org id. */
@@ -286,6 +288,15 @@ export default function Sidebar({
             className="w-full rounded-xl px-3 py-1.5 text-left text-sm text-slate-500 hover:bg-slate-50 hover:text-ink-800"
           >
             🏷️ White-label pages
+          </button>
+        )}
+        {canManageOrg && (
+          <button
+            type="button"
+            onClick={onOpenOrgSettings}
+            className="w-full rounded-xl px-3 py-1.5 text-left text-sm text-slate-500 hover:bg-slate-50 hover:text-ink-800"
+          >
+            🏢 Organization settings
           </button>
         )}
         <a
