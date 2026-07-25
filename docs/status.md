@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-07-23_
+_Last updated: 2026-07-24_
 
 ## At a glance
 
@@ -463,7 +463,23 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       dashboard-only items (leaked password protection, Auth connections switched to the
       percentage strategy at 10%) were toggled the same day; the advisors now report only the
       documented acceptances.
-- [ ] Then: SEO/community/AEO channels, and the paid test itself once the pre-flight passes.
+- [x] **Google Ads: fixed the zero-impression launch + added a B2B campaign** (2026-07-24). The
+      Search test was live ~30 days and got **2 impressions, 0 clicks, $0 spent** (0 in the final
+      week). Diagnosed from the account export as **bid/ad-rank starvation, not keywords**: every
+      keyword was Enabled with broad match live, but Auction Insights showed eligibility in only ~11
+      auctions all month at **0% top-of-page rate** against premium-vertical competitors (BetterHelp,
+      FranklinCovey, Insperity). The **$2.50 CPC cap was below the auction reserve**, and later
+      switching to **Maximize Conversions with zero conversions in the account** made Smart Bidding
+      bid near-nothing (a death spiral). Corrected the build sheet
+      ([ads-campaign.md](ads-campaign.md)): **Maximize Clicks with a ~$10/$14 CPC cap, never Smart
+      Bidding until 15-30 conversions, Auto-apply OFF**, dropped the self-defeating `free` negative,
+      and added a zero-impression diagnostic runbook. Restructured into **Campaign 1 (consumer:
+      manager/co-worker/partner/parent → mode pages)** and a new **Campaign 2 (B2B → /for-business:
+      team training, workplace conflict, AI-for-teams, white-label)**, plus For-business + FAQ
+      sitelinks. The account-side fixes are the owner's to apply in the Ads UI; the repo change is
+      the corrected sheet.
+- [ ] Then: SEO/community/AEO channels. The paid test is now live and corrected (see above);
+      re-evaluate at day 7 / day 21 against the decision rules in the build sheet.
 
 ## Open questions / decisions
 
