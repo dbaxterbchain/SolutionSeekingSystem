@@ -810,7 +810,16 @@ Use **GTM Preview** alongside **GA4 → Admin → DebugView**:
 
 A small Search test, run to **buy data, not customers**. At $5/month the CAC maths does not
 close, and roughly zero to two subscriptions from a $300 budget is the *expected* outcome.
-Judge the test on **cost per started conversation**, never on subscriptions.
+Judge the consumer test on **cost per started conversation**, never on subscriptions. A separate
+**B2B campaign** points at `/for-business` and is judged on `team_enquiry_submitted` (a seated team
+is worth chasing as a lead). The full asset list, and the zero-impression post-mortem, live in
+[ads-campaign.md](ads-campaign.md).
+
+> **If impressions are ~0, it is almost always the bid strategy, not the keywords.** The first live
+> run got 2 impressions in 30 days because the CPC cap ($2.50) was below the ad-rank reserve for
+> these premium verticals, and then switching to **Maximize Conversions with zero conversions** in
+> the account made Smart Bidding bid near-nothing. Fix: **Maximize Clicks with a real CPC cap
+> (~$10), never Smart Bidding until 15-30 conversions exist,** and Auto-apply OFF.
 
 ### Ad attribution: how a click becomes a row in the database
 
@@ -863,16 +872,17 @@ Two things that will bite, both already handled, both worth knowing:
 - **Search only. Search partners OFF, Display OFF** (both default ON, both eat the budget).
 - **Locations: United States, "Presence: people in your targeted locations"** (the default,
   "presence or interest", bills you for clicks from anywhere on earth).
-- **Bidding: Maximize Clicks with a max CPC cap (~$2.50).** NOT Target CPA: Smart Bidding needs
-  roughly 15-30 conversions a month to learn, and you will have far fewer. With manual bidding
-  the conversion actions above are measurement only, which is exactly what is wanted.
-- **Budget: ~$15/day for 21 days.** Put the end date in a calendar.
-- **Two ad groups, each pointing at its matching mode page** (this is what the mode pages are
-  for): manager → `/practice/modes/manager`, co-worker → `/practice/modes/coworker`. Never the
-  homepage.
-- **Negatives, day one:** free, pdf, template, script, letter, jobs, salary, hiring, fire,
-  termination, "write up", lawsuit, attorney, hr complaint, reddit, meme, chatgpt. (`letter`,
-  `write up` and `termination` are HR-paperwork intent, not conversation-prep intent.)
+- **Bidding: Maximize Clicks with a max CPC cap (~$10 consumer, ~$14 B2B).** NOT Maximize
+  Conversions / Target CPA: Smart Bidding needs roughly 15-30 conversions to learn, and the account
+  has 0. Maximize Clicks needs no conversion history. The $2.50 cap the first run used was below the
+  auction reserve, which is why it never served.
+- **Budget: ~$15/day (consumer), ~$20/day (B2B), 21 days.** Put the end date in a calendar.
+- **Consumer ad groups point at their mode page** (manager → `/practice/modes/manager`, co-worker →
+  `/practice/modes/coworker`, partner, parent); the **B2B campaign points at `/for-business`**. Never
+  the homepage.
+- **Negatives, day one (consumer):** pdf, template, script, letter, jobs, salary, hiring, fire,
+  termination, "write up", lawsuit, attorney, hr complaint, reddit, meme, chatgpt. (NOT `free` — the
+  funnel is free-to-try and the ads say so; blocking it suppressed volume.)
 - **No Performance Max.** "Asset groups" are a PMax concept: it sprays a small budget across
   YouTube, Display and Gmail, cannot be debugged, and needs a conversion diet we cannot feed.
 
