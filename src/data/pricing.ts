@@ -22,6 +22,14 @@ export const FREE_ACCOUNT_MESSAGES = 10;
 /** What a converting anonymous user still has left once they register. */
 export const FREE_MESSAGES_AFTER_SIGNUP = FREE_ACCOUNT_MESSAGES - FREE_ANON_MESSAGES;
 
+/**
+ * Teams plan seat bounds. The single source for the pricing UI, the checkout
+ * validation, and the org seat editor; if these ever disagree the site sells
+ * a plan the server refuses to create.
+ */
+export const TEAM_MIN_SEATS = 5;
+export const TEAM_MAX_SEATS = 500;
+
 export type PlanId = 'monthly' | 'annual' | 'team';
 
 export interface Plan {
@@ -38,7 +46,11 @@ export interface Plan {
   billingDuration?: 'P1M' | 'P1Y';
   /** Optional badge, e.g. "Two months free". */
   note?: string;
-  /** Self-serve plans go through Stripe Checkout; the team plan is an enquiry. */
+  /**
+   * Individual self-serve plans go through /api/checkout. The team plan is
+   * NOT selfServe (resolvePlan rejects it there) because it has its own
+   * per-seat endpoint, /api/team-checkout.
+   */
   selfServe: boolean;
   features: string[];
 }

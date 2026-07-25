@@ -130,7 +130,8 @@ tables, managed through `/api/assistants`. Each assistant belongs to a **workspa
 the active workspace and changeable via a **move** action. A separate `shared` boolean
 (migration `0025`) says whether the other members of that org can see it — a private draft
 (`shared = false`) in an org workspace stays owner-only until a `manager` (role on
-`org_members`, set from `/admin`) flips it shared. Moving an assistant always resets sharing,
+`org_members`, set from the dashboard's Organization settings panel by another manager, or
+from `/admin`) flips it shared. Moving an assistant always resets sharing,
 so nothing is silently shared into an org. Every member then uses a shared assistant with
 their own private history (`chat_sessions` has a nullable `assistant_id`).
 

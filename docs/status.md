@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-07-24_
+_Last updated: 2026-07-24 (org self-service)_
 
 ## At a glance
 
@@ -478,6 +478,26 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       team training, workplace conflict, AI-for-teams, white-label)**, plus For-business + FAQ
       sitelinks. The account-side fixes are the owner's to apply in the Ads UI; the repo change is
       the corrected sheet.
+- [x] **Organization self-service: members, roles, details, automatic billing** (2026-07-24).
+      Orgs move into their own hands. **Self-serve creation**: a buyer on /pricing names the org,
+      picks seats (min 5, $4/seat/month via the new `STRIPE_PRICE_ID_TEAM`), pays through
+      `/api/team-checkout`, and the Stripe webhook creates the org (`billing='stripe'`) with the
+      buyer bound as first manager; the dashboard polls on `?org_checkout=success` and switches
+      into the new workspace. **Manager self-management**: a new "Organization settings" panel
+      (`OrgPanel` + `/api/org`, gated by the shared `requireManager` in `src/lib/server/orgAuth.ts`)
+      handles rename, add/remove members, promote/demote (with last-manager protection), a seat
+      stepper that updates the Stripe subscription quantity with proration (floor = member count,
+      three layers: UI, API 409, `enforce_seat_floor` trigger), and the org's own Stripe billing
+      portal. **Migration 0027**: `organizations.billing` ('manual'|'stripe'), `created_by`, the
+      seat-floor trigger, and a widened status CHECK (fixes a latent webhook 500-retry loop on
+      Stripe's `unpaid`/`incomplete*` statuses). **Webhook**: org creation on
+      `checkout.session.completed` (idempotent by unique `stripe_customer_id`; team metadata
+      carries `creator_user_id`, never `user_id`, so org events can never contaminate the personal
+      `subscriptions` table), and seat sync from quantity changes (clamped + logged on conflict).
+      **Admin**: /admin org tools retained, plus billing-mode pill/toggle, Stripe customer link,
+      and a friendly seats-below-members 409. Manually billed orgs keep working unchanged
+      (`billing='manual'`, seat editor disabled with an invoice notice). Enquiry form stays for
+      custom deals, collapsed behind the new self-serve `TeamCheckout` on /pricing.
 - [ ] Then: SEO/community/AEO channels. The paid test is now live and corrected (see above);
       re-evaluate at day 7 / day 21 against the decision rules in the build sheet.
 

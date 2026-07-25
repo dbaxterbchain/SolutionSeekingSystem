@@ -6,7 +6,8 @@ import { PLANS, DEFAULT_PLAN, type PlanId } from '../../data/pricing';
  *
  * The client sends a plan ID ('monthly' | 'annual'), never a Stripe price id: a
  * $0.01 price can be created in the Stripe dashboard at any time, and trusting a
- * client-supplied price would let anyone subscribe for a cent. This allowlist is
+ * client-supplied price would let anyone subscribe for a cent. This allowlist
+ * (three env-mapped prices: monthly, annual, and the per-seat team price) is
  * the only place a price id is resolved.
  */
 
@@ -24,8 +25,8 @@ export interface ResolvedPlan {
 
 /**
  * Resolve an untrusted plan id from a request body. Returns null for anything
- * unknown, for the team plan (which is an enquiry, not a checkout), or when the
- * price id isn't configured.
+ * unknown, for the team plan (which has its own per-seat endpoint,
+ * /api/team-checkout), or when the price id isn't configured.
  */
 export function resolvePlan(input: unknown): ResolvedPlan | null {
   // Absent or unrecognised falls back to the default plan (older clients send no
@@ -45,4 +46,25 @@ export function resolvePlan(input: unknown): ResolvedPlan | null {
   }
 
   return { plan, priceId, value: Number(PLANS[plan].priceAmount) };
+}
+
+export interface ResolvedTeamPlan {
+  priceId: string;
+  /** Dollar amount PER SEAT; multiply by quantity for a conversion value. */
+  unitValue: number;
+}
+
+/**
+ * The per-seat Teams price. Separate from resolvePlan on purpose: the team
+ * plan has its own endpoint (/api/team-checkout) with quantity semantics that
+ * the individual checkout must never grow, and PLANS.team.selfServe stays
+ * false so resolvePlan keeps rejecting 'team' there.
+ */
+export function resolveTeamPlan(): ResolvedTeamPlan | null {
+  const priceId = serverEnv('STRIPE_PRICE_ID_TEAM');
+  if (!priceId) {
+    console.error('Stripe price not configured for the team plan (STRIPE_PRICE_ID_TEAM)');
+    return null;
+  }
+  return { priceId, unitValue: Number(PLANS.team.priceAmount) };
 }
