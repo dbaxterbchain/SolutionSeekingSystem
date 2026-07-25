@@ -115,14 +115,22 @@ def create_campaign(camp_spec, spec, client, customer_id, apply):
     if not apply:
         return
 
-    # 1. Budget
-    budget_svc = client.get_service("CampaignBudgetService")
-    b_op = client.get_type("CampaignBudgetOperation")
-    b_op.create.name = f"{name} budget"
-    b_op.create.amount_micros = micros(camp_spec["daily_budget"])
-    b_op.create.delivery_method = client.enums.BudgetDeliveryMethodEnum.STANDARD
-    b_op.create.explicitly_shared = False
-    budget_res = budget_svc.mutate_campaign_budgets(customer_id=customer_id, operations=[b_op]).results[0].resource_name
+    # 1. Budget (idempotent: reuse one left behind by a previous partial run)
+    existing_budget = gaql(
+        client, customer_id,
+        f"SELECT campaign_budget.resource_name FROM campaign_budget WHERE campaign_budget.name = '{name} budget'",
+    )
+    if existing_budget:
+        budget_res = existing_budget[0].campaign_budget.resource_name
+        print(f"  reusing budget {budget_res}")
+    else:
+        budget_svc = client.get_service("CampaignBudgetService")
+        b_op = client.get_type("CampaignBudgetOperation")
+        b_op.create.name = f"{name} budget"
+        b_op.create.amount_micros = micros(camp_spec["daily_budget"])
+        b_op.create.delivery_method = client.enums.BudgetDeliveryMethodEnum.STANDARD
+        b_op.create.explicitly_shared = False
+        budget_res = budget_svc.mutate_campaign_budgets(customer_id=customer_id, operations=[b_op]).results[0].resource_name
 
     # 2. Campaign: Search only, both partner networks OFF, paused, capped Maximize Clicks
     camp_svc = client.get_service("CampaignService")
@@ -138,6 +146,11 @@ def create_campaign(camp_spec, spec, client, customer_id, apply):
     c.network_settings.target_partner_search_network = False
     c.target_spend.cpc_bid_ceiling_micros = micros(camp_spec["cpc_ceiling"])
     c.final_url_suffix = spec["url_suffix"]
+    # Required since API v25 (EU political ads transparency). These campaigns
+    # target the US and carry no political content.
+    c.contains_eu_political_advertising = (
+        client.enums.EuPoliticalAdvertisingStatusEnum.DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING
+    )
     c.geo_target_type_setting.positive_geo_target_type = (
         client.enums.PositiveGeoTargetTypeEnum.PRESENCE
     )
