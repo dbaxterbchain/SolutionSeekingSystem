@@ -35,6 +35,7 @@ uv run manage.py set-budget --campaign "SSS Consumer" --amount 15 --apply
 uv run manage.py set-cpc-cap --campaign "SSS Consumer" --cap 10 --apply
 uv run manage.py add-negative --campaign "SSS Consumer" --keyword "..." --apply
 uv run manage.py remove-negative --campaign "SSS Consumer" --keyword "..." --apply
+uv run manage.py set-schedule --campaign "..." --start 8 --end 17 --apply   # daily ad schedule
 
 # Asset management (PMax asset groups + campaign-level callouts/snippets)
 uv run assets.py list --campaign "..."                    # full asset inventory

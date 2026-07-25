@@ -51,10 +51,12 @@ def apply_or_print(args, description: str, fn):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["pause", "enable", "set-budget", "set-cpc-cap", "add-negative", "remove-negative"])
+    parser.add_argument("action", choices=["pause", "enable", "set-budget", "set-cpc-cap", "add-negative", "remove-negative", "set-schedule"])
     parser.add_argument("--campaign", required=True)
     parser.add_argument("--amount", type=float, help="Budget dollars/day (set-budget)")
     parser.add_argument("--cap", type=float, help="Max CPC dollars (set-cpc-cap)")
+    parser.add_argument("--start", type=int, help="Start hour 0-23 (set-schedule, daily)")
+    parser.add_argument("--end", type=int, help="End hour 1-24 (set-schedule, daily)")
     parser.add_argument("--keyword", help="Negative keyword text")
     parser.add_argument("--match", default="BROAD", choices=["BROAD", "PHRASE", "EXACT"])
     parser.add_argument("--apply", action="store_true", help="Execute (default is dry run)")
@@ -106,6 +108,55 @@ def main() -> None:
             return svc.mutate_campaigns(customer_id=customer_id, operations=[op])
 
         apply_or_print(args, f"set '{campaign.name}' Maximize Clicks CPC ceiling to ${args.cap:.2f}", run)
+
+    elif args.action == "set-schedule":
+        if args.start is None or args.end is None or not (0 <= args.start < args.end <= 24):
+            sys.exit("set-schedule needs --start and --end hours with 0 <= start < end <= 24")
+        ga = client.get_service("GoogleAdsService")
+        existing = [
+            r
+            for batch in ga.search_stream(
+                customer_id=customer_id,
+                query=(
+                    "SELECT campaign_criterion.resource_name, campaign_criterion.ad_schedule.day_of_week, "
+                    "campaign_criterion.ad_schedule.start_hour, campaign_criterion.ad_schedule.end_hour "
+                    f"FROM campaign_criterion WHERE campaign.id = {campaign.id} "
+                    "AND campaign_criterion.type = 'AD_SCHEDULE'"
+                ),
+            )
+            for r in batch.results
+        ]
+        days = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+
+        def run():
+            svc = client.get_service("CampaignCriterionService")
+            ops = []
+            for row in existing:
+                op = client.get_type("CampaignCriterionOperation")
+                op.remove = row.campaign_criterion.resource_name
+                ops.append(op)
+            for day in days:
+                op = client.get_type("CampaignCriterionOperation")
+                sched = op.create.ad_schedule
+                sched.day_of_week = getattr(client.enums.DayOfWeekEnum, day)
+                sched.start_hour = args.start
+                sched.start_minute = client.enums.MinuteOfHourEnum.ZERO
+                sched.end_hour = args.end
+                sched.end_minute = client.enums.MinuteOfHourEnum.ZERO
+                op.create.campaign = client.get_service("CampaignService").campaign_path(customer_id, campaign.id)
+                ops.append(op)
+            return svc.mutate_campaign_criteria(customer_id=customer_id, operations=ops)
+
+        current = ", ".join(
+            f"{r.campaign_criterion.ad_schedule.day_of_week.name} {r.campaign_criterion.ad_schedule.start_hour}-{r.campaign_criterion.ad_schedule.end_hour}"
+            for r in existing[:3]
+        ) + (f" (+{len(existing) - 3} more)" if len(existing) > 3 else "")
+        apply_or_print(
+            args,
+            f"replace ad schedule on '{campaign.name}': remove {len(existing)} rows [{current or 'none'}], "
+            f"set daily {args.start}:00-{args.end}:00 (7 rows)",
+            run,
+        )
 
     elif args.action == "add-negative":
         if not args.keyword:
