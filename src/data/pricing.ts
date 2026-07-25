@@ -35,7 +35,7 @@ export type PlanId = 'monthly' | 'annual' | 'team';
 export interface Plan {
   id: PlanId;
   name: string;
-  /** Display price, e.g. "$5". */
+  /** Display price, e.g. "$8". */
   priceLabel: string;
   /** Numeric amount for JSON-LD offers, e.g. "5.00". Never retyped elsewhere. */
   priceAmount: string;
@@ -59,8 +59,8 @@ export const PLANS: Record<PlanId, Plan> = {
   monthly: {
     id: 'monthly',
     name: 'Monthly',
-    priceLabel: '$5',
-    priceAmount: '5.00',
+    priceLabel: '$8',
+    priceAmount: '8.00',
     currency: 'USD',
     cadence: 'per month',
     billingDuration: 'P1M',
@@ -75,8 +75,8 @@ export const PLANS: Record<PlanId, Plan> = {
   annual: {
     id: 'annual',
     name: 'Annual',
-    priceLabel: '$50',
-    priceAmount: '50.00',
+    priceLabel: '$80',
+    priceAmount: '80.00',
     currency: 'USD',
     cadence: 'per year',
     billingDuration: 'P1Y',

@@ -498,6 +498,15 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       and a friendly seats-below-members 409. Manually billed orgs keep working unchanged
       (`billing='manual'`, seat editor disabled with an invoice notice). Enquiry form stays for
       custom deals, collapsed behind the new self-serve `TeamCheckout` on /pricing.
+- [x] **Consumer price: $5 to $8 per month, annual $50 to $80** (2026-07-25). Same reasoning
+      and mechanics as the team raise below: comparable AI coaching tools run $10-30/month, and
+      "unlimited" conversations carry real per-message API cost. Annual keeps its two-months-free
+      structure (8 x 10 = 80). Existing subscribers are grandfathered automatically (old Stripe
+      price ids keep billing at $5/$50). Hardcoded stragglers were converted to derive from
+      `PLANS` while sweeping (DashboardView subscribe card, the mode pages' JSON-LD offer, the
+      pricing OG description), so the next change is pricing.ts plus docs only. The AI grounding
+      prompts carry no prices, so the prompt cache is untouched. Requires new live $8/month and
+      $80/year prices in `STRIPE_PRICE_ID` / `STRIPE_PRICE_ID_ANNUAL` on Netlify BEFORE deploy.
 - [x] **Teams price: $4 to $8 per seat** (2026-07-25). The team seat was priced below an
       individual subscription ($4 < $5) while including strictly more (shared dashboard,
       document-grounded assistants, white-label pages on the org's own domain). Raised to

@@ -16,6 +16,7 @@ import {
 } from '../../lib/chatSessions';
 import { getContextMeta, MODE_CONTEXTS } from '../../lib/contexts';
 import { track, getGaIds, type Tier } from '../../lib/analytics';
+import { PLANS, priceCopy } from '../../data/pricing';
 import { getFirstTouch } from '../../lib/attribution';
 import { streamChat } from '../../lib/chatStream';
 import { listDocuments, uploadAndRegister, type DocumentMeta } from '../../lib/documents';
@@ -566,10 +567,10 @@ export default function DashboardView() {
         <h2 className="mt-3 font-heading text-xl font-bold text-ink-800">The dashboard is part of a subscription</h2>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600">
           Subscribe for unlimited conversations with the Guide and Mentor, every mode, saved history, document
-          uploads, and specialized assistants. It is $5 a month, cancel anytime.
+          uploads, and specialized assistants. It is {PLANS.monthly.priceLabel} a month, cancel anytime.
         </p>
         <button type="button" onClick={startCheckout} disabled={checkoutBusy} className="btn-primary mt-5 disabled:opacity-60">
-          {checkoutBusy ? 'Opening checkout…' : 'Subscribe for $5/month'}
+          {checkoutBusy ? 'Opening checkout…' : priceCopy.subscribeCta}
         </button>
         <p className="mt-3 text-xs text-slate-500">
           Or{' '}
