@@ -42,6 +42,8 @@ fields:
 title: Good Faith                 # display name
 order: 2                          # position in the list (1–12)
 icon: "🌱"                        # emoji marker
+illustration: ../../assets/principles/good-faith.webp  # hero + card image (optional)
+illustrationAlt: "..."            # descriptive alt for the illustration (no dashes)
 tagline: >-                       # one-line summary (card + hero)
   Approaching others with the genuine assumption that they too act with integrity.
 whatItIs: >-                      # 1. Description — what it is
@@ -68,8 +70,14 @@ example: >-                       # "Solution Seeking in action" worked example
 (`: `), quotes, or apostrophes. It avoids all escaping headaches. The existing files are
 good templates to copy.
 
+The `illustration` field is an optional image path, relative to the YAML file, pointing into
+`src/assets/principles/<slug>.webp` (Astro optimizes it via `astro:assets`; put source art
+there, not in `public/`). It renders as the hero on the detail page and the card thumbnail on
+the index and home grids. `illustrationAlt` is its descriptive alt text.
+
 To add a 13th principle: drop in a new YAML file with `order: 13`. The grid, detail page,
-and prev/next navigation update automatically.
+and prev/next navigation update automatically. Add an `illustration` (and `illustrationAlt`)
+to match the others; it is optional, so the build will not break if art is not ready yet.
 
 ---
 
