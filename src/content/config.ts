@@ -8,27 +8,33 @@ import { glob } from 'astro/loaders';
  */
 const principles = defineCollection({
   loader: glob({ pattern: '**/*.yaml', base: './src/content/principles' }),
-  schema: z.object({
-    title: z.string(),
-    order: z.number(),
-    tagline: z.string(),
-    icon: z.string(), // emoji used as a lightweight visual marker
-    // 1. Description
-    whatItIs: z.string(),
-    howUsed: z.string(),
-    // 2. Best Practices
-    bestPractices: z.array(z.string()),
-    // 3. Goals
-    goals: z.array(z.string()),
-    // 4. Antigoals
-    antigoals: z.array(z.string()),
-    // 5. Practice Patterns / Education
-    practices: z.array(z.object({ title: z.string(), body: z.string() })),
-    // 6. FAQ / Common Issues
-    faq: z.array(z.object({ q: z.string(), a: z.string() })),
-    // Worked example
-    example: z.string(),
-  }),
+  schema: ({ image }) =>
+    z.object({
+      title: z.string(),
+      order: z.number(),
+      tagline: z.string(),
+      icon: z.string(), // emoji used as a lightweight visual marker
+      // Hero/card illustration, path relative to the YAML file
+      // (e.g. ../../assets/principles/understanding.webp). Optional so a new
+      // principle still builds before its art exists.
+      illustration: image().optional(),
+      illustrationAlt: z.string().optional(), // descriptive alt for the illustration
+      // 1. Description
+      whatItIs: z.string(),
+      howUsed: z.string(),
+      // 2. Best Practices
+      bestPractices: z.array(z.string()),
+      // 3. Goals
+      goals: z.array(z.string()),
+      // 4. Antigoals
+      antigoals: z.array(z.string()),
+      // 5. Practice Patterns / Education
+      practices: z.array(z.object({ title: z.string(), body: z.string() })),
+      // 6. FAQ / Common Issues
+      faq: z.array(z.object({ q: z.string(), a: z.string() })),
+      // Worked example
+      example: z.string(),
+    }),
 });
 
 /** The 3-step Communication Protocol. Narrative content authored in Markdown. */

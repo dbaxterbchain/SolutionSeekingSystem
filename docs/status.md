@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-07-24 (org self-service)_
+_Last updated: 2026-07-26 (Wisdom Principle illustrations)_
 
 ## At a glance
 
@@ -554,6 +554,15 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       (FAQ, checkout stepper, pricing card, JSON-LD), so the change is one constant plus the
       deployment runbook line. Requires the live $8 price in `STRIPE_PRICE_ID_TEAM` on Netlify
       BEFORE this deploys (otherwise the UI shows $8 while Stripe bills $4).
+- [x] **Wisdom Principle illustrations** (2026-07-26). Added one custom illustration per
+      principle (12 blue-and-cream images). New optional `illustration` + `illustrationAlt`
+      fields on the `principles` collection (`image()` schema helper, sources in
+      `src/assets/principles/*.webp`, downscaled and re-encoded so the 12 add ~4 MB not ~30 MB).
+      Rendered via `astro:assets` `<Image>` as a responsive hero on each `/principles/<slug>`
+      page and as a full-bleed card thumbnail on the principles index and the home page's
+      featured six (`PrincipleCard` gained an optional `image` prop; the card image is
+      decorative since the card title is the label). OG cards unchanged. Fields optional so a
+      future principle still builds without art.
 - [ ] Then: SEO/community/AEO channels. The paid test is now live and corrected (see above);
       re-evaluate at day 7 / day 21 against the decision rules in the build sheet.
 
