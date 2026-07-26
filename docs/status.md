@@ -523,6 +523,17 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       (`fix_conversion_goals.py`: GA4 traffic events like page_view/session_start and
       checkout_abandoned demoted to secondary; signup_completed promoted to primary, which
       cleans the SSS campaigns' Conversions column).
+- [x] **Ads tooling extracted to `adkit`** (2026-07-25). The `ads/` toolkit graduated into a
+      standalone multi-client CLI in the private repo **dbaxterbchain/adkit** (installed
+      globally via `uv tool install -e .`; usable from any directory). Clients are per-config
+      (`clients/<name>/client.toml`) with structural write scopes; this site is `--client sss`
+      (prefix scope) and the coffee shop is `--client beanchain` (allowlist scope), with a
+      registry lint refusing overlapping scopes on the shared ad account. New in the
+      extraction: `adkit digest --client X` produces a client-facing markdown performance
+      report (spend, results by type, search terms with a PMax fallback, change log). The
+      `ads/` scripts were removed from this repo (clean cutover); `ads/editor-import/` stays
+      as a historical zero-credential fallback, docs/ads-api-setup.md is now a pointer stub,
+      and `GOOGLE_ADS_*` left `.env` (credentials live in `~/.google-ads.yaml` only).
 - [x] **Consumer price: $5 to $8 per month, annual $50 to $80** (2026-07-25). Same reasoning
       and mechanics as the team raise below: comparable AI coaching tools run $10-30/month, and
       "unlimited" conversations carry real per-message API cost. Annual keeps its two-months-free
