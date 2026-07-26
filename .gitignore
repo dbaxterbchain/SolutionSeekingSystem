@@ -13,6 +13,7 @@ dist/
 .env
 .env.production
 .env*.local
+.adkit.toml
 
 # feature-verification browser output (curated copies live in docs/features/)
 .playwright-mcp/
