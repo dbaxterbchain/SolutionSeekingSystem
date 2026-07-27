@@ -1,0 +1,49 @@
+---
+/**
+ * Renders one of the custom concept icons (src/assets/icons/<name>.svg).
+ *
+ * Astro inlines imported SVGs, so the artwork inherits the surrounding text
+ * color through `currentColor`. Size and color come from `class`, e.g.
+ * `<Icon name="protocol" class="h-9 w-9 text-brand-500" />`.
+ *
+ * Icons are decorative: every use sits beside a visible text label, so they are
+ * hidden from assistive tech rather than given a redundant name.
+ */
+import type { IconName } from '../lib/icons';
+
+import Protocol from '../assets/icons/protocol.svg';
+import Principles from '../assets/icons/principles.svg';
+import Tools from '../assets/icons/tools.svg';
+import Introspection from '../assets/icons/introspection.svg';
+import MutualUnderstanding from '../assets/icons/mutual-understanding.svg';
+import SolutionSpark from '../assets/icons/solution-spark.svg';
+import OneOnOne from '../assets/icons/one-on-one.svg';
+import Feedback from '../assets/icons/feedback.svg';
+import Targeted from '../assets/icons/targeted.svg';
+import Sessions from '../assets/icons/sessions.svg';
+
+// Typed as Record<IconName, …> so a new name in src/lib/icons.ts fails the
+// build here until its artwork is registered.
+const ICONS: Record<IconName, typeof Protocol> = {
+  protocol: Protocol,
+  principles: Principles,
+  tools: Tools,
+  introspection: Introspection,
+  'mutual-understanding': MutualUnderstanding,
+  'solution-spark': SolutionSpark,
+  'one-on-one': OneOnOne,
+  feedback: Feedback,
+  targeted: Targeted,
+  sessions: Sessions,
+};
+
+interface Props {
+  name: IconName;
+  class?: string;
+}
+
+const { name, class: className = 'h-6 w-6' } = Astro.props;
+const Svg = ICONS[name];
+---
+
+<Svg class={className} aria-hidden="true" />

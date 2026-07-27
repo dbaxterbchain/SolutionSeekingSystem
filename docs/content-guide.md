@@ -226,6 +226,39 @@ existing `parent`/`partner` seeds.
 
 ---
 
+## Concept icons — `src/assets/icons/` + `Icon.astro`
+
+The structural concepts (the three parts of the system, the three protocol steps, the four
+Leadership Tools) use custom line-icons rather than emoji. Sources are plain SVGs in
+`src/assets/icons/<name>.svg`; `src/components/Icon.astro` renders one by name:
+
+```astro
+<Icon name="protocol" class="h-9 w-9 text-brand-500" />
+```
+
+Astro inlines imported SVGs, so the artwork inherits the surrounding text color via
+`currentColor` — which is why size *and* color are passed as `class`, and why the icons work
+inside hover states (`group-hover:text-brand-600`) with no extra markup.
+
+Rules for adding one:
+
+- Author the SVG with `viewBox="0 0 48 48"`, `stroke="currentColor"` (or
+  `fill="currentColor"`), and **no `width`/`height` attributes** — a fixed size fights the
+  utility classes.
+- Add the name to `ICON_NAMES` in `src/lib/icons.ts`, then import and register it in the
+  `ICONS` map in `Icon.astro`. The map is typed `Record<IconName, …>`, so a name without
+  artwork (or a typo at a call site) fails `npm run check` rather than rendering nothing.
+- Names live in `src/lib/icons.ts` (not in the `.astro` component) so plain `.ts` data files
+  like `src/data/concepts.ts` can reference them. Leadership Tools map from their content
+  slug via `TOOL_ICONS`/`toolIcon()` in the same file.
+- Icons are **decorative**: every one sits beside a visible text label, so `Icon.astro` sets
+  `aria-hidden="true"` and adds no title. If you ever use one with no adjacent label, give it
+  an accessible name at the call site instead.
+
+The Four Pillars and the 12 Wisdom Principles deliberately keep their emoji markers.
+
+---
+
 ## Glossary, Pillars, Nav — `src/data/`
 
 Small, structured data that isn't a collection:

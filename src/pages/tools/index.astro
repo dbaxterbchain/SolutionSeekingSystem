@@ -2,7 +2,9 @@
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageHero from '../../components/PageHero.astro';
+import Icon from '../../components/Icon.astro';
 import { breadcrumbs, collectionPage, howTo } from '../../lib/schema';
+import { toolIcon } from '../../lib/icons';
 
 const tools = (await getCollection('tools')).sort((a, b) => a.data.order - b.data.order);
 
@@ -53,10 +55,17 @@ const schemas = [
             href={`/tools/${t.id}`}
             class="group flex flex-col rounded-2xl border border-slate-100 bg-white p-7 shadow-card transition-all duration-200 hover:-translate-y-1 hover:border-brand-200 hover:shadow-card-hover"
           >
-            <span class="font-display text-2xl text-brand-100 group-hover:text-brand-200">
-              {String(t.data.order).padStart(2, '0')}
-            </span>
-            <h2 class="mt-2 text-xl font-bold text-ink-800 group-hover:text-brand-700">{t.data.title}</h2>
+            <div class="flex items-center gap-3">
+              {toolIcon(t.id) && (
+                <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-500 transition-colors group-hover:bg-brand-100 group-hover:text-brand-600">
+                  <Icon name={toolIcon(t.id)!} class="h-7 w-7" />
+                </span>
+              )}
+              <span class="font-display text-2xl text-brand-100 group-hover:text-brand-200">
+                {String(t.data.order).padStart(2, '0')}
+              </span>
+            </div>
+            <h2 class="mt-4 text-xl font-bold text-ink-800 group-hover:text-brand-700">{t.data.title}</h2>
             <p class="mt-2 flex-1 text-sm leading-relaxed text-slate-600">{t.data.summary}</p>
             <span class="mt-4 text-sm font-semibold text-brand-600">How it works →</span>
           </a>
