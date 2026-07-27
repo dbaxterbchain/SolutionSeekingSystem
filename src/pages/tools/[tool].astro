@@ -2,7 +2,9 @@
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import StepNav from '../../components/StepNav.astro';
+import Icon from '../../components/Icon.astro';
 import { breadcrumbs, learningArticle } from '../../lib/schema';
+import { toolIcon } from '../../lib/icons';
 
 export async function getStaticPaths() {
   const tools = (await getCollection('tools')).sort((a, b) => a.data.order - b.data.order);
@@ -15,6 +17,7 @@ export async function getStaticPaths() {
 const { entry, prev, next } = Astro.props;
 const { Content } = await render(entry);
 const t = entry.data;
+const icon = toolIcon(entry.id);
 
 const site = Astro.site ?? Astro.url;
 const schemas = [
@@ -44,8 +47,15 @@ const schemas = [
       <a href="/tools" class="text-sm font-semibold text-brand-600 hover:text-brand-700">
         ← Leadership Tools
       </a>
-      <p class="eyebrow mt-4">Leadership Tool {String(t.order).padStart(2, '0')}</p>
-      <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-ink-800 sm:text-5xl">{t.title}</h1>
+      <div class="mt-4 flex items-center gap-3">
+        {icon && (
+          <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-brand-500 shadow-card">
+            <Icon name={icon} class="h-7 w-7" />
+          </span>
+        )}
+        <p class="eyebrow">Leadership Tool {String(t.order).padStart(2, '0')}</p>
+      </div>
+      <h1 class="mt-3 text-4xl font-extrabold tracking-tight text-ink-800 sm:text-5xl">{t.title}</h1>
       <p class="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">{t.summary}</p>
     </div>
   </section>

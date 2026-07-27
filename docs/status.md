@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-07-26 (Wisdom Principle illustrations)_
+_Last updated: 2026-07-26 (custom concept icons)_
 
 ## At a glance
 
@@ -563,6 +563,17 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       featured six (`PrincipleCard` gained an optional `image` prop; the card image is
       decorative since the card title is the label). OG cards unchanged. Fields optional so a
       future principle still builds without art.
+- [x] **Custom concept icons + an icon system** (2026-07-26). Ten custom line-icons replace the
+      emoji placeholders on the structural concepts: the home "One system, three parts" trio
+      (Protocol, Principles, Tools), the three Communication Protocol steps in
+      `ProtocolDiagram`, and the four Leadership Tools (whose index cards previously showed only
+      a numeral). New `src/components/Icon.astro` renders them via Astro 5's stable
+      SVG-as-component import, so each icon inlines and inherits its Tailwind text color through
+      `currentColor` (including on card hover). Names and the tool-slug map live in
+      `src/lib/icons.ts` so plain `.ts` data files can reference them; the `IconName` union
+      makes a typo a build error. The Four Pillars and the 12 principles keep their emoji, which
+      reads as intentional: crisp line-icons for the system's structure, warm emoji for its
+      human values. Two icons (`guide`, `living-system`) are held back for a later pass.
 - [ ] Then: SEO/community/AEO channels. The paid test is now live and corrected (see above);
       re-evaluate at day 7 / day 21 against the decision rules in the build sheet.
 

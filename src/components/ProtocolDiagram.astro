@@ -1,5 +1,6 @@
 ---
 import { protocolSteps } from '../data/concepts';
+import Icon from './Icon.astro';
 
 interface Props {
   /** Render compact (home) or full (protocol overview) variant. */
@@ -20,7 +21,7 @@ const { variant = 'default' } = Astro.props;
             <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-500 font-display text-xl text-white">
               {s.step}
             </span>
-            <span class="text-2xl" aria-hidden="true">{s.icon}</span>
+            <Icon name={s.icon} class="h-8 w-8 text-brand-500 transition-colors group-hover:text-brand-600" />
           </div>
           <h3 class="mt-4 text-lg font-bold text-ink-800 group-hover:text-brand-700">
             {s.title}

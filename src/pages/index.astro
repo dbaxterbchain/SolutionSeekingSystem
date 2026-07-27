@@ -3,11 +3,13 @@ import { getCollection } from 'astro:content';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ProtocolDiagram from '../components/ProtocolDiagram.astro';
 import PrincipleCard from '../components/PrincipleCard.astro';
+import Icon from '../components/Icon.astro';
 import DemoExcerpt from '../components/DemoExcerpt.astro';
 import Testimonials from '../components/Testimonials.astro';
 import ProvenanceBand from '../components/ProvenanceBand.astro';
 import { pillars, systemDefinition } from '../data/concepts';
 import { organization, webSite } from '../lib/schema';
+import type { IconName } from '../lib/icons';
 import { getFeaturedDemo } from '../lib/demoExcerpt';
 import { getApprovedTestimonials } from '../lib/server/testimonials';
 
@@ -30,21 +32,21 @@ const parts = [
     title: 'The Communication Protocol',
     body: 'A repeatable three-step pattern for turning conflict into understanding and understanding into action.',
     href: '/protocol',
-    icon: '🔄',
+    icon: 'protocol',
   },
   {
     title: '12 Wisdom Principles',
     body: 'The "source code" of the system: the values that make the protocol actually work.',
     href: '/principles',
-    icon: '📖',
+    icon: 'principles',
   },
   {
     title: 'Leadership Tools',
     body: 'Real practices that apply the protocol to everyday leadership, relationships, and teams.',
     href: '/tools',
-    icon: '🧰',
+    icon: 'tools',
   },
-];
+] as const satisfies readonly { title: string; body: string; href: string; icon: IconName }[];
 ---
 
 <BaseLayout schemas={[webSite(site), organization(site)]}>
@@ -176,7 +178,7 @@ const parts = [
               href={p.href}
               class="group flex flex-col rounded-2xl border border-slate-100 bg-white p-7 shadow-card transition-all duration-200 hover:-translate-y-1 hover:border-brand-200 hover:shadow-card-hover"
             >
-              <span class="text-3xl" aria-hidden="true">{p.icon}</span>
+              <Icon name={p.icon} class="h-10 w-10 text-brand-500 transition-colors group-hover:text-brand-600" />
               <h3 class="mt-4 text-xl font-bold text-ink-800 group-hover:text-brand-700">{p.title}</h3>
               <p class="mt-2 flex-1 text-sm leading-relaxed text-slate-600">{p.body}</p>
               <span class="mt-4 text-sm font-semibold text-brand-600">Explore →</span>

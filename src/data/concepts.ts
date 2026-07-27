@@ -1,3 +1,5 @@
+import type { IconName } from '../lib/icons';
+
 /**
  * Canonical definition of the system — the single quotable answer to
  * "What is the Solution Seeking System?". Reused on the homepage, /system,
@@ -90,7 +92,8 @@ export interface ProtocolStepMeta {
   title: string;
   slug: string;
   oneLine: string;
-  icon: string;
+  /** Custom line icon (src/assets/icons), rendered by ProtocolDiagram. */
+  icon: IconName;
 }
 
 /** Lightweight protocol metadata for diagrams and navigation. */
@@ -100,20 +103,20 @@ export const protocolSteps: ProtocolStepMeta[] = [
     title: 'Introspection',
     slug: 'introspection',
     oneLine: 'Understand yourself first: your feelings, needs, and goals.',
-    icon: '🧭',
+    icon: 'introspection',
   },
   {
     step: 2,
     title: 'Mutual Understanding',
     slug: 'mutual-understanding',
     oneLine: "Fully understand the other person's perspective, and ensure they understand yours.",
-    icon: '🤝',
+    icon: 'mutual-understanding',
   },
   {
     step: 3,
     title: 'Solution Seeking',
     slug: 'solution-seeking',
     oneLine: 'Collaboratively develop and agree on specific, measurable solutions.',
-    icon: '💡',
+    icon: 'solution-spark',
   },
 ];
