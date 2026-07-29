@@ -40,7 +40,7 @@ export default function Sidebar({
   onSelectOrg,
   mine,
   shared,
-  onToggleShare,
+  onOpenSharing,
   orgName,
   recents,
   activeChatId,
@@ -66,8 +66,8 @@ export default function Sidebar({
   onSelectOrg: (orgId: string | null) => void;
   mine: Assistant[];
   shared: Assistant[];
-  /** Share / unshare an owned assistant within the active org workspace. */
-  onToggleShare: (a: Assistant) => void;
+  /** Open the sharing dialog for an assistant in the active org workspace. */
+  onOpenSharing: (a: Assistant) => void;
   orgName: string | null;
   recents: ChatSession[] | null;
   activeChatId: string | null;
@@ -80,20 +80,22 @@ export default function Sidebar({
   const assistantActive = (id: string) => selection.kind === 'assistant' && selection.id === id;
 
   const AssistantRow = ({ a, editable }: { a: Assistant; editable: boolean }) => {
-    // A manager can share/unshare their own assistants when an org workspace is active.
-    const canToggleShare = editable && activeOrgId !== null && canManageOrg;
+    // Managers co-manage rows that are shared somehow (org-wide or with
+    // specific people); a fully private draft stays its owner's alone.
+    const manageable =
+      editable ||
+      (canManageOrg && activeOrgId !== null && (a.shared || a.member_share_ids.length > 0));
+    // Sharing is manager-only, and only meaningful inside an org workspace.
+    const canShare = manageable && activeOrgId !== null && canManageOrg;
     const items: RowMenuItem[] = [];
-    if (editable) {
+    if (manageable) {
       items.push({ label: 'Edit', onSelect: () => onEditAssistant(a) });
       items.push({ label: 'Duplicate', onSelect: () => onDuplicateAssistant(a) });
     }
-    if (canToggleShare) {
-      items.push({
-        label: a.shared ? 'Stop sharing' : `Share with ${orgName ?? 'organization'}`,
-        onSelect: () => onToggleShare(a),
-      });
+    if (canShare) {
+      items.push({ label: 'Sharing…', onSelect: () => onOpenSharing(a) });
     }
-    if (editable) {
+    if (manageable) {
       items.push({ label: 'Delete', tone: 'danger', onSelect: () => onDeleteAssistant(a) });
     }
     return (
@@ -109,11 +111,19 @@ export default function Sidebar({
           <span className="block truncate text-sm font-semibold">{a.name}</span>
           <span className="mt-0.5 flex items-center gap-1.5 text-xs capitalize text-slate-400">
             {a.base_agent}
-            {a.shared && (
+            {a.shared ? (
               <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[0.65rem] font-semibold normal-case text-brand-600">
                 Shared
               </span>
-            )}
+            ) : a.member_share_ids.length > 0 ? (
+              <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[0.65rem] font-semibold normal-case text-brand-600">
+                Shared with {a.member_share_ids.length}
+              </span>
+            ) : a.member_shared ? (
+              <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[0.65rem] font-semibold normal-case text-brand-600">
+                Shared with you
+              </span>
+            ) : null}
           </span>
         </button>
         {items.length > 0 && (

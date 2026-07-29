@@ -22,8 +22,6 @@ import { streamChat } from '../../lib/chatStream';
 import { listDocuments, uploadAndRegister, type DocumentMeta } from '../../lib/documents';
 import {
   fetchAssistants,
-  shareAssistant,
-  unshareAssistant,
   duplicateAssistant,
   deleteAssistant,
   AssistantActionError,
@@ -37,6 +35,7 @@ import Sidebar from './dashboard/Sidebar';
 import AttachControl from './dashboard/AttachControl';
 import DocumentsPanel from './dashboard/DocumentsPanel';
 import AssistantEditor from './dashboard/AssistantEditor';
+import ShareDialog from './dashboard/ShareDialog';
 import WhiteLabelPanel from './dashboard/WhiteLabelPanel';
 import OrgPanel from './dashboard/OrgPanel';
 
@@ -81,6 +80,7 @@ export default function DashboardView() {
   const [workspaceResolved, setWorkspaceResolved] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Assistant | null>(null);
+  const [sharing, setSharing] = useState<Assistant | null>(null);
   const [whiteLabelOpen, setWhiteLabelOpen] = useState(false);
   const [orgPanelOpen, setOrgPanelOpen] = useState(false);
   // Post-Teams-checkout hand-off: 'pending' while we wait for the webhook to
@@ -326,17 +326,6 @@ export default function DashboardView() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, canUseDashboard]);
-
-  // One-click share toggle for an owned assistant in the active org workspace.
-  const toggleShare = async (a: Assistant) => {
-    try {
-      if (a.shared) await unshareAssistant(a.id);
-      else await shareAssistant(a.id);
-      refreshAssistants();
-    } catch (e) {
-      setError((e as Error).message || 'Could not update sharing. Please try again.');
-    }
-  };
 
   const duplicate = async (a: Assistant) => {
     try {
@@ -707,7 +696,7 @@ export default function DashboardView() {
           onSelectOrg={selectWorkspace}
           mine={mine}
           shared={shared}
-          onToggleShare={toggleShare}
+          onOpenSharing={setSharing}
           orgName={activeOrg?.orgName ?? null}
           recents={recents}
           activeChatId={chatId}
@@ -875,10 +864,20 @@ export default function DashboardView() {
           onDelete={editing ? () => removeAssistant(editing) : undefined}
         />
       )}
+      {sharing && activeOrgId && (
+        <ShareDialog
+          assistant={sharing}
+          orgId={activeOrgId}
+          orgName={activeOrg?.orgName ?? null}
+          owned={mine.some((a) => a.id === sharing.id)}
+          onClose={() => setSharing(null)}
+          onSaved={refreshAssistants}
+        />
+      )}
       <WhiteLabelPanel
         open={whiteLabelOpen}
         onClose={() => setWhiteLabelOpen(false)}
-        assistants={[...mine.filter((a) => a.shared), ...shared]}
+        assistants={[...mine, ...shared].filter((a) => a.org_id === activeOrgId)}
         orgId={activeOrgId}
         orgName={activeOrg?.orgName ?? null}
       />

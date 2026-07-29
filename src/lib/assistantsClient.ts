@@ -17,6 +17,13 @@ export interface Assistant {
   org_id: string | null;
   /** Whether other members of org_id can see it (managers share). */
   shared: boolean;
+  /**
+   * Seats (org_members ids) this assistant is shared with specifically.
+   * Populated for the owner and workspace managers; empty for everyone else.
+   */
+  member_share_ids: string[];
+  /** True when this assistant reaches the caller through a specific share. */
+  member_shared: boolean;
   documents: AssistantDocRef[];
   created_at: string;
   updated_at: string;
@@ -132,6 +139,15 @@ export async function shareAssistant(id: string): Promise<void> {
 
 export async function unshareAssistant(id: string): Promise<void> {
   await post({ action: 'unshare', id });
+}
+
+/**
+ * Replace the list of seats (org_members ids) this assistant is shared with
+ * specifically (managers only). Additive with the org-wide share flag; a
+ * specific share is the only way to share with a client seat.
+ */
+export async function setAssistantShares(id: string, memberIds: string[]): Promise<void> {
+  await post({ action: 'set_shares', id, member_ids: memberIds });
 }
 
 /** Move to another workspace (null = Personal). Resets sharing; org targets need a manager. */

@@ -2,7 +2,12 @@ import type { APIRoute } from 'astro';
 import type { User } from '@supabase/supabase-js';
 import { json } from '../../lib/server/auth';
 import { requireSubscriber } from '../../lib/server/subscriberAuth';
-import { getOrgMemberships, isManagerOf, isMemberOf } from '../../lib/server/orgMembership';
+import {
+  getOrgMemberships,
+  getMembership,
+  isManagerOf,
+  isMemberOf,
+} from '../../lib/server/orgMembership';
 import { supabaseAdmin } from '../../lib/server/supabaseAdmin';
 import { AGENT_IDS, type AgentId } from '../../lib/server/agents';
 import { getContextMeta } from '../../lib/contexts';
@@ -44,9 +49,10 @@ export const GET: APIRoute = async ({ request }) => {
 
   const memberships = await getOrgMemberships(user);
 
-  // Resolve the workspace: a real org only if the caller belongs to it, else Personal.
+  // Resolve the workspace: a real org only if the caller holds a seat there, else Personal.
   const requested = new URL(request.url).searchParams.get('org_id')?.trim() || '';
-  const workspace = requested && isMemberOf(memberships, requested) ? requested : null;
+  const membership = requested ? getMembership(memberships, requested) : undefined;
+  const workspace = membership ? requested : null;
 
   // mine: the caller's own assistants in this workspace.
   let mineQuery = supabaseAdmin
@@ -61,25 +67,66 @@ export const GET: APIRoute = async ({ request }) => {
     return json({ error: 'server_error' }, 500);
   }
 
-  // shared: other members' assistants shared into this org workspace (none for Personal).
-  let sharedRows: AssistantRowRaw[] = [];
-  if (workspace) {
-    const { data } = await supabaseAdmin
-      .from('assistants')
-      .select(ROW_COLUMNS)
-      .eq('org_id', workspace)
-      .eq('shared', true)
-      .neq('owner_user_id', user.id)
-      .order('updated_at', { ascending: false });
-    sharedRows = (data ?? []) as AssistantRowRaw[];
+  // shared: what this seat can reach beyond its own rows (none for Personal).
+  // A client seat sees only rows shared with it specifically; a member seat
+  // adds the org-wide shares; a manager seat also sees rows that are reachable
+  // only through specific shares, so it can manage them.
+  const collected = new Map<string, AssistantRowRaw>();
+  let sharedToMe = new Set<string>();
+  if (workspace && membership) {
+    const { data: myShares } = await supabaseAdmin
+      .from('assistant_shares')
+      .select('assistant_id')
+      .eq('member_id', membership.memberId);
+    sharedToMe = new Set((myShares ?? []).map((s) => s.assistant_id));
+
+    if (sharedToMe.size > 0) {
+      const { data } = await supabaseAdmin
+        .from('assistants')
+        .select(ROW_COLUMNS)
+        .eq('org_id', workspace)
+        .in('id', [...sharedToMe]);
+      for (const r of (data ?? []) as AssistantRowRaw[]) collected.set(r.id, r);
+    }
+    if (membership.role !== 'client') {
+      const { data } = await supabaseAdmin
+        .from('assistants')
+        .select(ROW_COLUMNS)
+        .eq('org_id', workspace)
+        .eq('shared', true);
+      for (const r of (data ?? []) as AssistantRowRaw[]) collected.set(r.id, r);
+    }
+    if (membership.role === 'manager') {
+      const { data } = await supabaseAdmin
+        .from('assistants')
+        .select(`${ROW_COLUMNS}, assistant_shares!inner ( member_id )`)
+        .eq('org_id', workspace);
+      for (const r of (data ?? []) as AssistantRowRaw[]) collected.set(r.id, r);
+    }
   }
+  const sharedRows = [...collected.values()]
+    .filter((r) => r.owner_user_id !== user.id)
+    .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
 
   const mine = (mineRows ?? []) as AssistantRowRaw[];
-  const docs = await loadDocViews([...mine, ...sharedRows].map((a) => a.id));
+  const all = [...mine, ...sharedRows];
+  const docs = await loadDocViews(all.map((a) => a.id));
+  const shareMap = workspace ? await loadShareMap(all.map((a) => a.id)) : new Map<string, string[]>();
+
+  // Who gets to see the specific-share list: the row's owner and workspace
+  // managers (it drives the sharing UI); others only learn what reaches them.
+  const shapeRow = (r: AssistantRowRaw) => ({
+    ...shape(r, docs),
+    member_share_ids:
+      r.owner_user_id === user.id || membership?.role === 'manager'
+        ? (shareMap.get(r.id) ?? [])
+        : [],
+    member_shared: sharedToMe.has(r.id),
+  });
 
   return json({
-    mine: mine.map((r) => shape(r, docs)),
-    shared: sharedRows.map((r) => shape(r, docs)),
+    mine: mine.map(shapeRow),
+    shared: sharedRows.map(shapeRow),
     memberships: memberships.map((m) => ({ orgId: m.orgId, orgName: m.orgName, role: m.role })),
   });
 };
@@ -99,6 +146,23 @@ async function loadDocViews(assistantIds: string[]): Promise<Map<string, DocView
     const list = map.get(j.assistant_id) ?? [];
     list.push({ id: d.id, name: d.name, char_count: d.char_count });
     map.set(j.assistant_id, list);
+  }
+  return map;
+}
+
+/** member_id lists per assistant, in stable (created_at) order. */
+async function loadShareMap(assistantIds: string[]): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (assistantIds.length === 0) return map;
+  const { data } = await supabaseAdmin
+    .from('assistant_shares')
+    .select('assistant_id, member_id')
+    .in('assistant_id', assistantIds)
+    .order('created_at', { ascending: true });
+  for (const s of data ?? []) {
+    const list = map.get(s.assistant_id) ?? [];
+    list.push(s.member_id);
+    map.set(s.assistant_id, list);
   }
   return map;
 }
@@ -139,6 +203,8 @@ export const POST: APIRoute = async ({ request }) => {
       return shareAssistant(auth.user, body);
     case 'unshare':
       return unshareAssistant(auth.user, body);
+    case 'set_shares':
+      return setAssistantShares(auth.user, body);
     case 'move':
       return moveAssistant(auth.user, body);
     default:
@@ -265,9 +331,10 @@ async function createAssistant(user: User, body: Record<string, unknown>): Promi
 }
 
 /**
- * Load an assistant the user owns, or is a manager of the org it's SHARED to. A private
- * draft (org_id set but shared = false) that merely lives in an org workspace stays
- * owner-only; managers gain co-management only once it is shared.
+ * Load an assistant the user owns, or co-manages as a manager of its org. A manager
+ * co-manages once the assistant is shared at all: org-wide OR with specific members.
+ * A fully private draft (org_id set, no sharing of any kind) that merely lives in an
+ * org workspace stays owner-only.
  */
 async function loadOwnedOrManaged(
   user: User,
@@ -294,9 +361,16 @@ async function loadOwnedOrManaged(
     .maybeSingle();
   if (!row) return { response: json({ error: 'not_found' }, 404) };
   if (row.owner_user_id === user.id) return { row };
-  if (row.org_id && row.shared) {
+  if (row.org_id) {
     const memberships = await getOrgMemberships(user);
-    if (isManagerOf(memberships, row.org_id)) return { row };
+    if (isManagerOf(memberships, row.org_id)) {
+      if (row.shared) return { row };
+      const { count } = await supabaseAdmin
+        .from('assistant_shares')
+        .select('assistant_id', { count: 'exact', head: true })
+        .eq('assistant_id', row.id);
+      if (count) return { row };
+    }
   }
   // 404, not 403: an id the caller can't manage is not confirmed to exist.
   return { response: json({ error: 'not_found' }, 404) };
@@ -444,6 +518,61 @@ async function unshareAssistant(user: User, body: Record<string, unknown>): Prom
   return json({ ok: true });
 }
 
+/**
+ * Replace an assistant's specific-share list (managers only, like org-wide
+ * sharing). Additive with the org-wide flag: org-wide reaches member and
+ * manager seats, while a specific share is the only way to reach a client
+ * seat. Shares target SEATS (org_members.id), so an invited-but-unclaimed
+ * email can be shared to ahead of its first sign-in.
+ */
+async function setAssistantShares(user: User, body: Record<string, unknown>): Promise<Response> {
+  const id = str(body.id);
+  if (!id) return json({ error: 'bad_request' }, 400);
+  const memberIds = Array.isArray(body.member_ids)
+    ? [...new Set(body.member_ids.filter((x): x is string => typeof x === 'string'))].slice(0, 200)
+    : [];
+
+  // Owner, or manager of a row that is already shared somehow: a manager can
+  // reshape sharing but cannot pull another member's private draft into it.
+  const access = await loadOwnedOrManaged(user, id);
+  if ('response' in access) return access.response;
+  const { row } = access;
+  if (!row.org_id) return json({ error: 'bad_request', field: 'org_id' }, 400); // Personal can't share
+  const memberships = await getOrgMemberships(user);
+  if (!isManagerOf(memberships, row.org_id)) return json({ error: 'manager_required' }, 403);
+
+  // Every target must be a seat of the assistant's own org.
+  if (memberIds.length > 0) {
+    const { data: seats } = await supabaseAdmin
+      .from('org_members')
+      .select('id')
+      .eq('org_id', row.org_id)
+      .in('id', memberIds);
+    if ((seats ?? []).length !== memberIds.length) {
+      return json({ error: 'bad_request', field: 'member_ids' }, 400);
+    }
+  }
+
+  // Replace wholesale (the document-links idiom): the lists are tiny.
+  const { error: delErr } = await supabaseAdmin
+    .from('assistant_shares')
+    .delete()
+    .eq('assistant_id', id);
+  if (delErr) {
+    console.error('share clear failed', delErr);
+    return json({ error: 'server_error' }, 500);
+  }
+  if (memberIds.length > 0) {
+    const rows = memberIds.map((member_id) => ({ assistant_id: id, member_id }));
+    const { error: insErr } = await supabaseAdmin.from('assistant_shares').insert(rows);
+    if (insErr) {
+      console.error('share insert failed', insErr);
+      return json({ error: 'server_error' }, 500);
+    }
+  }
+  return json({ ok: true, count: memberIds.length });
+}
+
 // Move an assistant to another workspace (Personal or an org the owner belongs to). Moving
 // only ever produces a PRIVATE draft (shared reset to false), so membership - not manager -
 // is enough; SHARING it afterwards is the manager-gated step. This also means an assistant
@@ -470,5 +599,12 @@ async function moveAssistant(user: User, body: Record<string, unknown>): Promise
     console.error('assistant move failed', error);
     return json({ error: 'server_error' }, 500);
   }
+  // Specific shares target seats of the ORIGIN org; none of them can follow a
+  // move, so a move always lands as a fully private draft.
+  const { error: shareErr } = await supabaseAdmin
+    .from('assistant_shares')
+    .delete()
+    .eq('assistant_id', id);
+  if (shareErr) console.error('move share clear failed', shareErr);
   return json({ ok: true });
 }

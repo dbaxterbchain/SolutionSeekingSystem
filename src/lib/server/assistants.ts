@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 import { supabaseAdmin } from './supabaseAdmin';
-import { getOrgMemberships, isMemberOf } from './orgMembership';
+import { getOrgMemberships, getMembership } from './orgMembership';
 import type { AgentId } from './agents';
 
 /** Total setup-injection budget (~30k tokens): instructions + all knowledge docs. */
@@ -28,10 +28,11 @@ export interface AssistantDoc {
 
 /**
  * Load an assistant the user is allowed to use, with its knowledge documents in
- * deterministic order. Access = owner, OR a member of the organization the
- * assistant is SHARED to (org_id set and shared = true). A private draft that
- * merely lives in an org workspace stays owner-only. Returns null when the
- * assistant doesn't exist or the caller can't reach it, so the API can answer a
+ * deterministic order. Access = owner, OR org-wide share (org_id set, shared =
+ * true) for a member/manager seat in that org, OR a per-seat assistant_shares
+ * row (the only arm that reaches a client seat). A private draft that merely
+ * lives in an org workspace stays owner-only. Returns null when the assistant
+ * doesn't exist or the caller can't reach it, so the API can answer a
  * non-probeable 404.
  */
 export async function loadAssistantForUser(
@@ -50,10 +51,21 @@ export async function loadAssistantForUser(
   if (!assistant) return null;
 
   if (assistant.owner_user_id !== user.id) {
-    // Not the owner: allowed only if it's shared to an org they belong to.
-    if (!assistant.org_id || !assistant.shared) return null;
+    // Not the owner: only reachable through a seat in the assistant's org.
+    if (!assistant.org_id) return null;
     const memberships = await getOrgMemberships(user);
-    if (!isMemberOf(memberships, assistant.org_id)) return null;
+    const membership = getMembership(memberships, assistant.org_id);
+    if (!membership) return null;
+    // Org-wide sharing deliberately excludes client seats.
+    const orgWide = assistant.shared && membership.role !== 'client';
+    if (!orgWide) {
+      const { count } = await supabaseAdmin
+        .from('assistant_shares')
+        .select('assistant_id', { count: 'exact', head: true })
+        .eq('assistant_id', assistantId)
+        .eq('member_id', membership.memberId);
+      if (!count) return null;
+    }
   }
 
   const { data: joins } = await supabaseAdmin
