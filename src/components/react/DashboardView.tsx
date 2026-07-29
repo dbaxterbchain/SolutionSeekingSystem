@@ -24,6 +24,9 @@ import {
   fetchAssistants,
   shareAssistant,
   unshareAssistant,
+  duplicateAssistant,
+  deleteAssistant,
+  AssistantActionError,
   type Assistant,
   type AssistantsData,
 } from '../../lib/assistantsClient';
@@ -335,6 +338,48 @@ export default function DashboardView() {
     }
   };
 
+  const duplicate = async (a: Assistant) => {
+    try {
+      await duplicateAssistant(a.id);
+      refreshAssistants();
+    } catch (e) {
+      setError((e as Error).message || 'Could not duplicate that assistant. Please try again.');
+    }
+  };
+
+  /**
+   * Confirm and delete an assistant, handling the server's 409 `page_attached`
+   * answer (white-label pages cascade away with their assistant) with a second,
+   * explicit confirmation. Returns true when it was deleted; false when the
+   * user cancelled; throws with a user-facing message when the server refused.
+   */
+  const removeAssistant = async (a: Assistant): Promise<boolean> => {
+    const ok = await confirm({
+      title: 'Delete this assistant?',
+      message: `"${a.name}" will be permanently removed${a.shared ? ' for everyone in the organization' : ''}. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return false;
+    try {
+      await deleteAssistant(a.id);
+    } catch (e) {
+      if (!(e instanceof AssistantActionError) || e.code !== 'page_attached') throw e;
+      const slugs = e.slugs ?? [];
+      const pages = slugs.map((s) => `/a/${a.org_id}/${s}`).join(', ');
+      const okPages = await confirm({
+        title: slugs.length === 1 ? 'This assistant powers a live page' : 'This assistant powers live pages',
+        message: `Deleting it also deletes ${pages}. Anyone who visits will get a 404. This cannot be undone.`,
+        confirmLabel: slugs.length === 1 ? 'Delete assistant and page' : 'Delete assistant and pages',
+        tone: 'danger',
+      });
+      if (!okPages) return false;
+      await deleteAssistant(a.id, { confirm: true });
+    }
+    refreshAssistants();
+    return true;
+  };
+
   const openSaved = (saved: ChatSession) => {
     if (streaming) return;
     setChatId(saved.id);
@@ -643,6 +688,12 @@ export default function DashboardView() {
             setEditing(a);
             setEditorOpen(true);
           }}
+          onDuplicateAssistant={(a) => void duplicate(a)}
+          onDeleteAssistant={(a) => {
+            void removeAssistant(a).catch((e) =>
+              setError((e as Error).message || 'Could not delete that assistant. Please try again.')
+            );
+          }}
           onNewAssistant={() => {
             setEditing(null);
             setEditorOpen(true);
@@ -821,6 +872,7 @@ export default function DashboardView() {
           memberships={memberships}
           activeOrgId={activeOrgId}
           onSaved={refreshAssistants}
+          onDelete={editing ? () => removeAssistant(editing) : undefined}
         />
       )}
       <WhiteLabelPanel

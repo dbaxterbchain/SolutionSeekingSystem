@@ -66,6 +66,23 @@ export async function fetchAssistants(orgId: string | null): Promise<AssistantsD
   };
 }
 
+/**
+ * A failed assistant action, keeping the server's error code (and any payload)
+ * so callers can branch on it: e.g. `page_attached` carries the white-label
+ * slugs that would be deleted along with the assistant.
+ */
+export class AssistantActionError extends Error {
+  code?: string;
+  slugs?: string[];
+
+  constructor(message: string, code?: string, slugs?: string[]) {
+    super(message);
+    this.name = 'AssistantActionError';
+    this.code = code;
+    this.slugs = slugs;
+  }
+}
+
 async function post(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
   const res = await fetch('/api/assistants', {
     method: 'POST',
@@ -73,7 +90,13 @@ async function post(payload: Record<string, unknown>): Promise<Record<string, un
     body: JSON.stringify(payload),
   });
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.message ?? assistantErrorMessage(data?.error));
+  if (!res.ok) {
+    throw new AssistantActionError(
+      data?.message ?? assistantErrorMessage(data?.error),
+      typeof data?.error === 'string' ? data.error : undefined,
+      Array.isArray(data?.slugs) ? data.slugs : undefined
+    );
+  }
   return data ?? {};
 }
 
@@ -87,8 +110,19 @@ export async function updateAssistant(id: string, input: AssistantInput): Promis
   await post({ action: 'update', id, ...input });
 }
 
-export async function deleteAssistant(id: string): Promise<void> {
-  await post({ action: 'delete', id });
+/** Copy an assistant (config + document links) into a new private draft. */
+export async function duplicateAssistant(id: string): Promise<string> {
+  const data = await post({ action: 'duplicate', id });
+  return String(data.id ?? '');
+}
+
+/**
+ * Delete an assistant. Without `confirm`, the server answers 409 `page_attached`
+ * (with the page slugs) when white-label pages would be deleted along with it;
+ * pass `confirm: true` after the user has accepted that.
+ */
+export async function deleteAssistant(id: string, opts?: { confirm?: boolean }): Promise<void> {
+  await post({ action: 'delete', id, ...(opts?.confirm ? { confirm: true } : {}) });
 }
 
 /** Share within the assistant's own org workspace (managers only). */
@@ -109,10 +143,14 @@ function assistantErrorMessage(code?: string): string {
   switch (code) {
     case 'manager_required':
       return 'Only an organization manager can share assistants.';
+    case 'role_restricted':
+      return 'Your role in this organization does not allow that.';
     case 'too_many_assistants':
       return 'You have reached the 20-assistant limit.';
     case 'setup_too_large':
       return 'Those instructions and documents are too long together. Use fewer or shorter documents.';
+    case 'page_attached':
+      return 'This assistant powers a white-label page, so deleting it needs an extra confirmation.';
     default:
       return 'Something went wrong. Please try again.';
   }

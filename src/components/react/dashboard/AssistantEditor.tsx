@@ -6,14 +6,12 @@ import type { DocumentMeta } from '../../../lib/documents';
 import {
   createAssistant,
   updateAssistant,
-  deleteAssistant,
   shareAssistant,
   unshareAssistant,
   moveAssistant,
   type Assistant,
   type OrgMembershipView,
 } from '../../../lib/assistantsClient';
-import { useDialog } from '../Dialog';
 
 const MAX_INSTRUCTIONS = 8000;
 const MAX_DOCS = 5;
@@ -34,6 +32,7 @@ export default function AssistantEditor({
   memberships,
   activeOrgId,
   onSaved,
+  onDelete,
 }: {
   open: boolean;
   onClose: () => void;
@@ -49,6 +48,12 @@ export default function AssistantEditor({
   /** The active workspace (null = Personal) — the default for a new assistant. */
   activeOrgId: string | null;
   onSaved: () => void;
+  /**
+   * Confirm + delete `editing` (owned by DashboardView so the sidebar and the
+   * editor share one flow, including the page-attached confirmation). Resolves
+   * true when deleted, false when the user cancelled.
+   */
+  onDelete?: () => Promise<boolean>;
 }) {
   const [name, setName] = useState(editing?.name ?? '');
   const [agent, setAgent] = useState<AgentId>(editing?.base_agent ?? 'guide');
@@ -62,7 +67,6 @@ export default function AssistantEditor({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { confirm, dialog } = useDialog();
 
   // Whether the user manages the selected workspace (only then can they share into it).
   const canManageWorkspace =
@@ -141,24 +145,19 @@ export default function AssistantEditor({
   };
 
   const remove = async () => {
-    if (!editing) return;
-    const ok = await confirm({
-      title: 'Delete this assistant?',
-      message: `"${editing.name}" will be permanently removed${editing.shared ? ' for everyone in the organization' : ''}. This cannot be undone.`,
-      confirmLabel: 'Delete',
-      tone: 'danger',
-    });
-    if (!ok) return;
+    if (!editing || !onDelete) return;
     setBusy(true);
     setError(null);
     try {
-      await deleteAssistant(editing.id);
-      onSaved();
-      onClose();
+      const deleted = await onDelete();
+      if (deleted) {
+        onClose();
+        return;
+      }
     } catch (e) {
       setError((e as Error).message);
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   return createPortal(
@@ -372,7 +371,7 @@ export default function AssistantEditor({
         </div>
 
         <div className="mt-6 flex items-center justify-between gap-3">
-          {editing ? (
+          {editing && onDelete ? (
             <button
               type="button"
               onClick={remove}
@@ -399,7 +398,6 @@ export default function AssistantEditor({
           </div>
         </div>
       </div>
-      {dialog}
     </div>,
     document.body
   );

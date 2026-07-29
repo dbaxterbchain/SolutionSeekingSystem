@@ -1,6 +1,7 @@
 import type { AgentId, ChatSession } from '../../../lib/chatSessions';
 import { getContextMeta } from '../../../lib/contexts';
 import type { Assistant } from '../../../lib/assistantsClient';
+import RowMenu, { type RowMenuItem } from './RowMenu';
 
 /**
  * The dashboard's left rail: pick a standard agent or a specialized assistant,
@@ -27,6 +28,8 @@ export default function Sidebar({
   onSelectAgent,
   onSelectAssistant,
   onEditAssistant,
+  onDuplicateAssistant,
+  onDeleteAssistant,
   onNewAssistant,
   onOpenDocuments,
   onOpenWhiteLabel,
@@ -50,6 +53,8 @@ export default function Sidebar({
   onSelectAgent: (agent: AgentId) => void;
   onSelectAssistant: (a: Assistant) => void;
   onEditAssistant: (a: Assistant) => void;
+  onDuplicateAssistant: (a: Assistant) => void;
+  onDeleteAssistant: (a: Assistant) => void;
   onNewAssistant: () => void;
   onOpenDocuments: () => void;
   onOpenWhiteLabel: () => void;
@@ -77,61 +82,45 @@ export default function Sidebar({
   const AssistantRow = ({ a, editable }: { a: Assistant; editable: boolean }) => {
     // A manager can share/unshare their own assistants when an org workspace is active.
     const canToggleShare = editable && activeOrgId !== null && canManageOrg;
+    const items: RowMenuItem[] = [];
+    if (editable) {
+      items.push({ label: 'Edit', onSelect: () => onEditAssistant(a) });
+      items.push({ label: 'Duplicate', onSelect: () => onDuplicateAssistant(a) });
+    }
+    if (canToggleShare) {
+      items.push({
+        label: a.shared ? 'Stop sharing' : `Share with ${orgName ?? 'organization'}`,
+        onSelect: () => onToggleShare(a),
+      });
+    }
+    if (editable) {
+      items.push({ label: 'Delete', tone: 'danger', onSelect: () => onDeleteAssistant(a) });
+    }
     return (
       <div className="group relative">
         <button
           type="button"
           onClick={() => onSelectAssistant(a)}
           aria-current={assistantActive(a.id) ? 'true' : undefined}
-          className={`block w-full rounded-xl px-3 py-2 ${editable ? 'pr-16' : 'pr-3'} text-left transition-colors ${
+          className={`block w-full rounded-xl px-3 py-2 ${items.length > 0 ? 'pr-9' : 'pr-3'} text-left transition-colors ${
             assistantActive(a.id) ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-ink-800'
           }`}
         >
           <span className="block truncate text-sm font-semibold">{a.name}</span>
           <span className="mt-0.5 flex items-center gap-1.5 text-xs capitalize text-slate-400">
             {a.base_agent}
-            {a.shared && !canToggleShare && (
+            {a.shared && (
               <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[0.65rem] font-semibold normal-case text-brand-600">
                 Shared
               </span>
             )}
           </span>
         </button>
-        <div className="absolute right-1.5 top-1.5 flex items-center gap-0.5">
-          {canToggleShare && (
-            <button
-              type="button"
-              onClick={() => onToggleShare(a)}
-              aria-label={
-                a.shared
-                  ? `Stop sharing ${a.name}`
-                  : `Share ${a.name} with ${orgName ?? 'your organization'}`
-              }
-              title={
-                a.shared
-                  ? 'Shared with your organization. Click to stop.'
-                  : 'Share with everyone in your organization'
-              }
-              className={`rounded-md px-1.5 py-1 text-xs transition-colors ${
-                a.shared
-                  ? 'text-brand-600 hover:bg-brand-50'
-                  : 'text-slate-400 opacity-100 hover:bg-slate-100 hover:text-slate-600 focus:opacity-100 lg:opacity-0 lg:group-hover:opacity-100'
-              }`}
-            >
-              {a.shared ? '👥✓' : '👥'}
-            </button>
-          )}
-          {editable && (
-            <button
-              type="button"
-              onClick={() => onEditAssistant(a)}
-              aria-label={`Edit ${a.name}`}
-              className="rounded-md px-1.5 py-1 text-xs text-slate-400 opacity-100 transition-opacity hover:bg-slate-100 hover:text-slate-600 focus:opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
-            >
-              ✎
-            </button>
-          )}
-        </div>
+        {items.length > 0 && (
+          <div className="absolute right-1.5 top-1.5">
+            <RowMenu label={`Actions for ${a.name}`} items={items} />
+          </div>
+        )}
       </div>
     );
   };

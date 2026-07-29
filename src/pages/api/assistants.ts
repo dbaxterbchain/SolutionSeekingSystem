@@ -131,6 +131,8 @@ export const POST: APIRoute = async ({ request }) => {
       return createAssistant(auth.user, body);
     case 'update':
       return updateAssistant(auth.user, body);
+    case 'duplicate':
+      return duplicateAssistant(auth.user, body);
     case 'delete':
       return deleteAssistant(auth.user, body);
     case 'share':
@@ -150,20 +152,37 @@ const idList = (v: unknown): string[] =>
     ? [...new Set(v.filter((x): x is string => typeof x === 'string'))].slice(0, MAX_ASSISTANT_DOCS)
     : [];
 
-/** Confirm the docs are the user's own and (with the instructions) fit the budget. */
+/**
+ * Confirm the docs are usable by this caller and (with the instructions) fit the
+ * budget. A document qualifies when the acting user owns it, or (on update, via
+ * `allowLinkedTo`) when it is already linked to that assistant: inherited links
+ * must survive edits by people who did not upload the file, e.g. a manager
+ * editing a shared assistant, or the owner of a duplicate.
+ */
 async function checkDocsBudget(
   userId: string,
   documentIds: string[],
-  instructions: string
+  instructions: string,
+  allowLinkedTo?: string
 ): Promise<Response | null> {
   if (documentIds.length === 0) return null;
+  let linkedIds = new Set<string>();
+  if (allowLinkedTo) {
+    const { data: linked } = await supabaseAdmin
+      .from('assistant_documents')
+      .select('document_id')
+      .eq('assistant_id', allowLinkedTo);
+    linkedIds = new Set((linked ?? []).map((l) => l.document_id));
+  }
   const { data } = await supabaseAdmin
     .from('documents')
-    .select('id, char_count')
-    .eq('user_id', userId)
+    .select('id, char_count, user_id')
     .in('id', documentIds);
   const found = data ?? [];
-  if (found.length !== documentIds.length) {
+  if (
+    found.length !== documentIds.length ||
+    found.some((d) => d.user_id !== userId && !linkedIds.has(d.id))
+  ) {
     return json({ error: 'bad_request', field: 'documents' }, 400);
   }
   const total = instructions.length + found.reduce((s, d) => s + (d.char_count ?? 0), 0);
@@ -190,17 +209,24 @@ async function attachDocs(assistantId: string, documentIds: string[]): Promise<v
   if (error) console.error('attach docs failed', error);
 }
 
-async function createAssistant(user: User, body: Record<string, unknown>): Promise<Response> {
+/** The global per-owner cap; applies to created and duplicated assistants alike. */
+async function checkAssistantQuota(userId: string): Promise<Response | null> {
   const { count } = await supabaseAdmin
     .from('assistants')
     .select('id', { count: 'exact', head: true })
-    .eq('owner_user_id', user.id);
+    .eq('owner_user_id', userId);
   if ((count ?? 0) >= MAX_ASSISTANTS_PER_USER) {
     return json(
       { error: 'too_many_assistants', message: `You can have up to ${MAX_ASSISTANTS_PER_USER} assistants.` },
       409
     );
   }
+  return null;
+}
+
+async function createAssistant(user: User, body: Record<string, unknown>): Promise<Response> {
+  const quotaErr = await checkAssistantQuota(user.id);
+  if (quotaErr) return quotaErr;
 
   const name = str(body.name).trim();
   if (name.length < 1 || name.length > 80) return json({ error: 'bad_request', field: 'name' }, 400);
@@ -247,12 +273,23 @@ async function loadOwnedOrManaged(
   user: User,
   id: string
 ): Promise<
-  | { row: { id: string; owner_user_id: string; org_id: string | null; shared: boolean; base_agent: AgentId } }
+  | {
+      row: {
+        id: string;
+        owner_user_id: string;
+        org_id: string | null;
+        shared: boolean;
+        base_agent: AgentId;
+        name: string;
+        context: string | null;
+        instructions: string;
+      };
+    }
   | { response: Response }
 > {
   const { data: row } = await supabaseAdmin
     .from('assistants')
-    .select('id, owner_user_id, org_id, shared, base_agent')
+    .select('id, owner_user_id, org_id, shared, base_agent, name, context, instructions')
     .eq('id', id)
     .maybeSingle();
   if (!row) return { response: json({ error: 'not_found' }, 404) };
@@ -282,7 +319,7 @@ async function updateAssistant(user: User, body: Record<string, unknown>): Promi
   const instructions = str(body.instructions).slice(0, 8000);
   const documentIds = idList(body.document_ids);
 
-  const budgetErr = await checkDocsBudget(user.id, documentIds, instructions);
+  const budgetErr = await checkDocsBudget(user.id, documentIds, instructions, id);
   if (budgetErr) return budgetErr;
 
   const { error } = await supabaseAdmin
@@ -297,6 +334,54 @@ async function updateAssistant(user: User, body: Record<string, unknown>): Promi
   await supabaseAdmin.from('assistant_documents').delete().eq('assistant_id', id);
   await attachDocs(id, documentIds);
   return json({ ok: true });
+}
+
+/**
+ * Copy an assistant the caller can manage into a row they own: same workspace,
+ * same config, same document LINKS (the files themselves are not copied; the
+ * update-path budget check accepts inherited links). Sharing state never
+ * carries over: the copy starts as a private draft.
+ */
+async function duplicateAssistant(user: User, body: Record<string, unknown>): Promise<Response> {
+  const id = str(body.id);
+  if (!id) return json({ error: 'bad_request' }, 400);
+  const access = await loadOwnedOrManaged(user, id);
+  if ('response' in access) return access.response;
+  const quotaErr = await checkAssistantQuota(user.id);
+  if (quotaErr) return quotaErr;
+
+  const source = access.row;
+  const { data: created, error } = await supabaseAdmin
+    .from('assistants')
+    .insert({
+      owner_user_id: user.id,
+      org_id: source.org_id,
+      name: `${source.name} (copy)`.slice(0, 80),
+      base_agent: source.base_agent,
+      context: source.context,
+      instructions: source.instructions,
+    })
+    .select('id')
+    .single();
+  if (error || !created) {
+    console.error('assistant duplicate failed', error);
+    return json({ error: 'server_error' }, 500);
+  }
+
+  const { data: joins } = await supabaseAdmin
+    .from('assistant_documents')
+    .select('document_id, position')
+    .eq('assistant_id', id);
+  if (joins && joins.length > 0) {
+    const rows = joins.map((j) => ({
+      assistant_id: created.id,
+      document_id: j.document_id,
+      position: j.position,
+    }));
+    const { error: linkErr } = await supabaseAdmin.from('assistant_documents').insert(rows);
+    if (linkErr) console.error('duplicate doc links failed', linkErr);
+  }
+  return json({ id: created.id });
 }
 
 async function deleteAssistant(user: User, body: Record<string, unknown>): Promise<Response> {
