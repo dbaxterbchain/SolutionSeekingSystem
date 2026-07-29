@@ -32,7 +32,7 @@ export interface Assistant {
 export interface OrgMembershipView {
   orgId: string;
   orgName: string;
-  role: 'member' | 'manager';
+  role: 'member' | 'manager' | 'client';
 }
 
 export interface AssistantsData {

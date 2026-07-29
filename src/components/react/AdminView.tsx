@@ -35,7 +35,7 @@ interface OrgMember {
   id: string;
   email: string;
   claimed: boolean;
-  role: 'member' | 'manager';
+  role: 'member' | 'manager' | 'client';
   joined_at: string | null;
 }
 
@@ -530,7 +530,7 @@ function OrgsTab({
                   <span className={`text-xs ${m.claimed ? 'text-emerald-600' : 'text-slate-400'}`}>
                     {m.claimed ? 'signed in' : 'has not signed in yet'}
                   </span>
-                  {/* Managers can share assistants org-wide and manage white-label pages. */}
+                  {/* Managers run the org; members author; clients only use what is shared with them. */}
                   <select
                     value={m.role}
                     onChange={async (e) => {
@@ -542,6 +542,7 @@ function OrgsTab({
                   >
                     <option value="member">Member</option>
                     <option value="manager">Manager</option>
+                    <option value="client">Client</option>
                   </select>
                   <button
                     type="button"

@@ -19,7 +19,7 @@ export type Selection = { kind: 'agent'; agent: AgentId } | { kind: 'assistant';
 interface OrgOption {
   orgId: string;
   orgName: string;
-  role: 'member' | 'manager';
+  role: 'member' | 'manager' | 'client';
 }
 
 export default function Sidebar({
@@ -35,6 +35,9 @@ export default function Sidebar({
   onOpenWhiteLabel,
   onOpenOrgSettings,
   canManageOrg,
+  canCreate,
+  showDocuments,
+  clientView,
   memberships,
   activeOrgId,
   onSelectOrg,
@@ -60,6 +63,12 @@ export default function Sidebar({
   onOpenWhiteLabel: () => void;
   onOpenOrgSettings: () => void;
   canManageOrg: boolean;
+  /** Whether this user may create assistants in the active workspace. */
+  canCreate: boolean;
+  /** Whether the workspace document library applies here (not for clients). */
+  showDocuments: boolean;
+  /** The stripped-down view for a client seat in the active org. */
+  clientView: boolean;
   memberships: OrgOption[];
   /** The active workspace: null = Personal, else an org id. */
   activeOrgId: string | null;
@@ -203,16 +212,23 @@ export default function Sidebar({
           </div>
         )}
 
-        {shared.length > 0 && (
+        {(shared.length > 0 || clientView) && (
           <div>
             <p className="truncate px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Shared with {orgName ?? 'your org'}
+              {clientView ? 'Your assistants' : `Shared with ${orgName ?? 'your org'}`}
             </p>
-            <div className="mt-2 space-y-1">
-              {shared.map((a) => (
-                <AssistantRow key={a.id} a={a} editable={false} />
-              ))}
-            </div>
+            {shared.length > 0 ? (
+              <div className="mt-2 space-y-1">
+                {shared.map((a) => (
+                  <AssistantRow key={a.id} a={a} editable={false} />
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-500">
+                Nothing here yet. When {orgName ?? 'your organization'} shares an assistant with
+                you, it appears here, ready to chat.
+              </p>
+            )}
           </div>
         )}
 
@@ -266,20 +282,24 @@ export default function Sidebar({
       </div>
 
       <div className="space-y-1.5 border-t border-slate-100 pt-3">
-        <button
-          type="button"
-          onClick={onNewAssistant}
-          className="btn-secondary w-full text-sm"
-        >
-          ✨ Create assistant
-        </button>
-        <button
-          type="button"
-          onClick={onOpenDocuments}
-          className="w-full rounded-xl px-3 py-1.5 text-left text-sm text-slate-500 hover:bg-slate-50 hover:text-ink-800"
-        >
-          📎 Documents
-        </button>
+        {canCreate && (
+          <button
+            type="button"
+            onClick={onNewAssistant}
+            className="btn-secondary w-full text-sm"
+          >
+            ✨ Create assistant
+          </button>
+        )}
+        {showDocuments && (
+          <button
+            type="button"
+            onClick={onOpenDocuments}
+            className="w-full rounded-xl px-3 py-1.5 text-left text-sm text-slate-500 hover:bg-slate-50 hover:text-ink-800"
+          >
+            📎 Documents
+          </button>
+        )}
         {canManageOrg && (
           <button
             type="button"

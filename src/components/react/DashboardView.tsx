@@ -108,20 +108,30 @@ export default function DashboardView() {
   // the server already scoped `mine`/`shared` to it, so no client-side org filter.
   const activeOrg = memberships.find((m) => m.orgId === activeOrgId) ?? null;
   const isManagerOfActive = activeOrg?.role === 'manager';
+  const activeRole = activeOrg?.role ?? null;
   const ownsSelected = Boolean(assistant && mine.some((a) => a.id === assistant.id));
   const canManageSelected =
     ownsSelected ||
     Boolean(
       assistant?.org_id &&
-        assistant?.shared &&
+        (assistant?.shared || (assistant?.member_share_ids.length ?? 0) > 0) &&
         memberships.some((m) => m.orgId === assistant.org_id && m.role === 'manager')
     );
+  // Authoring (creating assistants, the document library) is off only for
+  // client-only users; fails OPEN when the entitlement lookup failed, because
+  // the server is the real gate (see the note on canUseDashboard).
+  const canAuthor = entitlement?.kind === 'subscriber' ? entitlement.authoring !== false : true;
+  const canCreateHere = activeOrgId ? activeRole !== 'client' : canAuthor;
+  const canUseDocsHere = canCreateHere;
+  // A client's uploads (chat attachments) always land in their Personal
+  // library; the server refuses org-tagged documents for client seats.
+  const docsOrgId = activeOrgId && activeRole === 'client' ? null : activeOrgId;
 
   const refreshRecents = () => {
     listChatSessions(activeOrgId).then(setRecents).catch(() => setRecents([]));
   };
   const refreshDocuments = () => {
-    listDocuments(activeOrgId).then(setDocuments).catch(() => setDocuments([]));
+    listDocuments(docsOrgId).then(setDocuments).catch(() => setDocuments([]));
   };
   const refreshAssistants = () => {
     fetchAssistants(activeOrgId)
@@ -691,6 +701,9 @@ export default function DashboardView() {
           onOpenWhiteLabel={() => setWhiteLabelOpen(true)}
           onOpenOrgSettings={() => setOrgPanelOpen(true)}
           canManageOrg={isManagerOfActive}
+          canCreate={canCreateHere}
+          showDocuments={canUseDocsHere}
+          clientView={activeRole === 'client'}
           memberships={memberships}
           activeOrgId={activeOrgId}
           onSelectOrg={selectWorkspace}
@@ -828,7 +841,7 @@ export default function DashboardView() {
             selected={pendingAttachments}
             onChange={setPendingAttachments}
             onUpload={async (file) => {
-              const doc = await uploadAndRegister(file, activeOrgId);
+              const doc = await uploadAndRegister(file, docsOrgId);
               refreshDocuments();
               return doc;
             }}
@@ -842,8 +855,8 @@ export default function DashboardView() {
         open={documentsOpen}
         onClose={() => setDocumentsOpen(false)}
         documents={documents}
-        orgId={activeOrgId}
-        orgName={activeOrg?.orgName ?? null}
+        orgId={docsOrgId}
+        orgName={docsOrgId ? (activeOrg?.orgName ?? null) : null}
         onChanged={refreshDocuments}
       />
       {editorOpen && (
@@ -854,7 +867,7 @@ export default function DashboardView() {
           owned={editing ? mine.some((a) => a.id === editing.id) : true}
           documents={documents}
           onUpload={async (file) => {
-            const doc = await uploadAndRegister(file, activeOrgId);
+            const doc = await uploadAndRegister(file, docsOrgId);
             refreshDocuments();
             return doc;
           }}

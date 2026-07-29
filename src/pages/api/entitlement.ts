@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { getUserFromRequest } from '../../lib/server/auth';
-import { checkEntitlement } from '../../lib/server/entitlement';
+import { checkEntitlement, hasAuthorSource } from '../../lib/server/entitlement';
+import { getOrgMemberships } from '../../lib/server/orgMembership';
 
 export const prerender = false;
 
@@ -34,7 +35,21 @@ export const GET: APIRoute = async ({ request }) => {
 
   const entitlement = await checkEntitlement(user);
 
-  return new Response(JSON.stringify(entitlement), {
+  // Subscribers also learn whether they may AUTHOR (create assistants, keep a
+  // document library): false only for client-only users, whose every entitled
+  // seat is a client seat. The membership lookup is skipped for personal
+  // Stripe subscribers, who always author.
+  const payload =
+    entitlement.kind === 'subscriber'
+      ? {
+          ...entitlement,
+          authoring:
+            entitlement.via === 'stripe' ||
+            hasAuthorSource(entitlement, await getOrgMemberships(user)),
+        }
+      : entitlement;
+
+  return new Response(JSON.stringify(payload), {
     status: 200,
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });

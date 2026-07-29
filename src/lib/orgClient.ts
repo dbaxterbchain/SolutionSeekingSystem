@@ -62,8 +62,12 @@ export async function renameOrg(orgId: string, name: string): Promise<void> {
   await post({ action: 'rename', org_id: orgId, name });
 }
 
-export async function addMember(orgId: string, email: string): Promise<void> {
-  await post({ action: 'add_member', org_id: orgId, email });
+export async function addMember(
+  orgId: string,
+  email: string,
+  role: OrgMemberRole = 'member'
+): Promise<void> {
+  await post({ action: 'add_member', org_id: orgId, email, role });
 }
 
 export async function removeMember(orgId: string, memberId: string): Promise<void> {

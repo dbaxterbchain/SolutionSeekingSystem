@@ -6,8 +6,9 @@ import {
   getOrgMemberships,
   getMembership,
   isManagerOf,
-  isMemberOf,
+  isNonClientMemberOf,
 } from '../../lib/server/orgMembership';
+import { hasAuthorSource, type Entitlement } from '../../lib/server/entitlement';
 import { supabaseAdmin } from '../../lib/server/supabaseAdmin';
 import { AGENT_IDS, type AgentId } from '../../lib/server/agents';
 import { getContextMeta } from '../../lib/contexts';
@@ -192,11 +193,11 @@ export const POST: APIRoute = async ({ request }) => {
 
   switch (action) {
     case 'create':
-      return createAssistant(auth.user, body);
+      return createAssistant(auth.user, auth.entitlement, body);
     case 'update':
       return updateAssistant(auth.user, body);
     case 'duplicate':
-      return duplicateAssistant(auth.user, body);
+      return duplicateAssistant(auth.user, auth.entitlement, body);
     case 'delete':
       return deleteAssistant(auth.user, body);
     case 'share':
@@ -290,7 +291,11 @@ async function checkAssistantQuota(userId: string): Promise<Response | null> {
   return null;
 }
 
-async function createAssistant(user: User, body: Record<string, unknown>): Promise<Response> {
+async function createAssistant(
+  user: User,
+  entitlement: Entitlement,
+  body: Record<string, unknown>
+): Promise<Response> {
   const quotaErr = await checkAssistantQuota(user.id);
   if (quotaErr) return quotaErr;
 
@@ -306,12 +311,18 @@ async function createAssistant(user: User, body: Record<string, unknown>): Promi
   const instructions = str(body.instructions).slice(0, 8000);
   const documentIds = idList(body.document_ids);
 
-  // The workspace the assistant is created in: an org the caller belongs to, else Personal.
+  // The workspace the assistant is created in: an org the caller holds a
+  // non-client seat in, else Personal. Client seats consume, they never author
+  // into the org; Personal authoring needs a non-client entitlement source.
   // New assistants are never auto-shared (a manager shares afterwards).
   const orgId = str(body.org_id).trim() || null;
+  const memberships = await getOrgMemberships(user);
   if (orgId) {
-    const memberships = await getOrgMemberships(user);
-    if (!isMemberOf(memberships, orgId)) return json({ error: 'bad_request', field: 'org_id' }, 400);
+    if (!isNonClientMemberOf(memberships, orgId)) {
+      return json({ error: 'bad_request', field: 'org_id' }, 400);
+    }
+  } else if (!hasAuthorSource(entitlement, memberships)) {
+    return json({ error: 'role_restricted' }, 403);
   }
 
   const budgetErr = await checkDocsBudget(user.id, documentIds, instructions);
@@ -416,7 +427,11 @@ async function updateAssistant(user: User, body: Record<string, unknown>): Promi
  * update-path budget check accepts inherited links). Sharing state never
  * carries over: the copy starts as a private draft.
  */
-async function duplicateAssistant(user: User, body: Record<string, unknown>): Promise<Response> {
+async function duplicateAssistant(
+  user: User,
+  entitlement: Entitlement,
+  body: Record<string, unknown>
+): Promise<Response> {
   const id = str(body.id);
   if (!id) return json({ error: 'bad_request' }, 400);
   const access = await loadOwnedOrManaged(user, id);
@@ -425,6 +440,17 @@ async function duplicateAssistant(user: User, body: Record<string, unknown>): Pr
   if (quotaErr) return quotaErr;
 
   const source = access.row;
+  // Duplicating authors a new row where the source lives, so the same rules as
+  // create apply: a non-client seat for an org workspace, an authoring source
+  // for Personal. (Reachable by an owner whose seat was later made a client.)
+  const memberships = await getOrgMemberships(user);
+  if (source.org_id) {
+    if (!isNonClientMemberOf(memberships, source.org_id)) {
+      return json({ error: 'role_restricted' }, 403);
+    }
+  } else if (!hasAuthorSource(entitlement, memberships)) {
+    return json({ error: 'role_restricted' }, 403);
+  }
   const { data: created, error } = await supabaseAdmin
     .from('assistants')
     .insert({
@@ -588,8 +614,12 @@ async function moveAssistant(user: User, body: Record<string, unknown>): Promise
     .maybeSingle();
   if (!row || row.owner_user_id !== user.id) return json({ error: 'not_found' }, 404);
   if (target) {
+    // Moving INTO an org workspace requires a non-client seat there; moving
+    // out to Personal is always the owner's right.
     const memberships = await getOrgMemberships(user);
-    if (!isMemberOf(memberships, target)) return json({ error: 'bad_request', field: 'org_id' }, 400);
+    if (!isNonClientMemberOf(memberships, target)) {
+      return json({ error: 'bad_request', field: 'org_id' }, 400);
+    }
   }
   const { error } = await supabaseAdmin
     .from('assistants')

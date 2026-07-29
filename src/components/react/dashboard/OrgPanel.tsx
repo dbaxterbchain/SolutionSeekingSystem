@@ -9,6 +9,7 @@ import {
   setSeats,
   openBillingPortal,
   type OrgView,
+  type OrgMemberRole,
 } from '../../../lib/orgClient';
 import { useDialog } from '../Dialog';
 
@@ -46,6 +47,7 @@ export default function OrgPanel({
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState('');
   const [newEmail, setNewEmail] = useState('');
+  const [newRole, setNewRole] = useState<OrgMemberRole>('member');
   const [seatDraft, setSeatDraft] = useState<number | null>(null);
   const { confirm, dialog } = useDialog();
 
@@ -184,6 +186,10 @@ export default function OrgPanel({
                   {memberCount} of {org.seats} seats used
                 </span>
               </div>
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                Managers run the organization. Members use shared assistants and make their own.
+                Clients only use what you share with them directly.
+              </p>
               <ul className="mt-2 space-y-1.5">
                 {members.map((m) => {
                   const lastManager = m.role === 'manager' && managerCount <= 1;
@@ -211,12 +217,13 @@ export default function OrgPanel({
                         disabled={busy || lastManager}
                         title={lastManager ? 'An organization needs at least one manager.' : undefined}
                         onChange={(e) =>
-                          run(() => setMemberRole(orgId, m.id, e.target.value as 'member' | 'manager'))
+                          run(() => setMemberRole(orgId, m.id, e.target.value as OrgMemberRole))
                         }
                         aria-label={`Role for ${m.email}`}
                       >
                         <option value="member">Member</option>
                         <option value="manager">Manager</option>
+                        <option value="client">Client</option>
                       </select>
                       <button
                         type="button"
@@ -239,8 +246,9 @@ export default function OrgPanel({
                   const email = newEmail.trim();
                   if (!email) return;
                   run(async () => {
-                    await addMember(orgId, email);
+                    await addMember(orgId, email, newRole);
                     setNewEmail('');
+                    setNewRole('member');
                   }, 'Member added. They get access by signing in with that email.');
                 }}
               >
@@ -252,12 +260,22 @@ export default function OrgPanel({
                   onChange={(e) => setNewEmail(e.target.value)}
                   aria-label="New member email"
                 />
+                <select
+                  className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-sm text-slate-600"
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value as OrgMemberRole)}
+                  aria-label="Role for the new member"
+                >
+                  <option value="member">Member</option>
+                  <option value="manager">Manager</option>
+                  <option value="client">Client</option>
+                </select>
                 <button
                   type="submit"
                   className="btn-secondary whitespace-nowrap text-sm"
                   disabled={busy || newEmail.trim() === ''}
                 >
-                  Add member
+                  Add
                 </button>
               </form>
               <p className="mt-1.5 text-xs leading-relaxed text-slate-500">

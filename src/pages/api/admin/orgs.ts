@@ -173,7 +173,7 @@ export const POST: APIRoute = async ({ request }) => {
     case 'set_role': {
       const id = clean(body?.id, 40);
       const role = body?.role;
-      if (!id || (role !== 'member' && role !== 'manager')) {
+      if (!id || (role !== 'member' && role !== 'manager' && role !== 'client')) {
         return adminJson({ error: 'invalid' }, 400);
       }
       const { error } = await supabaseAdmin.from('org_members').update({ role }).eq('id', id);

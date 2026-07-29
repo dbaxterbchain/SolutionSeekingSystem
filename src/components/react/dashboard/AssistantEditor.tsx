@@ -333,12 +333,15 @@ export default function AssistantEditor({
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
                 >
                   <option value="">Personal (only you)</option>
-                  {memberships.map((m) => (
-                    <option key={m.orgId} value={m.orgId}>
-                      {m.orgName}
-                      {m.role === 'manager' ? ' (manager)' : ''}
-                    </option>
-                  ))}
+                  {/* Client seats consume, they don't author into the org. */}
+                  {memberships
+                    .filter((m) => m.role !== 'client')
+                    .map((m) => (
+                      <option key={m.orgId} value={m.orgId}>
+                        {m.orgName}
+                        {m.role === 'manager' ? ' (manager)' : ''}
+                      </option>
+                    ))}
                 </select>
                 <p className="mt-1 text-xs text-slate-400">
                   Only shows in this workspace. Documents you attach follow the same rule.
