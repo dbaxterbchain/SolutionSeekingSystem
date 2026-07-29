@@ -20,7 +20,9 @@ const SETUP_BUDGET = 120_000;
 /**
  * Create or edit a specialized assistant: name, base agent (locked after
  * create), an optional mode, custom instructions, and up to five knowledge
- * documents. Managers get a Share toggle for assistants they own.
+ * documents. A new assistant can start from a template (inheriting its setup
+ * live); an owned one can be turned INTO a template. Managers get a Share
+ * toggle for assistants they own.
  */
 export default function AssistantEditor({
   open,
@@ -31,6 +33,8 @@ export default function AssistantEditor({
   onUpload,
   memberships,
   activeOrgId,
+  templates,
+  startFromTemplate,
   onSaved,
   onDelete,
 }: {
@@ -47,6 +51,10 @@ export default function AssistantEditor({
   memberships: OrgMembershipView[];
   /** The active workspace (null = Personal) — the default for a new assistant. */
   activeOrgId: string | null;
+  /** Templates visible in the active workspace ("Start from" options). */
+  templates: Assistant[];
+  /** Pre-selected template for the "New from template" shortcut. */
+  startFromTemplate: Assistant | null;
   onSaved: () => void;
   /**
    * Confirm + delete `editing` (owned by DashboardView so the sidebar and the
@@ -56,10 +64,18 @@ export default function AssistantEditor({
   onDelete?: () => Promise<boolean>;
 }) {
   const [name, setName] = useState(editing?.name ?? '');
-  const [agent, setAgent] = useState<AgentId>(editing?.base_agent ?? 'guide');
-  const [context, setContext] = useState<string>(editing?.context ?? '');
+  const [agent, setAgent] = useState<AgentId>(
+    editing?.base_agent ?? startFromTemplate?.base_agent ?? 'guide'
+  );
+  const [context, setContext] = useState<string>(
+    editing?.context ?? startFromTemplate?.context ?? ''
+  );
   const [instructions, setInstructions] = useState(editing?.instructions ?? '');
   const [docIds, setDocIds] = useState<string[]>(editing?.documents.map((d) => d.id) ?? []);
+  // Create only: the template this assistant is built on ('' = blank start).
+  const [startFrom, setStartFrom] = useState<string>(startFromTemplate?.id ?? '');
+  // Edit only (owners): whether this assistant is offered as a template.
+  const [isTemplate, setIsTemplate] = useState<boolean>(editing?.is_template ?? false);
   // The workspace this assistant lives in (null = Personal). New → the active workspace.
   const [workspace, setWorkspace] = useState<string | null>(editing ? editing.org_id : activeOrgId);
   const [shareOn, setShareOn] = useState<boolean>(editing?.shared ?? false);
@@ -85,8 +101,38 @@ export default function AssistantEditor({
 
   const modes = MODE_CONTEXTS.filter((m) => m.agents.includes(agent));
   const selectedDocs = (documents ?? []).filter((d) => docIds.includes(d.id));
-  const usedChars = instructions.length + selectedDocs.reduce((s, d) => s + d.char_count, 0);
+
+  // The template whose setup this assistant inherits: the "Start from" choice
+  // while creating, or the stored link while editing a child. Its footprint is
+  // reserved in the budget (documents it already carries are not counted twice).
+  const templateRow = editing
+    ? editing.template_id
+      ? (templates.find((t) => t.id === editing.template_id) ?? null)
+      : null
+    : startFrom
+      ? (templates.find((t) => t.id === startFrom) ?? null)
+      : null;
+  const templateDocIds = new Set(templateRow?.documents.map((d) => d.id) ?? []);
+  const templateReserve = templateRow
+    ? templateRow.instructions.length + templateRow.documents.reduce((s, d) => s + d.char_count, 0)
+    : 0;
+  const usedChars =
+    instructions.length +
+    templateReserve +
+    selectedDocs.reduce((s, d) => s + (templateDocIds.has(d.id) ? 0 : d.char_count), 0);
   const overBudget = usedChars > SETUP_BUDGET;
+
+  const pickTemplate = (id: string) => {
+    setStartFrom(id);
+    const t = templates.find((x) => x.id === id);
+    if (t) {
+      // Composition assumes one persona: the base agent follows the template,
+      // and the mode starts from the template's (still overridable).
+      setAgent(t.base_agent);
+      setContext(t.context ?? '');
+      setWorkspace(activeOrgId);
+    }
+  };
 
   const toggleDoc = (id: string) => {
     setDocIds((cur) =>
@@ -123,9 +169,12 @@ export default function AssistantEditor({
       };
       if (!editing) {
         // New assistants are created in the chosen workspace, never auto-shared.
-        await createAssistant(input, workspace);
+        await createAssistant({ ...input, template_id: startFrom || null }, workspace);
       } else {
-        await updateAssistant(editing.id, input);
+        await updateAssistant(editing.id, {
+          ...input,
+          ...(owned && !editing.template_id ? { is_template: isTemplate } : {}),
+        });
         // A workspace change moves the assistant (server resets sharing on a move).
         const moved = workspace !== editing.org_id;
         if (moved) await moveAssistant(editing.id, workspace);
@@ -182,6 +231,46 @@ export default function AssistantEditor({
         </div>
 
         <div className="mt-4 space-y-4">
+          {!editing && templates.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-ink-800" htmlFor="a-template">
+                Start from
+              </label>
+              <select
+                id="a-template"
+                value={startFrom}
+                onChange={(e) => pickTemplate(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+              >
+                <option value="">Blank assistant</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} (template)
+                  </option>
+                ))}
+              </select>
+              {startFrom && (
+                <p className="mt-1 text-xs text-slate-400">
+                  Inherits the template's instructions and documents, now and whenever the template
+                  changes. Add this assistant's own on top.
+                </p>
+              )}
+            </div>
+          )}
+
+          {editing && templateRow && (
+            <p className="rounded-xl bg-violet-50 px-3 py-2 text-xs leading-relaxed text-violet-700">
+              Built on <span className="font-semibold">{templateRow.name}</span>. It inherits that
+              template's instructions and documents; edits to the template reach this assistant
+              automatically.
+            </p>
+          )}
+          {editing && !templateRow && editing.template_id && (
+            <p className="rounded-xl bg-violet-50 px-3 py-2 text-xs leading-relaxed text-violet-700">
+              Built on a template it inherits instructions and documents from.
+            </p>
+          )}
+
           <div>
             <label className="mb-1 block text-sm font-semibold text-ink-800" htmlFor="a-name">
               Name
@@ -202,7 +291,7 @@ export default function AssistantEditor({
                 <button
                   key={a}
                   type="button"
-                  disabled={Boolean(editing)}
+                  disabled={Boolean(editing) || Boolean(startFrom)}
                   onClick={() => {
                     setAgent(a);
                     setContext('');
@@ -211,7 +300,7 @@ export default function AssistantEditor({
                     agent === a
                       ? 'border-brand-400 bg-brand-50 font-semibold text-brand-700'
                       : 'border-slate-200 text-slate-600 hover:border-brand-300'
-                  } ${editing ? 'cursor-not-allowed opacity-70' : ''}`}
+                  } ${editing || startFrom ? 'cursor-not-allowed opacity-70' : ''}`}
                 >
                   {a}
                 </button>
@@ -219,6 +308,9 @@ export default function AssistantEditor({
             </div>
             {editing && (
               <p className="mt-1 text-xs text-slate-400">The base assistant can't change after creating.</p>
+            )}
+            {!editing && startFrom && (
+              <p className="mt-1 text-xs text-slate-400">Follows the template's base assistant.</p>
             )}
           </div>
 
@@ -267,6 +359,7 @@ export default function AssistantEditor({
               </span>
               <span className={`text-xs ${overBudget ? 'text-red-600' : 'text-slate-400'}`}>
                 {Math.round(usedChars / 1000)}k / {SETUP_BUDGET / 1000}k chars
+                {templateReserve > 0 && ` (incl. ${Math.round(templateReserve / 1000)}k template)`}
               </span>
             </div>
             <input
@@ -325,12 +418,13 @@ export default function AssistantEditor({
                 <select
                   id="a-workspace"
                   value={workspace ?? ''}
+                  disabled={Boolean(startFrom)}
                   onChange={(e) => {
                     const v = e.target.value || null;
                     setWorkspace(v);
                     if (v === null) setShareOn(false);
                   }}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 disabled:opacity-60"
                 >
                   <option value="">Personal (only you)</option>
                   {/* Client seats consume, they don't author into the org. */}
@@ -344,7 +438,9 @@ export default function AssistantEditor({
                     ))}
                 </select>
                 <p className="mt-1 text-xs text-slate-400">
-                  Only shows in this workspace. Documents you attach follow the same rule.
+                  {startFrom
+                    ? 'Lives in the same workspace as its template.'
+                    : 'Only shows in this workspace. Documents you attach follow the same rule.'}
                 </p>
               </div>
               {editing && workspace !== null && (
@@ -368,6 +464,30 @@ export default function AssistantEditor({
                 <p className="text-xs text-slate-400">You can share it with the organization after creating it.</p>
               )}
             </div>
+          )}
+
+          {editing && owned && !editing.template_id && (
+            <label className="flex items-start gap-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2.5 text-xs text-ink-700">
+              <input
+                type="checkbox"
+                checked={isTemplate}
+                disabled={isTemplate && editing.child_count > 0}
+                onChange={(e) => setIsTemplate(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                <span className="font-semibold">Use as a template.</span> New assistants can be
+                built on it and inherit its instructions and documents. Editing the template
+                updates all of them.
+                {isTemplate && editing.child_count > 0 && (
+                  <span className="text-slate-400">
+                    {' '}
+                    (In use by {editing.child_count}{' '}
+                    {editing.child_count === 1 ? 'assistant' : 'assistants'}.)
+                  </span>
+                )}
+              </span>
+            </label>
           )}
 
           {error && <p className="text-sm text-amber-700">{error}</p>}

@@ -30,6 +30,7 @@ export default function Sidebar({
   onEditAssistant,
   onDuplicateAssistant,
   onDeleteAssistant,
+  onNewFromTemplate,
   onNewAssistant,
   onOpenDocuments,
   onOpenWhiteLabel,
@@ -58,6 +59,7 @@ export default function Sidebar({
   onEditAssistant: (a: Assistant) => void;
   onDuplicateAssistant: (a: Assistant) => void;
   onDeleteAssistant: (a: Assistant) => void;
+  onNewFromTemplate: (a: Assistant) => void;
   onNewAssistant: () => void;
   onOpenDocuments: () => void;
   onOpenWhiteLabel: () => void;
@@ -97,6 +99,9 @@ export default function Sidebar({
     // Sharing is manager-only, and only meaningful inside an org workspace.
     const canShare = manageable && activeOrgId !== null && canManageOrg;
     const items: RowMenuItem[] = [];
+    if (a.is_template && canCreate) {
+      items.push({ label: 'New from template', onSelect: () => onNewFromTemplate(a) });
+    }
     if (manageable) {
       items.push({ label: 'Edit', onSelect: () => onEditAssistant(a) });
       items.push({ label: 'Duplicate', onSelect: () => onDuplicateAssistant(a) });
@@ -120,6 +125,11 @@ export default function Sidebar({
           <span className="block truncate text-sm font-semibold">{a.name}</span>
           <span className="mt-0.5 flex items-center gap-1.5 text-xs capitalize text-slate-400">
             {a.base_agent}
+            {a.is_template && (
+              <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[0.65rem] font-semibold normal-case text-violet-700">
+                Template
+              </span>
+            )}
             {a.shared ? (
               <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[0.65rem] font-semibold normal-case text-brand-600">
                 Shared
@@ -205,9 +215,12 @@ export default function Sidebar({
           <div>
             <p className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">My assistants</p>
             <div className="mt-2 space-y-1">
-              {mine.map((a) => (
-                <AssistantRow key={a.id} a={a} editable />
-              ))}
+              {/* Templates first: they are the starting points. */}
+              {[...mine]
+                .sort((a, b) => Number(b.is_template) - Number(a.is_template))
+                .map((a) => (
+                  <AssistantRow key={a.id} a={a} editable />
+                ))}
             </div>
           </div>
         )}

@@ -80,6 +80,8 @@ export default function DashboardView() {
   const [workspaceResolved, setWorkspaceResolved] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Assistant | null>(null);
+  // Prefill for the "New from template" shortcut (create flow only).
+  const [editorTemplate, setEditorTemplate] = useState<Assistant | null>(null);
   const [sharing, setSharing] = useState<Assistant | null>(null);
   const [whiteLabelOpen, setWhiteLabelOpen] = useState(false);
   const [orgPanelOpen, setOrgPanelOpen] = useState(false);
@@ -685,6 +687,7 @@ export default function DashboardView() {
           onSelectAssistant={startAssistant}
           onEditAssistant={(a) => {
             setEditing(a);
+            setEditorTemplate(null);
             setEditorOpen(true);
           }}
           onDuplicateAssistant={(a) => void duplicate(a)}
@@ -693,8 +696,14 @@ export default function DashboardView() {
               setError((e as Error).message || 'Could not delete that assistant. Please try again.')
             );
           }}
+          onNewFromTemplate={(a) => {
+            setEditing(null);
+            setEditorTemplate(a);
+            setEditorOpen(true);
+          }}
           onNewAssistant={() => {
             setEditing(null);
+            setEditorTemplate(null);
             setEditorOpen(true);
           }}
           onOpenDocuments={() => setDocumentsOpen(true)}
@@ -873,6 +882,8 @@ export default function DashboardView() {
           }}
           memberships={memberships}
           activeOrgId={activeOrgId}
+          templates={[...mine, ...shared].filter((a) => a.is_template)}
+          startFromTemplate={editorTemplate}
           onSaved={refreshAssistants}
           onDelete={editing ? () => removeAssistant(editing) : undefined}
         />

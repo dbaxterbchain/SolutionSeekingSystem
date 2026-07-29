@@ -12,13 +12,13 @@ import { hasAuthorSource, type Entitlement } from '../../lib/server/entitlement'
 import { supabaseAdmin } from '../../lib/server/supabaseAdmin';
 import { AGENT_IDS, type AgentId } from '../../lib/server/agents';
 import { getContextMeta } from '../../lib/contexts';
-import { MAX_ASSISTANT_DOCS, MAX_SETUP_CHARS } from '../../lib/server/assistants';
+import { MAX_ASSISTANT_DOCS, MAX_SETUP_CHARS, canUseAssistant } from '../../lib/server/assistants';
 
 export const prerender = false;
 
 const MAX_ASSISTANTS_PER_USER = 20;
 const ROW_COLUMNS =
-  'id, owner_user_id, org_id, shared, name, base_agent, context, instructions, created_at, updated_at';
+  'id, owner_user_id, org_id, shared, name, base_agent, context, instructions, is_template, template_id, created_at, updated_at';
 
 interface DocView {
   id: string;
@@ -34,6 +34,8 @@ interface AssistantRowRaw {
   base_agent: AgentId;
   context: string | null;
   instructions: string;
+  is_template: boolean;
+  template_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -114,6 +116,20 @@ export const GET: APIRoute = async ({ request }) => {
   const docs = await loadDocViews(all.map((a) => a.id));
   const shareMap = workspace ? await loadShareMap(all.map((a) => a.id)) : new Map<string, string[]>();
 
+  // How many assistants are built on each visible template (drives the
+  // "in use" hints and the un-template guard in the editor).
+  const childCounts = new Map<string, number>();
+  const templateIds = all.filter((r) => r.is_template).map((r) => r.id);
+  if (templateIds.length > 0) {
+    const { data } = await supabaseAdmin
+      .from('assistants')
+      .select('template_id')
+      .in('template_id', templateIds);
+    for (const r of data ?? []) {
+      if (r.template_id) childCounts.set(r.template_id, (childCounts.get(r.template_id) ?? 0) + 1);
+    }
+  }
+
   // Who gets to see the specific-share list: the row's owner and workspace
   // managers (it drives the sharing UI); others only learn what reaches them.
   const shapeRow = (r: AssistantRowRaw) => ({
@@ -123,6 +139,7 @@ export const GET: APIRoute = async ({ request }) => {
         ? (shareMap.get(r.id) ?? [])
         : [],
     member_shared: sharedToMe.has(r.id),
+    child_count: childCounts.get(r.id) ?? 0,
   });
 
   return json({
@@ -177,6 +194,8 @@ function shape(r: AssistantRowRaw, docs: Map<string, DocView[]>) {
     instructions: r.instructions,
     org_id: r.org_id,
     shared: r.shared,
+    is_template: r.is_template,
+    template_id: r.template_id,
     documents: docs.get(r.id) ?? [],
     created_at: r.created_at,
     updated_at: r.updated_at,
@@ -219,20 +238,24 @@ const idList = (v: unknown): string[] =>
     ? [...new Set(v.filter((x): x is string => typeof x === 'string'))].slice(0, MAX_ASSISTANT_DOCS)
     : [];
 
+interface BudgetDoc {
+  id: string;
+  char_count: number;
+}
+
 /**
- * Confirm the docs are usable by this caller and (with the instructions) fit the
- * budget. A document qualifies when the acting user owns it, or (on update, via
+ * Validate the submitted doc ids and return their char counts for budget math.
+ * A document qualifies when the acting user owns it, or (on update, via
  * `allowLinkedTo`) when it is already linked to that assistant: inherited links
  * must survive edits by people who did not upload the file, e.g. a manager
  * editing a shared assistant, or the owner of a duplicate.
  */
-async function checkDocsBudget(
+async function resolveBudgetDocs(
   userId: string,
   documentIds: string[],
-  instructions: string,
   allowLinkedTo?: string
-): Promise<Response | null> {
-  if (documentIds.length === 0) return null;
+): Promise<{ docs: BudgetDoc[] } | { response: Response }> {
+  if (documentIds.length === 0) return { docs: [] };
   let linkedIds = new Set<string>();
   if (allowLinkedTo) {
     const { data: linked } = await supabaseAdmin
@@ -250,17 +273,123 @@ async function checkDocsBudget(
     found.length !== documentIds.length ||
     found.some((d) => d.user_id !== userId && !linkedIds.has(d.id))
   ) {
-    return json({ error: 'bad_request', field: 'documents' }, 400);
+    return { response: json({ error: 'bad_request', field: 'documents' }, 400) };
   }
-  const total = instructions.length + found.reduce((s, d) => s + (d.char_count ?? 0), 0);
-  if (total > MAX_SETUP_CHARS) {
-    return json(
-      {
-        error: 'setup_too_large',
-        message: 'Those instructions and documents are too long together. Use fewer or shorter documents.',
-      },
-      409
+  return { docs: found.map((d) => ({ id: d.id, char_count: d.char_count ?? 0 })) };
+}
+
+/** A template's setup footprint: its instructions plus its documents' chars. */
+async function templateFootprint(
+  templateId: string
+): Promise<{ chars: number; docIds: Set<string> }> {
+  const { data: t } = await supabaseAdmin
+    .from('assistants')
+    .select('instructions')
+    .eq('id', templateId)
+    .maybeSingle();
+  const { data: joins } = await supabaseAdmin
+    .from('assistant_documents')
+    .select('document_id, documents ( char_count )')
+    .eq('assistant_id', templateId);
+  let chars = t?.instructions.length ?? 0;
+  const docIds = new Set<string>();
+  for (const j of joins ?? []) {
+    docIds.add(j.document_id);
+    chars += (j.documents as unknown as { char_count: number | null } | null)?.char_count ?? 0;
+  }
+  return { chars, docIds };
+}
+
+/**
+ * instructions + docs (+ inherited template setup, docs deduped the same way
+ * chat-time composition dedupes them) against the one setup budget.
+ */
+function checkSetupBudget(
+  instructions: string,
+  docs: BudgetDoc[],
+  template: { chars: number; docIds: Set<string> } | null
+): Response | null {
+  const total =
+    instructions.length +
+    (template?.chars ?? 0) +
+    docs.reduce((s, d) => s + (template?.docIds.has(d.id) ? 0 : d.char_count), 0);
+  if (total <= MAX_SETUP_CHARS) return null;
+  return json(
+    {
+      error: 'setup_too_large',
+      message: template
+        ? 'This assistant plus its template are too long together. Use fewer or shorter documents.'
+        : 'Those instructions and documents are too long together. Use fewer or shorter documents.',
+    },
+    409
+  );
+}
+
+async function childCount(templateId: string): Promise<number> {
+  const { count } = await supabaseAdmin
+    .from('assistants')
+    .select('id', { count: 'exact', head: true })
+    .eq('template_id', templateId);
+  return count ?? 0;
+}
+
+const templateInUse = (count: number): Response =>
+  json(
+    {
+      error: 'template_in_use',
+      count,
+      message:
+        count === 1
+          ? 'An assistant is built on this template. Delete it first.'
+          : `${count} assistants are built on this template. Delete them first.`,
+    },
+    409
+  );
+
+/** Every child must still fit beside the template's NEW footprint. */
+async function checkTemplateRoom(
+  templateId: string,
+  instructions: string,
+  docs: BudgetDoc[]
+): Promise<Response | null> {
+  const { data: children } = await supabaseAdmin
+    .from('assistants')
+    .select('id, instructions')
+    .eq('template_id', templateId);
+  if (!children || children.length === 0) return null;
+  const { data: joins } = await supabaseAdmin
+    .from('assistant_documents')
+    .select('assistant_id, document_id, documents ( char_count )')
+    .in(
+      'assistant_id',
+      children.map((c) => c.id)
     );
+  const perChild = new Map<string, BudgetDoc[]>();
+  for (const j of joins ?? []) {
+    const list = perChild.get(j.assistant_id) ?? [];
+    list.push({
+      id: j.document_id,
+      char_count: (j.documents as unknown as { char_count: number | null } | null)?.char_count ?? 0,
+    });
+    perChild.set(j.assistant_id, list);
+  }
+  const footprint = instructions.length + docs.reduce((s, d) => s + d.char_count, 0);
+  const newIds = new Set(docs.map((d) => d.id));
+  for (const c of children) {
+    const own = (perChild.get(c.id) ?? []).reduce(
+      (s, d) => s + (newIds.has(d.id) ? 0 : d.char_count),
+      0
+    );
+    if (footprint + c.instructions.length + own > MAX_SETUP_CHARS) {
+      return json(
+        {
+          error: 'template_too_large',
+          message:
+            'Assistants built on this template no longer fit beside it. Shorten the template or its documents.',
+        },
+        409
+      );
+    }
   }
   return null;
 }
@@ -325,12 +454,43 @@ async function createAssistant(
     return json({ error: 'role_restricted' }, 403);
   }
 
-  const budgetErr = await checkDocsBudget(user.id, documentIds, instructions);
+  // Optional template base: must be a real template the creator can use, in
+  // the SAME workspace, with the same base agent (composition assumes one
+  // persona). Chains are impossible (a template never has template_id).
+  const templateId = str(body.template_id) || null;
+  let template: { chars: number; docIds: Set<string> } | null = null;
+  if (templateId) {
+    const { data: t } = await supabaseAdmin
+      .from('assistants')
+      .select('id, owner_user_id, org_id, shared, is_template, template_id, base_agent')
+      .eq('id', templateId)
+      .maybeSingle();
+    if (!t || !t.is_template || t.template_id !== null || (t.org_id ?? null) !== orgId) {
+      return json({ error: 'bad_request', field: 'template_id' }, 400);
+    }
+    if (t.base_agent !== baseAgent) return json({ error: 'bad_request', field: 'agent' }, 400);
+    if (!(await canUseAssistant(t, user, memberships))) {
+      return json({ error: 'bad_request', field: 'template_id' }, 400);
+    }
+    template = await templateFootprint(templateId);
+  }
+
+  const resolved = await resolveBudgetDocs(user.id, documentIds);
+  if ('response' in resolved) return resolved.response;
+  const budgetErr = checkSetupBudget(instructions, resolved.docs, template);
   if (budgetErr) return budgetErr;
 
   const { data: created, error } = await supabaseAdmin
     .from('assistants')
-    .insert({ owner_user_id: user.id, org_id: orgId, name, base_agent: baseAgent, context, instructions })
+    .insert({
+      owner_user_id: user.id,
+      org_id: orgId,
+      name,
+      base_agent: baseAgent,
+      context,
+      instructions,
+      template_id: templateId,
+    })
     .select('id')
     .single();
   if (error || !created) {
@@ -361,13 +521,15 @@ async function loadOwnedOrManaged(
         name: string;
         context: string | null;
         instructions: string;
+        is_template: boolean;
+        template_id: string | null;
       };
     }
   | { response: Response }
 > {
   const { data: row } = await supabaseAdmin
     .from('assistants')
-    .select('id, owner_user_id, org_id, shared, base_agent, name, context, instructions')
+    .select('id, owner_user_id, org_id, shared, base_agent, name, context, instructions, is_template, template_id')
     .eq('id', id)
     .maybeSingle();
   if (!row) return { response: json({ error: 'not_found' }, 404) };
@@ -392,26 +554,53 @@ async function updateAssistant(user: User, body: Record<string, unknown>): Promi
   if (!id) return json({ error: 'bad_request' }, 400);
   const access = await loadOwnedOrManaged(user, id);
   if ('response' in access) return access.response;
+  const row = access.row;
 
   const name = str(body.name).trim();
   if (name.length < 1 || name.length > 80) return json({ error: 'bad_request', field: 'name' }, 400);
   // base_agent is immutable after create; validate the mode against the stored agent.
   const context = str(body.context) || null;
   if (context) {
-    const meta = getContextMeta(context, access.row.base_agent);
+    const meta = getContextMeta(context, row.base_agent);
     if (!meta || meta.kind !== 'mode') return json({ error: 'bad_request', field: 'context' }, 400);
   }
   const instructions = str(body.instructions).slice(0, 8000);
   const documentIds = idList(body.document_ids);
 
-  const budgetErr = await checkDocsBudget(user.id, documentIds, instructions, id);
+  // The owner may flip "Use as a template". A child can never become one, and
+  // a template in use cannot stop being one (the DB trigger backstops races).
+  let isTemplate = row.is_template;
+  if (typeof body.is_template === 'boolean' && row.owner_user_id === user.id) {
+    if (body.is_template && row.template_id) {
+      return json({ error: 'bad_request', field: 'is_template' }, 400);
+    }
+    if (!body.is_template && row.is_template) {
+      const kids = await childCount(id);
+      if (kids > 0) return templateInUse(kids);
+    }
+    isTemplate = body.is_template;
+  }
+
+  const resolved = await resolveBudgetDocs(user.id, documentIds, id);
+  if ('response' in resolved) return resolved.response;
+  const template = row.template_id ? await templateFootprint(row.template_id) : null;
+  const budgetErr = checkSetupBudget(instructions, resolved.docs, template);
   if (budgetErr) return budgetErr;
+
+  // Editing a template must leave room for every assistant built on it.
+  if (row.is_template) {
+    const roomErr = await checkTemplateRoom(id, instructions, resolved.docs);
+    if (roomErr) return roomErr;
+  }
 
   const { error } = await supabaseAdmin
     .from('assistants')
-    .update({ name, context, instructions })
+    .update({ name, context, instructions, is_template: isTemplate })
     .eq('id', id);
   if (error) {
+    if ((error as { code?: string }).code === '23514') {
+      return templateInUse(await childCount(id));
+    }
     console.error('assistant update failed', error);
     return json({ error: 'server_error' }, 500);
   }
@@ -451,6 +640,8 @@ async function duplicateAssistant(
   } else if (!hasAuthorSource(entitlement, memberships)) {
     return json({ error: 'role_restricted' }, 403);
   }
+  // A duplicate of a child keeps its template link (same workspace, so the
+  // link stays valid); a duplicate of a template is a plain assistant.
   const { data: created, error } = await supabaseAdmin
     .from('assistants')
     .insert({
@@ -460,6 +651,7 @@ async function duplicateAssistant(
       base_agent: source.base_agent,
       context: source.context,
       instructions: source.instructions,
+      template_id: source.template_id,
     })
     .select('id')
     .single();
@@ -489,6 +681,11 @@ async function deleteAssistant(user: User, body: Record<string, unknown>): Promi
   if (!id) return json({ error: 'bad_request' }, 400);
   const access = await loadOwnedOrManaged(user, id);
   if ('response' in access) return access.response;
+  // A template in use cannot be deleted (the RESTRICT FK is the backstop).
+  if (access.row.is_template) {
+    const kids = await childCount(id);
+    if (kids > 0) return templateInUse(kids);
+  }
   // A white-label page cascades away with its assistant (FK on delete cascade),
   // so warn before that happens unless the caller confirms.
   if (body.confirm !== true) {
@@ -502,6 +699,10 @@ async function deleteAssistant(user: User, body: Record<string, unknown>): Promi
   }
   const { error } = await supabaseAdmin.from('assistants').delete().eq('id', id);
   if (error) {
+    // 23503 = the restrict FK fired on a race (a child appeared since the check).
+    if ((error as { code?: string }).code === '23503') {
+      return templateInUse(await childCount(id));
+    }
     console.error('assistant delete failed', error);
     return json({ error: 'server_error' }, 500);
   }
@@ -609,10 +810,27 @@ async function moveAssistant(user: User, body: Record<string, unknown>): Promise
   const target = str(body.org_id).trim() || null; // null = Personal
   const { data: row } = await supabaseAdmin
     .from('assistants')
-    .select('owner_user_id')
+    .select('owner_user_id, org_id, is_template, template_id')
     .eq('id', id)
     .maybeSingle();
   if (!row || row.owner_user_id !== user.id) return json({ error: 'not_found' }, 404);
+  if ((row.org_id ?? null) !== target) {
+    // Template links never cross workspaces: a child cannot move away from its
+    // template, and a template cannot leave its children behind.
+    if (row.template_id) {
+      return json(
+        {
+          error: 'template_linked',
+          message: 'This assistant is built on a template and cannot move between workspaces.',
+        },
+        409
+      );
+    }
+    if (row.is_template) {
+      const kids = await childCount(id);
+      if (kids > 0) return templateInUse(kids);
+    }
+  }
   if (target) {
     // Moving INTO an org workspace requires a non-client seat there; moving
     // out to Personal is always the owner's right.

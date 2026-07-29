@@ -24,6 +24,12 @@ export interface Assistant {
   member_share_ids: string[];
   /** True when this assistant reaches the caller through a specific share. */
   member_shared: boolean;
+  /** Other assistants can be built on a template; it can't be deleted in use. */
+  is_template: boolean;
+  /** The template this assistant is built on (inherits its setup live). */
+  template_id: string | null;
+  /** For templates: how many assistants are built on it. */
+  child_count: number;
   documents: AssistantDocRef[];
   created_at: string;
   updated_at: string;
@@ -48,6 +54,10 @@ export interface AssistantInput {
   context: string | null;
   instructions: string;
   document_ids: string[];
+  /** Create only: the template this assistant is built on. */
+  template_id?: string | null;
+  /** Update only (owners): whether this assistant is a template. */
+  is_template?: boolean;
 }
 
 async function authHeaders(): Promise<Record<string, string>> {
@@ -167,6 +177,12 @@ function assistantErrorMessage(code?: string): string {
       return 'Those instructions and documents are too long together. Use fewer or shorter documents.';
     case 'page_attached':
       return 'This assistant powers a white-label page, so deleting it needs an extra confirmation.';
+    case 'template_in_use':
+      return 'Assistants are built on this template. Delete them first.';
+    case 'template_too_large':
+      return 'Assistants built on this template no longer fit beside it. Shorten the template or its documents.';
+    case 'template_linked':
+      return 'This assistant is built on a template and cannot move between workspaces.';
     default:
       return 'Something went wrong. Please try again.';
   }
