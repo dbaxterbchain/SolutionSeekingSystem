@@ -137,7 +137,8 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     if (!loaded) return json({ error: 'assistant_not_found' }, 404);
     effectiveAgent = loaded.assistant.base_agent;
     effectiveContext = loaded.assistant.context ?? undefined;
-    assistantSetup = buildAssistantSetup(loaded.assistant.instructions, loaded.docs);
+    // Template inheritance is already composed into the setup inputs.
+    assistantSetup = buildAssistantSetup(loaded.setupInstructions, loaded.setupDocs);
   }
 
   // Attachments are a subscriber feature; a free/anonymous caller who hand-crafts

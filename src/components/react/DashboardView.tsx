@@ -22,8 +22,9 @@ import { streamChat } from '../../lib/chatStream';
 import { listDocuments, uploadAndRegister, type DocumentMeta } from '../../lib/documents';
 import {
   fetchAssistants,
-  shareAssistant,
-  unshareAssistant,
+  duplicateAssistant,
+  deleteAssistant,
+  AssistantActionError,
   type Assistant,
   type AssistantsData,
 } from '../../lib/assistantsClient';
@@ -34,6 +35,7 @@ import Sidebar from './dashboard/Sidebar';
 import AttachControl from './dashboard/AttachControl';
 import DocumentsPanel from './dashboard/DocumentsPanel';
 import AssistantEditor from './dashboard/AssistantEditor';
+import ShareDialog from './dashboard/ShareDialog';
 import WhiteLabelPanel from './dashboard/WhiteLabelPanel';
 import OrgPanel from './dashboard/OrgPanel';
 
@@ -78,6 +80,9 @@ export default function DashboardView() {
   const [workspaceResolved, setWorkspaceResolved] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<Assistant | null>(null);
+  // Prefill for the "New from template" shortcut (create flow only).
+  const [editorTemplate, setEditorTemplate] = useState<Assistant | null>(null);
+  const [sharing, setSharing] = useState<Assistant | null>(null);
   const [whiteLabelOpen, setWhiteLabelOpen] = useState(false);
   const [orgPanelOpen, setOrgPanelOpen] = useState(false);
   // Post-Teams-checkout hand-off: 'pending' while we wait for the webhook to
@@ -105,20 +110,30 @@ export default function DashboardView() {
   // the server already scoped `mine`/`shared` to it, so no client-side org filter.
   const activeOrg = memberships.find((m) => m.orgId === activeOrgId) ?? null;
   const isManagerOfActive = activeOrg?.role === 'manager';
+  const activeRole = activeOrg?.role ?? null;
   const ownsSelected = Boolean(assistant && mine.some((a) => a.id === assistant.id));
   const canManageSelected =
     ownsSelected ||
     Boolean(
       assistant?.org_id &&
-        assistant?.shared &&
+        (assistant?.shared || (assistant?.member_share_ids.length ?? 0) > 0) &&
         memberships.some((m) => m.orgId === assistant.org_id && m.role === 'manager')
     );
+  // Authoring (creating assistants, the document library) is off only for
+  // client-only users; fails OPEN when the entitlement lookup failed, because
+  // the server is the real gate (see the note on canUseDashboard).
+  const canAuthor = entitlement?.kind === 'subscriber' ? entitlement.authoring !== false : true;
+  const canCreateHere = activeOrgId ? activeRole !== 'client' : canAuthor;
+  const canUseDocsHere = canCreateHere;
+  // A client's uploads (chat attachments) always land in their Personal
+  // library; the server refuses org-tagged documents for client seats.
+  const docsOrgId = activeOrgId && activeRole === 'client' ? null : activeOrgId;
 
   const refreshRecents = () => {
     listChatSessions(activeOrgId).then(setRecents).catch(() => setRecents([]));
   };
   const refreshDocuments = () => {
-    listDocuments(activeOrgId).then(setDocuments).catch(() => setDocuments([]));
+    listDocuments(docsOrgId).then(setDocuments).catch(() => setDocuments([]));
   };
   const refreshAssistants = () => {
     fetchAssistants(activeOrgId)
@@ -324,15 +339,46 @@ export default function DashboardView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, canUseDashboard]);
 
-  // One-click share toggle for an owned assistant in the active org workspace.
-  const toggleShare = async (a: Assistant) => {
+  const duplicate = async (a: Assistant) => {
     try {
-      if (a.shared) await unshareAssistant(a.id);
-      else await shareAssistant(a.id);
+      await duplicateAssistant(a.id);
       refreshAssistants();
     } catch (e) {
-      setError((e as Error).message || 'Could not update sharing. Please try again.');
+      setError((e as Error).message || 'Could not duplicate that assistant. Please try again.');
     }
+  };
+
+  /**
+   * Confirm and delete an assistant, handling the server's 409 `page_attached`
+   * answer (white-label pages cascade away with their assistant) with a second,
+   * explicit confirmation. Returns true when it was deleted; false when the
+   * user cancelled; throws with a user-facing message when the server refused.
+   */
+  const removeAssistant = async (a: Assistant): Promise<boolean> => {
+    const ok = await confirm({
+      title: 'Delete this assistant?',
+      message: `"${a.name}" will be permanently removed${a.shared ? ' for everyone in the organization' : ''}. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    });
+    if (!ok) return false;
+    try {
+      await deleteAssistant(a.id);
+    } catch (e) {
+      if (!(e instanceof AssistantActionError) || e.code !== 'page_attached') throw e;
+      const slugs = e.slugs ?? [];
+      const pages = slugs.map((s) => `/a/${a.org_id}/${s}`).join(', ');
+      const okPages = await confirm({
+        title: slugs.length === 1 ? 'This assistant powers a live page' : 'This assistant powers live pages',
+        message: `Deleting it also deletes ${pages}. Anyone who visits will get a 404. This cannot be undone.`,
+        confirmLabel: slugs.length === 1 ? 'Delete assistant and page' : 'Delete assistant and pages',
+        tone: 'danger',
+      });
+      if (!okPages) return false;
+      await deleteAssistant(a.id, { confirm: true });
+    }
+    refreshAssistants();
+    return true;
   };
 
   const openSaved = (saved: ChatSession) => {
@@ -641,22 +687,38 @@ export default function DashboardView() {
           onSelectAssistant={startAssistant}
           onEditAssistant={(a) => {
             setEditing(a);
+            setEditorTemplate(null);
+            setEditorOpen(true);
+          }}
+          onDuplicateAssistant={(a) => void duplicate(a)}
+          onDeleteAssistant={(a) => {
+            void removeAssistant(a).catch((e) =>
+              setError((e as Error).message || 'Could not delete that assistant. Please try again.')
+            );
+          }}
+          onNewFromTemplate={(a) => {
+            setEditing(null);
+            setEditorTemplate(a);
             setEditorOpen(true);
           }}
           onNewAssistant={() => {
             setEditing(null);
+            setEditorTemplate(null);
             setEditorOpen(true);
           }}
           onOpenDocuments={() => setDocumentsOpen(true)}
           onOpenWhiteLabel={() => setWhiteLabelOpen(true)}
           onOpenOrgSettings={() => setOrgPanelOpen(true)}
           canManageOrg={isManagerOfActive}
+          canCreate={canCreateHere}
+          showDocuments={canUseDocsHere}
+          clientView={activeRole === 'client'}
           memberships={memberships}
           activeOrgId={activeOrgId}
           onSelectOrg={selectWorkspace}
           mine={mine}
           shared={shared}
-          onToggleShare={toggleShare}
+          onOpenSharing={setSharing}
           orgName={activeOrg?.orgName ?? null}
           recents={recents}
           activeChatId={chatId}
@@ -788,7 +850,7 @@ export default function DashboardView() {
             selected={pendingAttachments}
             onChange={setPendingAttachments}
             onUpload={async (file) => {
-              const doc = await uploadAndRegister(file, activeOrgId);
+              const doc = await uploadAndRegister(file, docsOrgId);
               refreshDocuments();
               return doc;
             }}
@@ -802,8 +864,8 @@ export default function DashboardView() {
         open={documentsOpen}
         onClose={() => setDocumentsOpen(false)}
         documents={documents}
-        orgId={activeOrgId}
-        orgName={activeOrg?.orgName ?? null}
+        orgId={docsOrgId}
+        orgName={docsOrgId ? (activeOrg?.orgName ?? null) : null}
         onChanged={refreshDocuments}
       />
       {editorOpen && (
@@ -814,19 +876,32 @@ export default function DashboardView() {
           owned={editing ? mine.some((a) => a.id === editing.id) : true}
           documents={documents}
           onUpload={async (file) => {
-            const doc = await uploadAndRegister(file, activeOrgId);
+            const doc = await uploadAndRegister(file, docsOrgId);
             refreshDocuments();
             return doc;
           }}
           memberships={memberships}
           activeOrgId={activeOrgId}
+          templates={[...mine, ...shared].filter((a) => a.is_template)}
+          startFromTemplate={editorTemplate}
+          onSaved={refreshAssistants}
+          onDelete={editing ? () => removeAssistant(editing) : undefined}
+        />
+      )}
+      {sharing && activeOrgId && (
+        <ShareDialog
+          assistant={sharing}
+          orgId={activeOrgId}
+          orgName={activeOrg?.orgName ?? null}
+          owned={mine.some((a) => a.id === sharing.id)}
+          onClose={() => setSharing(null)}
           onSaved={refreshAssistants}
         />
       )}
       <WhiteLabelPanel
         open={whiteLabelOpen}
         onClose={() => setWhiteLabelOpen(false)}
-        assistants={[...mine.filter((a) => a.shared), ...shared]}
+        assistants={[...mine, ...shared].filter((a) => a.org_id === activeOrgId)}
         orgId={activeOrgId}
         orgName={activeOrg?.orgName ?? null}
       />

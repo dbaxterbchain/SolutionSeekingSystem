@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 import { supabaseAdmin } from './supabaseAdmin';
-import { getOrgMemberships } from './orgMembership';
+import { getOrgMemberships, type OrgMembership } from './orgMembership';
 import { FREE_ANON_MESSAGES, FREE_ACCOUNT_MESSAGES } from '../../data/pricing';
 
 /** Lifetime free messages for signed-in users without a subscription. */
@@ -31,6 +31,21 @@ export type Entitlement =
   | { kind: 'subscriber'; via: 'stripe' | 'org'; orgName?: string }
   | { kind: 'free'; tier: Tier; used: number; remaining: number; limit: number }
   | { kind: 'blocked'; tier: Tier; used: number; limit: number };
+
+/**
+ * Whether this user may AUTHOR: create assistants and keep a document library.
+ * True for a personal Stripe subscription, or a member/manager seat in an
+ * entitled org. A client-only user is a consumer: they chat with Guide/Mentor
+ * and whatever is shared with them (attaching their own uploads is fine), but
+ * they cannot create. Role governs authoring only; checkEntitlement below
+ * stays role-blind on purpose, so client seats keep their chat access.
+ */
+export const hasAuthorSource = (
+  entitlement: Entitlement,
+  memberships: OrgMembership[]
+): boolean =>
+  (entitlement.kind === 'subscriber' && entitlement.via === 'stripe') ||
+  memberships.some((m) => m.role !== 'client' && ENTITLED_STATUSES.includes(m.orgStatus));
 
 /**
  * The server is the only authority on how many messages a user has left.

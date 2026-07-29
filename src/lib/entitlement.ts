@@ -12,7 +12,17 @@ import { useSession } from './useSession';
  * matters, locking them out of a product somebody is paying for.
  */
 export type ClientEntitlement =
-  | { kind: 'subscriber'; via: 'stripe' | 'org'; orgName?: string }
+  | {
+      kind: 'subscriber';
+      via: 'stripe' | 'org';
+      orgName?: string;
+      /**
+       * Whether this user may author (create assistants, keep a document
+       * library). Absent on older responses; treat missing as true. False only
+       * for client-only users (every entitled seat is a client seat).
+       */
+      authoring?: boolean;
+    }
   | { kind: 'free'; tier: 'anon' | 'account'; used: number; remaining: number; limit: number }
   | { kind: 'blocked'; tier: 'anon' | 'account'; used: number; limit: number };
 

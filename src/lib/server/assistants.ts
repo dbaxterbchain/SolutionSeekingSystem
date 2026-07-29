@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 import { supabaseAdmin } from './supabaseAdmin';
-import { getOrgMemberships, isMemberOf } from './orgMembership';
+import { getOrgMemberships, getMembership, type OrgMembership } from './orgMembership';
 import type { AgentId } from './agents';
 
 /** Total setup-injection budget (~30k tokens): instructions + all knowledge docs. */
@@ -17,6 +17,8 @@ export interface AssistantRow {
   base_agent: AgentId;
   context: string | null;
   instructions: string;
+  is_template: boolean;
+  template_id: string | null;
 }
 
 export interface AssistantDoc {
@@ -26,36 +28,8 @@ export interface AssistantDoc {
   text: string;
 }
 
-/**
- * Load an assistant the user is allowed to use, with its knowledge documents in
- * deterministic order. Access = owner, OR a member of the organization the
- * assistant is SHARED to (org_id set and shared = true). A private draft that
- * merely lives in an org workspace stays owner-only. Returns null when the
- * assistant doesn't exist or the caller can't reach it, so the API can answer a
- * non-probeable 404.
- */
-export async function loadAssistantForUser(
-  assistantId: string,
-  user: User
-): Promise<{ assistant: AssistantRow; docs: AssistantDoc[] } | null> {
-  const { data: assistant, error } = await supabaseAdmin
-    .from('assistants')
-    .select('id, owner_user_id, org_id, shared, name, base_agent, context, instructions')
-    .eq('id', assistantId)
-    .maybeSingle();
-  if (error) {
-    console.error('assistant lookup failed', error);
-    return null;
-  }
-  if (!assistant) return null;
-
-  if (assistant.owner_user_id !== user.id) {
-    // Not the owner: allowed only if it's shared to an org they belong to.
-    if (!assistant.org_id || !assistant.shared) return null;
-    const memberships = await getOrgMemberships(user);
-    if (!isMemberOf(memberships, assistant.org_id)) return null;
-  }
-
+/** An assistant's knowledge documents in deterministic order. */
+async function loadDocsFor(assistantId: string): Promise<AssistantDoc[]> {
   const { data: joins } = await supabaseAdmin
     .from('assistant_documents')
     .select('position, document_id, documents ( name, extracted_text )')
@@ -63,7 +37,7 @@ export async function loadAssistantForUser(
     .order('position', { ascending: true })
     .order('document_id', { ascending: true });
 
-  const docs: AssistantDoc[] = (joins ?? []).map((j) => {
+  return (joins ?? []).map((j) => {
     const d = j.documents as unknown as { name: string; extracted_text: string } | null;
     return {
       document_id: j.document_id,
@@ -72,8 +46,117 @@ export async function loadAssistantForUser(
       text: d?.extracted_text ?? '',
     };
   });
+}
 
-  return { assistant: assistant as AssistantRow, docs };
+/**
+ * Whether this user may USE (chat with) the assistant: owner, org-wide share
+ * for a member/manager seat, or a specific share for their seat. The single
+ * access rule, shared by the chat gate and template instantiation.
+ */
+export async function canUseAssistant(
+  assistant: { id: string; owner_user_id: string; org_id: string | null; shared: boolean },
+  user: User,
+  memberships: OrgMembership[]
+): Promise<boolean> {
+  if (assistant.owner_user_id === user.id) return true;
+  if (!assistant.org_id) return false;
+  const membership = getMembership(memberships, assistant.org_id);
+  if (!membership) return false;
+  // Org-wide sharing deliberately excludes client seats.
+  if (assistant.shared && membership.role !== 'client') return true;
+  const { count } = await supabaseAdmin
+    .from('assistant_shares')
+    .select('assistant_id', { count: 'exact', head: true })
+    .eq('assistant_id', assistant.id)
+    .eq('member_id', membership.memberId);
+  return Boolean(count);
+}
+
+export interface LoadedAssistant {
+  assistant: AssistantRow;
+  docs: AssistantDoc[];
+  /**
+   * The composed setup inputs for buildAssistantSetup: when the assistant is
+   * built on a template, the template's instructions and documents come first
+   * and the assistant's own layer on top. Otherwise identical to the
+   * assistant's own instructions and docs.
+   */
+  setupInstructions: string;
+  setupDocs: AssistantDoc[];
+}
+
+/**
+ * Load an assistant the user is allowed to use, with its knowledge documents in
+ * deterministic order. Access = owner, OR org-wide share (org_id set, shared =
+ * true) for a member/manager seat in that org, OR a per-seat assistant_shares
+ * row (the only arm that reaches a client seat). A private draft that merely
+ * lives in an org workspace stays owner-only. Returns null when the assistant
+ * doesn't exist or the caller can't reach it, so the API can answer a
+ * non-probeable 404.
+ *
+ * Template composition happens here so /api/chat stays one call: a child
+ * inherits its template's setup, but ONLY while template and child share a
+ * workspace and, for org workspaces, the caller still holds a seat there. An
+ * ex-member chatting an org child of their own stops receiving the org's
+ * template content. Deterministic per (user, database state), so the prompt
+ * cache still hits; editing the template intentionally rolls children's
+ * entries.
+ */
+export async function loadAssistantForUser(
+  assistantId: string,
+  user: User
+): Promise<LoadedAssistant | null> {
+  const { data: assistant, error } = await supabaseAdmin
+    .from('assistants')
+    .select(
+      'id, owner_user_id, org_id, shared, name, base_agent, context, instructions, is_template, template_id'
+    )
+    .eq('id', assistantId)
+    .maybeSingle();
+  if (error) {
+    console.error('assistant lookup failed', error);
+    return null;
+  }
+  if (!assistant) return null;
+
+  let memberships: OrgMembership[] | null = null;
+  const loadMemberships = async () => {
+    if (memberships === null) memberships = await getOrgMemberships(user);
+    return memberships;
+  };
+
+  if (assistant.owner_user_id !== user.id) {
+    if (!assistant.org_id) return null;
+    if (!(await canUseAssistant(assistant, user, await loadMemberships()))) return null;
+  }
+
+  const docs = await loadDocsFor(assistantId);
+
+  let setupInstructions: string = assistant.instructions;
+  let setupDocs: AssistantDoc[] = docs;
+  if (assistant.template_id) {
+    const { data: template } = await supabaseAdmin
+      .from('assistants')
+      .select('id, org_id, is_template, instructions')
+      .eq('id', assistant.template_id)
+      .maybeSingle();
+    let included = Boolean(
+      template && template.is_template && (template.org_id ?? null) === (assistant.org_id ?? null)
+    );
+    if (included && assistant.org_id) {
+      included = Boolean(getMembership(await loadMemberships(), assistant.org_id));
+    }
+    if (included && template) {
+      const templateDocs = await loadDocsFor(template.id);
+      const inherited = new Set(templateDocs.map((d) => d.document_id));
+      setupInstructions = [template.instructions.trim(), assistant.instructions.trim()]
+        .filter(Boolean)
+        .join('\n\n');
+      setupDocs = [...templateDocs, ...docs.filter((d) => !inherited.has(d.document_id))];
+    }
+  }
+
+  return { assistant: assistant as AssistantRow, docs, setupInstructions, setupDocs };
 }
 
 /**

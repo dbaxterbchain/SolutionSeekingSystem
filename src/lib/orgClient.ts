@@ -6,11 +6,13 @@ import { supabase } from './supabase';
  * Error messages built from the server's `message` field when present.
  */
 
+export type OrgMemberRole = 'member' | 'manager' | 'client';
+
 export interface OrgMemberView {
   id: string;
   email: string;
   claimed: boolean;
-  role: 'member' | 'manager';
+  role: OrgMemberRole;
   joined_at: string | null;
   is_self: boolean;
 }
@@ -60,8 +62,12 @@ export async function renameOrg(orgId: string, name: string): Promise<void> {
   await post({ action: 'rename', org_id: orgId, name });
 }
 
-export async function addMember(orgId: string, email: string): Promise<void> {
-  await post({ action: 'add_member', org_id: orgId, email });
+export async function addMember(
+  orgId: string,
+  email: string,
+  role: OrgMemberRole = 'member'
+): Promise<void> {
+  await post({ action: 'add_member', org_id: orgId, email, role });
 }
 
 export async function removeMember(orgId: string, memberId: string): Promise<void> {
@@ -71,7 +77,7 @@ export async function removeMember(orgId: string, memberId: string): Promise<voi
 export async function setMemberRole(
   orgId: string,
   memberId: string,
-  role: 'member' | 'manager'
+  role: OrgMemberRole
 ): Promise<void> {
   await post({ action: 'set_role', org_id: orgId, id: memberId, role });
 }

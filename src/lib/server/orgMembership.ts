@@ -1,13 +1,15 @@
 import type { User } from '@supabase/supabase-js';
 import { supabaseAdmin } from './supabaseAdmin';
 
-export type OrgRole = 'member' | 'manager';
+export type OrgRole = 'member' | 'manager' | 'client';
 
 export interface OrgMembership {
   orgId: string;
   orgName: string;
   orgStatus: string;
   role: OrgRole;
+  /** The org_members row id (the SEAT): per-member shares are keyed to it. */
+  memberId: string;
 }
 
 /**
@@ -34,7 +36,7 @@ export async function getOrgMemberships(user: User): Promise<OrgMembership[]> {
 
   const { data, error } = await supabaseAdmin
     .from('org_members')
-    .select('role, org_id, organizations ( name, status )')
+    .select('id, role, org_id, organizations ( name, status )')
     .eq('user_id', user.id);
   if (error) {
     console.error('org memberships lookup failed', error);
@@ -50,14 +52,29 @@ export async function getOrgMemberships(user: User): Promise<OrgMembership[]> {
       orgName: org.name,
       orgStatus: org.status,
       role: (row.role as OrgRole) ?? 'member',
+      memberId: row.id,
     });
   }
   return memberships;
 }
 
-/** True if the user is a member of the given org. */
+/** The user's membership (seat) in the given org, if any. */
+export const getMembership = (
+  memberships: OrgMembership[],
+  orgId: string
+): OrgMembership | undefined => memberships.find((m) => m.orgId === orgId);
+
+/** True if the user is a member of the given org (any role, clients included). */
 export const isMemberOf = (memberships: OrgMembership[], orgId: string): boolean =>
   memberships.some((m) => m.orgId === orgId);
+
+/**
+ * True if the user holds a member or manager seat in the given org. Clients
+ * fail this: it gates org-wide resources (org documents, org-shared
+ * assistants, creating into the workspace) that a client seat must not reach.
+ */
+export const isNonClientMemberOf = (memberships: OrgMembership[], orgId: string): boolean =>
+  memberships.some((m) => m.orgId === orgId && m.role !== 'client');
 
 /** True if the user is a manager of the given org. */
 export const isManagerOf = (memberships: OrgMembership[], orgId: string): boolean =>

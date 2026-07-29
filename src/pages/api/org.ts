@@ -84,7 +84,7 @@ export const GET: APIRoute = async ({ request }) => {
     id: m.id,
     email: m.email,
     claimed: m.user_id !== null,
-    role: (m.role ?? 'member') as 'member' | 'manager',
+    role: (m.role ?? 'member') as 'member' | 'manager' | 'client',
     joined_at: m.joined_at,
     is_self: m.user_id === gate.user.id,
   }));
@@ -132,12 +132,16 @@ export const POST: APIRoute = async ({ request }) => {
       if (!looksLikeEmail(email)) {
         return json({ error: 'bad_request', message: 'A valid email address is required.' }, 400);
       }
+      const role = body.role === undefined ? 'member' : body.role;
+      if (role !== 'member' && role !== 'manager' && role !== 'client') {
+        return json({ error: 'bad_request', message: 'Unknown role.' }, 400);
+      }
       // Keyed to the user, not the IP: a manager legitimately adds many
       // members in a sitting, but not hundreds in an hour.
       if (await isRateLimited('org_add_member', gate.user.id, 30, 60 * 60)) {
         return json({ error: 'rate_limited' }, 429);
       }
-      const { error } = await supabaseAdmin.from('org_members').insert({ org_id: orgId, email });
+      const { error } = await supabaseAdmin.from('org_members').insert({ org_id: orgId, email, role });
       if (error) return fail('org add_member', error);
       return json({ ok: true });
     }
@@ -158,12 +162,15 @@ export const POST: APIRoute = async ({ request }) => {
 
     case 'set_role': {
       const role = body.role;
-      if (role !== 'member' && role !== 'manager') return json({ error: 'bad_request' }, 400);
+      if (role !== 'member' && role !== 'manager' && role !== 'client') {
+        return json({ error: 'bad_request' }, 400);
+      }
       const target = await loadMember(orgId, str(body.id));
       if (!target) return json({ error: 'not_found' }, 404);
-      // Demoting the only manager (yourself included) would strand the org.
+      // Demoting the only manager (yourself included, to ANY other role)
+      // would strand the org.
       if (
-        role === 'member' &&
+        role !== 'manager' &&
         target.role === 'manager' &&
         (await managerCount(orgId)) <= 1
       ) {

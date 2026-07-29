@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { json } from '../../lib/server/auth';
 import { requireSubscriber } from '../../lib/server/subscriberAuth';
-import { getOrgMemberships, isMemberOf } from '../../lib/server/orgMembership';
+import { getOrgMemberships, isNonClientMemberOf } from '../../lib/server/orgMembership';
 import { supabaseAdmin } from '../../lib/server/supabaseAdmin';
 import { extractText, UnsupportedContentError, type DocExt } from '../../lib/server/extractText';
 
@@ -21,11 +21,13 @@ export const GET: APIRoute = async ({ request }) => {
   const auth = await requireSubscriber(request);
   if ('error' in auth) return json({ error: auth.error }, auth.status);
 
+  // Org documents need a non-client seat; a client (or unknown-org) request
+  // falls back to the Personal library, which chat attachments rely on.
   const requested = new URL(request.url).searchParams.get('org_id')?.trim() || '';
   let workspace: string | null = null;
   if (requested) {
     const memberships = await getOrgMemberships(auth.user);
-    if (isMemberOf(memberships, requested)) workspace = requested;
+    if (isNonClientMemberOf(memberships, requested)) workspace = requested;
   }
 
   let query = supabaseAdmin
@@ -62,11 +64,15 @@ export const POST: APIRoute = async ({ request }) => {
   const pathOk = new RegExp(`^${user.id}/[0-9a-fA-F-]{36}\\.(pdf|docx|txt|md)$`).test(storagePath);
   if (!pathOk || !name) return json({ error: 'bad_request' }, 400);
 
-  // The workspace this document belongs to: an org the caller belongs to, else Personal.
+  // The workspace this document belongs to: an org the caller holds a
+  // non-client seat in, else Personal (clients keep personal uploads for
+  // chat attachments, never org-tagged documents).
   const orgId = typeof body?.org_id === 'string' && body.org_id.trim() ? body.org_id.trim() : null;
   if (orgId) {
     const memberships = await getOrgMemberships(user);
-    if (!isMemberOf(memberships, orgId)) return json({ error: 'bad_request', field: 'org_id' }, 400);
+    if (!isNonClientMemberOf(memberships, orgId)) {
+      return json({ error: 'bad_request', field: 'org_id' }, 400);
+    }
   }
 
   const { count } = await supabaseAdmin

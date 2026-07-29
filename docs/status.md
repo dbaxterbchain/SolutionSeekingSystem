@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-07-26 (custom concept icons)_
+_Last updated: 2026-07-29 (client role, per-member sharing, assistant templates)_
 
 ## At a glance
 
@@ -574,6 +574,56 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       makes a typo a build error. The Four Pillars and the 12 principles keep their emoji, which
       reads as intentional: crisp line-icons for the system's structure, warm emoji for its
       human values. Two icons (`guide`, `living-system`) are held back for a later pass.
+- [x] **Client role, per-member sharing, assistant templates, row menu** (2026-07-29). One
+      connected feature set so an org can serve its own customers (the driving pitch: a
+      landlord gives every tenant an assistant carrying that tenant's lease on top of one
+      shared building-rules template). Four shippable slices on branch
+      `client-role-and-sharing`:
+      **(1) Row menu + duplicate + working delete.** The sidebar's cramped hover icons became
+      a reusable overflow menu (`RowMenu`); new `duplicate` action copies config + document
+      LINKS into a private draft; the previously dead-ended 409 `page_attached` delete now
+      gets a second explicit confirmation listing the white-label pages that die with the
+      assistant. Also fixed the latent update-budget bug (a manager editing someone else's
+      shared assistant could not resubmit the owner's documents).
+      **(2) Per-member sharing (migration `0028`).** New server-only `assistant_shares`
+      table keyed to the SEAT (`org_members.id`), so a share can target an
+      invited-but-unclaimed email and starts working at first sign-in; additive with the
+      org-wide `shared` flag. Managers reshape shares in a new `ShareDialog`; rows carry
+      "Shared with N" / "Shared with you" badges; managers co-manage member-shared
+      assistants like org-shared ones; moves clear seat-bound shares; the white-label target
+      rule tightened (another member's fully private draft can no longer back a page) and
+      loosened (specifically-shared assistants can).
+      **(3) The `client` role.** A third `org_members.role` for an org's own customers:
+      dashboard + Guide/Mentor + ONLY assistants shared with them specifically. Org-wide
+      shares deliberately exclude clients; org documents and authoring are refused
+      server-side (`role_restricted` / workspace 400s) and hidden client-side (stripped
+      sidebar with a friendly empty state). Entitlement stays role-blind (clients chat on
+      the org's seat and count as a paid seat; zero billing changes); a new `authoring` flag
+      on `/api/entitlement` gates Personal-workspace creation for client-only users, while
+      their own uploads keep chat attachments working. Role pickers in Organization
+      settings (member rows + invite form, with a legend) and /admin. Also fixed the
+      last-manager guard, which only blocked demotion to `member` and would have let the
+      only manager demote themself to `client`.
+      **(4) Templates with live-base semantics (migration `0029`).** An owner marks an
+      assistant "Use as a template"; new assistants start from it and INHERIT its
+      instructions + documents at chat time (one deterministic `<assistant_setup>` block,
+      no new system content, no fifth cache breakpoint; template edits intentionally roll
+      children's cache entries). Editing the template updates every child; deletion,
+      un-templating, and cross-workspace moves are refused while children exist (friendly
+      409s + DB trigger/RESTRICT-FK backstops); budgets count the template's footprint and
+      a template edit verifies every child still fits. Editor gains "Start from" (locks the
+      base agent, reserves template chars in the meter); sidebar gains Template chips and
+      "New from template".
+      Verified end to end in a real browser on the local stack: manager built the
+      template/child/shares/page; the client's first sign-in claimed the seat and saw only
+      their assistant; chat opened with the template's marker word and mixed template +
+      child content (dashboard AND white-label page); template edit propagated to a child
+      on the next conversation; all five negative probes correct (org-wide chat 404,
+      template chat 404, org docs fall back to Personal, org create 400, personal create
+      403). `npm run check` + `npm run build` clean; migrations applied locally; the
+      publishable key is fully denied on `assistant_shares`. Screenshots in
+      [docs/features/client-role-and-sharing/](features/client-role-and-sharing/).
+      **Deploy note: run `npx supabase db push` (0028 + 0029) before this branch deploys.**
 - [ ] Then: SEO/community/AEO channels. The paid test is now live and corrected (see above);
       re-evaluate at day 7 / day 21 against the decision rules in the build sheet.
 

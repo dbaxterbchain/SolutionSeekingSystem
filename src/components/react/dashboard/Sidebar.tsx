@@ -1,6 +1,7 @@
 import type { AgentId, ChatSession } from '../../../lib/chatSessions';
 import { getContextMeta } from '../../../lib/contexts';
 import type { Assistant } from '../../../lib/assistantsClient';
+import RowMenu, { type RowMenuItem } from './RowMenu';
 
 /**
  * The dashboard's left rail: pick a standard agent or a specialized assistant,
@@ -18,7 +19,7 @@ export type Selection = { kind: 'agent'; agent: AgentId } | { kind: 'assistant';
 interface OrgOption {
   orgId: string;
   orgName: string;
-  role: 'member' | 'manager';
+  role: 'member' | 'manager' | 'client';
 }
 
 export default function Sidebar({
@@ -27,17 +28,23 @@ export default function Sidebar({
   onSelectAgent,
   onSelectAssistant,
   onEditAssistant,
+  onDuplicateAssistant,
+  onDeleteAssistant,
+  onNewFromTemplate,
   onNewAssistant,
   onOpenDocuments,
   onOpenWhiteLabel,
   onOpenOrgSettings,
   canManageOrg,
+  canCreate,
+  showDocuments,
+  clientView,
   memberships,
   activeOrgId,
   onSelectOrg,
   mine,
   shared,
-  onToggleShare,
+  onOpenSharing,
   orgName,
   recents,
   activeChatId,
@@ -50,19 +57,28 @@ export default function Sidebar({
   onSelectAgent: (agent: AgentId) => void;
   onSelectAssistant: (a: Assistant) => void;
   onEditAssistant: (a: Assistant) => void;
+  onDuplicateAssistant: (a: Assistant) => void;
+  onDeleteAssistant: (a: Assistant) => void;
+  onNewFromTemplate: (a: Assistant) => void;
   onNewAssistant: () => void;
   onOpenDocuments: () => void;
   onOpenWhiteLabel: () => void;
   onOpenOrgSettings: () => void;
   canManageOrg: boolean;
+  /** Whether this user may create assistants in the active workspace. */
+  canCreate: boolean;
+  /** Whether the workspace document library applies here (not for clients). */
+  showDocuments: boolean;
+  /** The stripped-down view for a client seat in the active org. */
+  clientView: boolean;
   memberships: OrgOption[];
   /** The active workspace: null = Personal, else an org id. */
   activeOrgId: string | null;
   onSelectOrg: (orgId: string | null) => void;
   mine: Assistant[];
   shared: Assistant[];
-  /** Share / unshare an owned assistant within the active org workspace. */
-  onToggleShare: (a: Assistant) => void;
+  /** Open the sharing dialog for an assistant in the active org workspace. */
+  onOpenSharing: (a: Assistant) => void;
   orgName: string | null;
   recents: ChatSession[] | null;
   activeChatId: string | null;
@@ -75,63 +91,65 @@ export default function Sidebar({
   const assistantActive = (id: string) => selection.kind === 'assistant' && selection.id === id;
 
   const AssistantRow = ({ a, editable }: { a: Assistant; editable: boolean }) => {
-    // A manager can share/unshare their own assistants when an org workspace is active.
-    const canToggleShare = editable && activeOrgId !== null && canManageOrg;
+    // Managers co-manage rows that are shared somehow (org-wide or with
+    // specific people); a fully private draft stays its owner's alone.
+    const manageable =
+      editable ||
+      (canManageOrg && activeOrgId !== null && (a.shared || a.member_share_ids.length > 0));
+    // Sharing is manager-only, and only meaningful inside an org workspace.
+    const canShare = manageable && activeOrgId !== null && canManageOrg;
+    const items: RowMenuItem[] = [];
+    if (a.is_template && canCreate) {
+      items.push({ label: 'New from template', onSelect: () => onNewFromTemplate(a) });
+    }
+    if (manageable) {
+      items.push({ label: 'Edit', onSelect: () => onEditAssistant(a) });
+      items.push({ label: 'Duplicate', onSelect: () => onDuplicateAssistant(a) });
+    }
+    if (canShare) {
+      items.push({ label: 'Sharing…', onSelect: () => onOpenSharing(a) });
+    }
+    if (manageable) {
+      items.push({ label: 'Delete', tone: 'danger', onSelect: () => onDeleteAssistant(a) });
+    }
     return (
       <div className="group relative">
         <button
           type="button"
           onClick={() => onSelectAssistant(a)}
           aria-current={assistantActive(a.id) ? 'true' : undefined}
-          className={`block w-full rounded-xl px-3 py-2 ${editable ? 'pr-16' : 'pr-3'} text-left transition-colors ${
+          className={`block w-full rounded-xl px-3 py-2 ${items.length > 0 ? 'pr-9' : 'pr-3'} text-left transition-colors ${
             assistantActive(a.id) ? 'bg-brand-50 text-brand-700' : 'text-slate-600 hover:bg-slate-50 hover:text-ink-800'
           }`}
         >
           <span className="block truncate text-sm font-semibold">{a.name}</span>
           <span className="mt-0.5 flex items-center gap-1.5 text-xs capitalize text-slate-400">
             {a.base_agent}
-            {a.shared && !canToggleShare && (
+            {a.is_template && (
+              <span className="rounded-full bg-violet-50 px-1.5 py-0.5 text-[0.65rem] font-semibold normal-case text-violet-700">
+                Template
+              </span>
+            )}
+            {a.shared ? (
               <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[0.65rem] font-semibold normal-case text-brand-600">
                 Shared
               </span>
-            )}
+            ) : a.member_share_ids.length > 0 ? (
+              <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[0.65rem] font-semibold normal-case text-brand-600">
+                Shared with {a.member_share_ids.length}
+              </span>
+            ) : a.member_shared ? (
+              <span className="rounded-full bg-brand-50 px-1.5 py-0.5 text-[0.65rem] font-semibold normal-case text-brand-600">
+                Shared with you
+              </span>
+            ) : null}
           </span>
         </button>
-        <div className="absolute right-1.5 top-1.5 flex items-center gap-0.5">
-          {canToggleShare && (
-            <button
-              type="button"
-              onClick={() => onToggleShare(a)}
-              aria-label={
-                a.shared
-                  ? `Stop sharing ${a.name}`
-                  : `Share ${a.name} with ${orgName ?? 'your organization'}`
-              }
-              title={
-                a.shared
-                  ? 'Shared with your organization. Click to stop.'
-                  : 'Share with everyone in your organization'
-              }
-              className={`rounded-md px-1.5 py-1 text-xs transition-colors ${
-                a.shared
-                  ? 'text-brand-600 hover:bg-brand-50'
-                  : 'text-slate-400 opacity-100 hover:bg-slate-100 hover:text-slate-600 focus:opacity-100 lg:opacity-0 lg:group-hover:opacity-100'
-              }`}
-            >
-              {a.shared ? '👥✓' : '👥'}
-            </button>
-          )}
-          {editable && (
-            <button
-              type="button"
-              onClick={() => onEditAssistant(a)}
-              aria-label={`Edit ${a.name}`}
-              className="rounded-md px-1.5 py-1 text-xs text-slate-400 opacity-100 transition-opacity hover:bg-slate-100 hover:text-slate-600 focus:opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
-            >
-              ✎
-            </button>
-          )}
-        </div>
+        {items.length > 0 && (
+          <div className="absolute right-1.5 top-1.5">
+            <RowMenu label={`Actions for ${a.name}`} items={items} />
+          </div>
+        )}
       </div>
     );
   };
@@ -197,23 +215,33 @@ export default function Sidebar({
           <div>
             <p className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">My assistants</p>
             <div className="mt-2 space-y-1">
-              {mine.map((a) => (
-                <AssistantRow key={a.id} a={a} editable />
-              ))}
+              {/* Templates first: they are the starting points. */}
+              {[...mine]
+                .sort((a, b) => Number(b.is_template) - Number(a.is_template))
+                .map((a) => (
+                  <AssistantRow key={a.id} a={a} editable />
+                ))}
             </div>
           </div>
         )}
 
-        {shared.length > 0 && (
+        {(shared.length > 0 || clientView) && (
           <div>
             <p className="truncate px-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-              Shared with {orgName ?? 'your org'}
+              {clientView ? 'Your assistants' : `Shared with ${orgName ?? 'your org'}`}
             </p>
-            <div className="mt-2 space-y-1">
-              {shared.map((a) => (
-                <AssistantRow key={a.id} a={a} editable={false} />
-              ))}
-            </div>
+            {shared.length > 0 ? (
+              <div className="mt-2 space-y-1">
+                {shared.map((a) => (
+                  <AssistantRow key={a.id} a={a} editable={false} />
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-relaxed text-slate-500">
+                Nothing here yet. When {orgName ?? 'your organization'} shares an assistant with
+                you, it appears here, ready to chat.
+              </p>
+            )}
           </div>
         )}
 
@@ -267,20 +295,24 @@ export default function Sidebar({
       </div>
 
       <div className="space-y-1.5 border-t border-slate-100 pt-3">
-        <button
-          type="button"
-          onClick={onNewAssistant}
-          className="btn-secondary w-full text-sm"
-        >
-          ✨ Create assistant
-        </button>
-        <button
-          type="button"
-          onClick={onOpenDocuments}
-          className="w-full rounded-xl px-3 py-1.5 text-left text-sm text-slate-500 hover:bg-slate-50 hover:text-ink-800"
-        >
-          📎 Documents
-        </button>
+        {canCreate && (
+          <button
+            type="button"
+            onClick={onNewAssistant}
+            className="btn-secondary w-full text-sm"
+          >
+            ✨ Create assistant
+          </button>
+        )}
+        {showDocuments && (
+          <button
+            type="button"
+            onClick={onOpenDocuments}
+            className="w-full rounded-xl px-3 py-1.5 text-left text-sm text-slate-500 hover:bg-slate-50 hover:text-ink-800"
+          >
+            📎 Documents
+          </button>
+        )}
         {canManageOrg && (
           <button
             type="button"

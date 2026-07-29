@@ -60,7 +60,7 @@ export const POST: APIRoute = async ({ request }) => {
     case 'create':
       return createPage(orgId, gate.user.id, body);
     case 'update':
-      return updatePage(orgId, body);
+      return updatePage(orgId, gate.user.id, body);
     case 'set_status':
       return setStatus(orgId, body);
     case 'delete':
@@ -70,9 +70,10 @@ export const POST: APIRoute = async ({ request }) => {
   }
 };
 
-/** Resolve and validate the page target: an org-shared assistant, or a standard agent + mode. */
+/** Resolve and validate the page target: an assistant in this org, or a standard agent + mode. */
 async function resolveTarget(
   orgId: string,
+  userId: string,
   body: Record<string, unknown>
 ): Promise<
   { assistant_id: string | null; agent: AgentId | null; context: string | null } | { error: Response }
@@ -82,14 +83,23 @@ async function resolveTarget(
   if (assistantId && agent) return { error: json({ error: 'bad_request', field: 'target' }, 400) };
 
   if (assistantId) {
-    // Must be shared to THIS org, or members couldn't use the page's assistant.
+    // Must live in THIS org, and be reachable by someone: org-shared, shared
+    // with specific members, or the caller's own. Another member's fully
+    // private draft can't back a page (nobody but its owner could chat).
     const { data: a } = await supabaseAdmin
       .from('assistants')
-      .select('org_id')
+      .select('org_id, owner_user_id, shared')
       .eq('id', assistantId)
       .maybeSingle();
     if (!a || a.org_id !== orgId) {
       return { error: json({ error: 'bad_request', field: 'assistant' }, 400) };
+    }
+    if (!a.shared && a.owner_user_id !== userId) {
+      const { count } = await supabaseAdmin
+        .from('assistant_shares')
+        .select('assistant_id', { count: 'exact', head: true })
+        .eq('assistant_id', assistantId);
+      if (!count) return { error: json({ error: 'bad_request', field: 'assistant' }, 400) };
     }
     return { assistant_id: assistantId, agent: null, context: null };
   }
@@ -129,7 +139,7 @@ async function createPage(
     return json({ error: 'too_many_pages', message: `You can have up to ${MAX_PAGES_PER_ORG} pages.` }, 409);
   }
 
-  const target = await resolveTarget(orgId, body);
+  const target = await resolveTarget(orgId, userId, body);
   if ('error' in target) return target.error;
 
   const { data, error } = await supabaseAdmin
@@ -168,14 +178,14 @@ async function loadOrgPage(
   return { logo_path: data.logo_path };
 }
 
-async function updatePage(orgId: string, body: Record<string, unknown>): Promise<Response> {
+async function updatePage(orgId: string, userId: string, body: Record<string, unknown>): Promise<Response> {
   const id = str(body.id);
   if (!id) return json({ error: 'bad_request' }, 400);
   const found = await loadOrgPage(orgId, id);
   if ('response' in found) return found.response;
   const title = str(body.title).trim();
   if (title.length < 1 || title.length > 120) return json({ error: 'bad_request', field: 'title' }, 400);
-  const target = await resolveTarget(orgId, body);
+  const target = await resolveTarget(orgId, userId, body);
   if ('error' in target) return target.error;
 
   const { error } = await supabaseAdmin

@@ -74,8 +74,11 @@ export default function WhiteLabelPanel({
 
   if (!open || typeof document === 'undefined') return null;
 
-  // Only assistants shared to THIS org can back a page (members must be able to use it).
-  const sharedAssistants = assistants.filter((a) => a.org_id === orgId);
+  // Any assistant in THIS org workspace can back a page; access follows its
+  // sharing (org-wide, or the specific people it is shared with). A fully
+  // private draft can only back a page for its own owner, so the server
+  // rejects those unless the caller owns them.
+  const eligibleAssistants = assistants.filter((a) => a.org_id === orgId);
 
   const remove = async (p: WhiteLabelPageView) => {
     if (!orgId) return;
@@ -134,14 +137,13 @@ export default function WhiteLabelPanel({
             <button
               type="button"
               onClick={() => setEditing(null)}
-              disabled={sharedAssistants.length === 0}
-              className="btn-secondary mt-4 w-full text-sm disabled:opacity-60"
+              className="btn-secondary mt-4 w-full text-sm"
             >
               + New page
             </button>
-            {sharedAssistants.length === 0 && (
+            {eligibleAssistants.length === 0 && (
               <p className="mt-2 text-xs text-slate-400">
-                Share an assistant with your organization first, or use a standard Guide/Mentor page.
+                No assistants in this workspace yet, but a page can also use the standard Guide or Mentor.
               </p>
             )}
             {error && <p className="mt-3 text-sm text-amber-700">{error}</p>}
@@ -170,7 +172,7 @@ export default function WhiteLabelPanel({
           <PageForm
             editing={editing}
             orgId={orgId}
-            sharedAssistants={sharedAssistants}
+            eligibleAssistants={eligibleAssistants}
             onCancel={() => setEditing(undefined)}
             onSaved={() => {
               setEditing(undefined);
@@ -288,13 +290,13 @@ type TargetValue = `agent:${AgentId}` | `assistant:${string}`;
 function PageForm({
   editing,
   orgId,
-  sharedAssistants,
+  eligibleAssistants,
   onCancel,
   onSaved,
 }: {
   editing: WhiteLabelPageView | null;
   orgId: string | null;
-  sharedAssistants: Assistant[];
+  eligibleAssistants: Assistant[];
   onCancel: () => void;
   onSaved: () => void;
 }) {
@@ -302,9 +304,16 @@ function PageForm({
     ? editing.assistant_id
       ? `assistant:${editing.assistant_id}`
       : `agent:${editing.agent ?? 'guide'}`
-    : sharedAssistants[0]
-      ? `assistant:${sharedAssistants[0].id}`
+    : eligibleAssistants[0]
+      ? `assistant:${eligibleAssistants[0].id}`
       : 'agent:guide';
+
+  const shareLabel = (a: Assistant) =>
+    a.shared
+      ? 'shared with everyone'
+      : a.member_share_ids.length > 0
+        ? 'shared with specific people'
+        : 'private, only you';
 
   const [slug, setSlug] = useState(editing?.slug ?? '');
   const [title, setTitle] = useState(editing?.title ?? '');
@@ -389,14 +398,17 @@ function PageForm({
           onChange={(e) => setTarget(e.target.value as TargetValue)}
           className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
         >
-          {sharedAssistants.map((a) => (
+          {eligibleAssistants.map((a) => (
             <option key={a.id} value={`assistant:${a.id}`}>
-              {a.name} (shared)
+              {a.name} ({shareLabel(a)})
             </option>
           ))}
           <option value="agent:guide">Standard Guide</option>
           <option value="agent:mentor">Standard Mentor</option>
         </select>
+        <p className="mt-1 text-xs text-slate-400">
+          Visitors can chat on the page only if the assistant is shared with them.
+        </p>
       </div>
 
       {isAgentTarget && modes.length > 0 && (
