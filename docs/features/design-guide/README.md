@@ -34,6 +34,16 @@ All 15 download links on the page were checked and return 200.
   a note saying what it is *for*. The reversed mark sits on an ink panel because
   a white asset on a white card is unreviewable.
 - `colour.png` — core tokens with hex and intended use, over the full brand ramp.
+- `gold.png` — the gold block. Gold means **the solution**: the third protocol
+  step, the output of a tool, the moment something is found. It is a
+  dark-background colour (1.58:1 on white, 8.66:1 on navy), so the block states
+  that plainly and prints a measured ratio under every step of the ramp. The
+  amber box at the bottom is itself amber, which is the point: amber already
+  means warning throughout the product and sits close enough to gold to be
+  confused with it.
+- `gold-in-situ.png` — gold doing its actual job in the Solution Builder. Among
+  three actions on the navy result panel, only the primary is gold, so it reads
+  as *the* thing to do at the moment the tool hands back a solution.
 - `typography.png` — Anton, Poppins and Inter with their roles, Tailwind class
   names, and a specimen in the actual face.
 - `permissions.png` — what may be done without asking, and what needs a

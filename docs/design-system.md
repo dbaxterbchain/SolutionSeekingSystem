@@ -12,6 +12,20 @@ This file covers only what a public page should not: where things live in the re
 | What | File | Notes |
 |---|---|---|
 | Colour, fonts, shadows | [`tailwind.config.mjs`](../tailwind.config.mjs) | `/design` **imports this** and renders the swatches from it, so the page cannot drift from the build. Change a token here and the guide updates itself. |
+| Contrast ratios | [`src/lib/contrast.ts`](../src/lib/contrast.ts) | WCAG ratios, computed at build time so `/design` states measured numbers instead of hand-written ones that go stale. |
+
+**`gold` means the solution.** It marks arrival: the third protocol step, the output of a
+tool, the moment something is found. Two constraints that are easy to forget:
+
+- It is a **dark-background** colour. `gold-500` is 1.58:1 on white and 8.66:1 on
+  `ink-800`. On light surfaces it is a shape, never type; `gold-800` and darker are the
+  steps that pass text on white.
+- It is **never a status colour.** Amber already means warning, error, and lapsed
+  subscription across eleven components, and `amber-200` is close enough to gold that the
+  two can be mistaken. Gold works around them.
+
+`sky` remains the accent (the SEEKING word). Live ratios and the full rules are on
+[/design](https://solutionseeking.com/design).
 | Component classes | [`src/styles/global.css`](../src/styles/global.css) | `.container-page`, `.btn*`, `.eyebrow`, `.prose-sss` |
 | Fonts | [`BaseLayout.astro`](../src/layouts/BaseLayout.astro) | Anton, Poppins, Inter from Google Fonts |
 | Concept icon names | [`src/lib/icons.ts`](../src/lib/icons.ts) | artwork in `src/assets/icons/`, rendered by `Icon.astro` |

@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-08-03 (public design guide at /design and a generated brand asset
+_Last updated: 2026-08-04 (gold ramp meaning "the solution"; before that, the public design guide at /design)_
 set; before that, the ad landing conversion pass)_
 
 ## At a glance
@@ -725,6 +725,39 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       Also settled the long-open **brand fonts** question (see below), and rewrote
       [design-system.md](design-system.md) down to the repo-only details, pointing at /design
       for everything else.
+- [x] **A gold ramp, meaning "the solution"** (2026-08-04). The palette was three cool
+      blues with no warm note anywhere. Gold `#F2C879` adds one, and it carries a meaning
+      rather than being decoration: it marks **arrival**, the third protocol step, the
+      output of a tool, the moment something is found. Used sparingly on purpose, because
+      gold everywhere stops meaning anything.
+      **Scoped by measurement, not by taste.** `gold-500` is **1.58:1 on white** and
+      **8.66:1 on `ink-800`**: a dark-background colour. Shipping it as a bare "accent" in
+      a public guide would have invited an outside designer to set body copy in it on a
+      white page. A full 50-900 ramp instead of one token, with `gold-800` deliberately
+      tuned darker than an even ramp would put it (4.27 to **4.68:1** on white) so the
+      rule lands on a clean boundary: **500 and lighter belong on dark, 800 and darker are
+      the text-on-white steps.**
+      **The conflict that shaped it:** amber is already load-bearing for warnings, errors
+      and lapsed subscriptions in eleven components, and `amber-200` sits close enough to
+      this gold that the two read as one family. Gold is therefore never a status colour,
+      and /design says so inside an amber box to make the point visually.
+      Applied first to the two existing `bg-ink-800` tool result panels
+      ([SolutionBuilder](../src/components/react/SolutionBuilder.tsx),
+      [ConversationPlanner](../src/components/react/ConversationPlanner.tsx)): the primary
+      action only, so gold reads as *the* thing to do at the moment the tool hands back a
+      solution. Deliberately NOT `/for-business#contact`, which is the enquiry form shipped
+      days earlier to fix a zero-conversion campaign; repainting it would confound the
+      measurement.
+      New [`src/lib/contrast.ts`](../src/lib/contrast.ts) computes WCAG ratios at build
+      time, so /design prints measured numbers under every swatch instead of hand-written
+      ones that go stale. Every claim above is asserted against the config, not eyeballed.
+      **Process note worth keeping:** two orphaned dev servers (from `TaskStop`, which
+      kills the npm wrapper but leaves the Vite child running on Windows) were holding
+      ports 4321 and 4322, so browser verification was silently hitting a server started
+      the previous day. Astro's HMR had picked up `.astro` edits, which is why it looked
+      fine, but a `tailwind.config.mjs` change needs a restart, so no gold utility existed
+      and the first screenshots showed slate where gold should be. Kill listeners on the
+      port before trusting a visual check.
 - [ ] Then: SEO/community/AEO channels. The paid test is now live and corrected (see above);
       re-evaluate at day 7 / day 21 against the decision rules in the build sheet.
 - [ ] **Ads pass, after this deploys:** repoint the Business final URL to
