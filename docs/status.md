@@ -578,6 +578,8 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       makes a typo a build error. The Four Pillars and the 12 principles keep their emoji, which
       reads as intentional: crisp line-icons for the system's structure, warm emoji for its
       human values. Two icons (`guide`, `living-system`) are held back for a later pass.
+      **Superseded 2026-08-04:** the principles and pillars got line icons too (see below).
+      The emoji split did not survive the principle illustrations landing on the same cards.
 - [x] **Client role, per-member sharing, assistant templates, row menu** (2026-07-29). One
       connected feature set so an org can serve its own customers (the driving pitch: a
       landlord gives every tenant an assistant carrying that tenant's lease on top of one
@@ -758,6 +760,26 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       fine, but a `tailwind.config.mjs` change needs a restart, so no gold utility existed
       and the first screenshots showed slate where gold should be. Kill listeners on the
       port before trusting a visual check.
+- [x] **Icons for the 12 Wisdom Principles** (2026-08-04). Twelve custom line icons join the
+      set (10 to 22), applied on the principle cards, the detail hero, the Four Pillars, and
+      the /design gallery. Screenshots and the full write-up:
+      [docs/features/principle-icons/](features/principle-icons/).
+      **This reverses the deliberate decision recorded in the 2026-07-26 icon entry above**,
+      which kept emoji on the principles and the pillars because "crisp line-icons for the
+      system's structure, warm emoji for its human values" read as intentional. It stopped
+      reading that way once the principle cards gained full-colour illustrations: an emoji
+      above one is a third visual language on a card that already has two. Monochrome line
+      art sits quietly beside the illustration instead of competing with it. The Four
+      Pillars went in the same pass because all four are themselves principles and the home
+      page shows the pillars and the principle cards on one screen.
+      Wiring mirrors the Leadership Tools exactly: `PRINCIPLE_ICONS` in
+      [`src/lib/icons.ts`](../src/lib/icons.ts) maps collection id to icon name. Unlike
+      `toolIcon`, `principleIcon` **throws** instead of returning `undefined`, because all
+      12 have art and a hole in that grid should stop the build. The `icon` field is
+      **removed from the principles schema and all 12 YAML files**: it held an emoji nothing
+      renders now, and art belongs next to the art registry rather than in the content.
+      The /design gallery's two groups are derived from the registry rather than listed
+      again, so a new icon files itself into the right one.
 - [ ] Then: SEO/community/AEO channels. The paid test is now live and corrected (see above);
       re-evaluate at day 7 / day 21 against the decision rules in the build sheet.
 - [ ] **Ads pass, after this deploys:** repoint the Business final URL to

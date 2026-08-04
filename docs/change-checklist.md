@@ -57,6 +57,10 @@ stale docs, no orphaned pages, no broken prompt cache.
 - [ ] New entry in an existing collection: schema validation covers you — but check the
       places that *feature* subsets (e.g. `/practice` shows the first 3 demos by `order`;
       home shows 6 principles).
+- [ ] New **principle** or **Leadership Tool**: the icon is not in the content. Add the SVG
+      to `src/assets/icons/`, the name to `ICON_NAMES`, the artwork to the `ICONS` map in
+      `Icon.astro`, and a slug entry to `PRINCIPLE_ICONS` / `TOOL_ICONS`
+      (`src/lib/icons.ts`). A principle without one fails the build, by design.
 - [ ] New collection: schema in `src/content/config.ts` → register in `collections`
       export; OG spread; llms.txt section; a `.md` serializer + `[…].md.ts` route +
       `markdownAlt` (GEO, see above); authoring section in

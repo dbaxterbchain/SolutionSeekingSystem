@@ -51,7 +51,6 @@ fields:
 ```yaml
 title: Good Faith                 # display name
 order: 2                          # position in the list (1–12)
-icon: "🌱"                        # emoji marker
 illustration: ../../assets/principles/good-faith.webp  # hero + card image (optional)
 illustrationAlt: "..."            # descriptive alt for the illustration (no dashes)
 tagline: >-                       # one-line summary (card + hero)
@@ -75,6 +74,11 @@ faq:                              # 6. FAQ — question + answer
 example: >-                       # "Solution Seeking in action" worked example
   ...
 ```
+
+There is deliberately **no `icon` field**. Each principle's line icon is registered in
+`PRINCIPLE_ICONS` (`src/lib/icons.ts`), keyed by the filename, the same way the Leadership
+Tools work. A new principle needs an entry there and an SVG in `src/assets/icons/`, or the
+build fails: art is wired next to the art registry, not authored in the content.
 
 **YAML tip:** use the folded block scalar `>-` for any value containing a colon-space
 (`: `), quotes, or apostrophes. It avoids all escaping headaches. The existing files are
@@ -238,9 +242,10 @@ existing `parent`/`partner` seeds.
 
 ## Concept icons — `src/assets/icons/` + `Icon.astro`
 
-The structural concepts (the three parts of the system, the three protocol steps, the four
-Leadership Tools) use custom line-icons rather than emoji. Sources are plain SVGs in
-`src/assets/icons/<name>.svg`; `src/components/Icon.astro` renders one by name:
+Every named concept (the three parts of the system, the three protocol steps, the four
+Leadership Tools, the 12 Wisdom Principles, the Four Pillars) uses a custom line-icon
+rather than emoji. Sources are plain SVGs in `src/assets/icons/<name>.svg`;
+`src/components/Icon.astro` renders one by name:
 
 ```astro
 <Icon name="protocol" class="h-9 w-9 text-brand-500" />
@@ -259,8 +264,14 @@ Rules for adding one:
   `ICONS` map in `Icon.astro`. The map is typed `Record<IconName, …>`, so a name without
   artwork (or a typo at a call site) fails `npm run check` rather than rendering nothing.
 - Names live in `src/lib/icons.ts` (not in the `.astro` component) so plain `.ts` data files
-  like `src/data/concepts.ts` can reference them. Leadership Tools map from their content
-  slug via `TOOL_ICONS`/`toolIcon()` in the same file.
+  like `src/data/concepts.ts` can reference them. Content collections map from their slug to
+  an icon in the same file: `TOOL_ICONS`/`toolIcon()` for Leadership Tools, and
+  `PRINCIPLE_ICONS`/`principleIcon()` for Wisdom Principles. `toolIcon` returns `undefined`
+  for a tool whose art does not exist yet; `principleIcon` throws, because all 12 principles
+  have art and a hole in that grid should stop the build.
+- Icons are **monochrome by rule**. No icon carries its own colour, a second tone, or a fill
+  that is not `currentColor`, so one icon can sit in brand blue on a card and in gold on an
+  ink panel without a second file.
 - Icons are **decorative**: every one sits beside a visible text label, so `Icon.astro` sets
   `aria-hidden="true"` and adds no title. If you ever use one with no adjacent label, give it
   an accessible name at the call site instead.

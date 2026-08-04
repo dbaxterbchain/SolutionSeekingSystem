@@ -2,7 +2,7 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
 import Icon from '../components/Icon.astro';
-import { ICON_NAMES } from '../lib/icons';
+import { ICON_NAMES, PRINCIPLE_ICONS, type IconName } from '../lib/icons';
 import { breadcrumbs } from '../lib/schema';
 import { ratio, verdict, VERDICT_LABEL } from '../lib/contrast';
 import tailwind from '../../tailwind.config.mjs';
@@ -38,6 +38,25 @@ const CORE = [
 ];
 
 const RAMP = ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900'];
+
+/**
+ * The icon set splits in two: the machinery of the system, and the twelve
+ * Wisdom Principles. Both groups are derived from the registry rather than
+ * listed again here, so a new icon lands in the right group by itself.
+ */
+const principleIconNames = Object.values(PRINCIPLE_ICONS) as readonly IconName[];
+const ICON_GROUPS = [
+  {
+    title: 'The system',
+    note: 'The three parts, the three protocol steps, and the four Leadership Tools.',
+    names: ICON_NAMES.filter((n) => !principleIconNames.includes(n)),
+  },
+  {
+    title: 'The Wisdom Principles',
+    note: 'One per principle, in the order they are taught.',
+    names: principleIconNames,
+  },
+];
 
 /**
  * Which steps of the gold ramp are safe for text, worked out here rather than
@@ -594,19 +613,26 @@ const schemas = [
       <p class="eyebrow">Icons</p>
       <h2 class="mt-2 font-heading text-3xl font-bold text-ink-800">Concept icons</h2>
       <p class="mt-4 max-w-2xl leading-relaxed text-slate-600">
-        Drawn for the parts of the system rather than picked from a set. They inherit the
-        surrounding text colour, so they take a brand colour wherever they sit.
+        Drawn for the parts of the system rather than picked from a set. One weight, one
+        48px grid, round caps. They inherit the surrounding text colour, so they take a
+        brand colour wherever they sit.
       </p>
-      <div class="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        {
-          ICON_NAMES.map((name) => (
-            <div class="flex flex-col items-center gap-3 rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-card">
-              <Icon name={name} class="h-9 w-9 text-brand-500" />
-              <code class="text-xs text-slate-500">{name}</code>
+      {
+        ICON_GROUPS.map((group) => (
+          <div class="mt-10">
+            <h3 class="font-heading text-lg font-bold text-ink-800">{group.title}</h3>
+            <p class="mt-1 text-sm text-slate-600">{group.note}</p>
+            <div class="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+              {group.names.map((name) => (
+                <div class="flex flex-col items-center gap-3 rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-card">
+                  <Icon name={name} class="h-9 w-9 text-brand-500" />
+                  <code class="text-xs text-slate-500">{name}</code>
+                </div>
+              ))}
             </div>
-          ))
-        }
-      </div>
+          </div>
+        ))
+      }
     </section>
 
     <!-- ── Permissions ────────────────────────────────────────────────────── -->

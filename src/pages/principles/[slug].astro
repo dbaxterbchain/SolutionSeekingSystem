@@ -2,8 +2,10 @@
 import { getCollection } from 'astro:content';
 import { Image } from 'astro:assets';
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import Icon from '../../components/Icon.astro';
 import StepNav from '../../components/StepNav.astro';
 import TryItBand from '../../components/TryItBand.astro';
+import { principleIcon } from '../../lib/icons';
 import { breadcrumbs, faqPage, learningArticle } from '../../lib/schema';
 
 export async function getStaticPaths() {
@@ -55,7 +57,7 @@ const schemas = [
       <div class="mt-5 grid items-center gap-8 sm:grid-cols-[1fr_auto]">
         <div>
           <div class="flex items-start gap-4">
-            <span class="text-5xl" aria-hidden="true">{p.icon}</span>
+            <Icon name={principleIcon(entry.id)} class="h-12 w-12 shrink-0 text-brand-500" />
             <div>
               <p class="eyebrow">Principle {String(p.order).padStart(2, '0')} of 12</p>
               <h1 class="mt-1 text-4xl font-extrabold tracking-tight text-ink-800 sm:text-5xl">

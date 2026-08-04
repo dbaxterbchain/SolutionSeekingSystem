@@ -13,7 +13,9 @@ const principles = defineCollection({
       title: z.string(),
       order: z.number(),
       tagline: z.string(),
-      icon: z.string(), // emoji used as a lightweight visual marker
+      // No icon field: the line icon comes from PRINCIPLE_ICONS in
+      // src/lib/icons.ts, keyed by this file's id, the same way the Leadership
+      // Tools work. Art belongs next to the art registry, not in the content.
       // Hero/card illustration, path relative to the YAML file
       // (e.g. ../../assets/principles/understanding.webp). Optional so a new
       // principle still builds before its art exists.

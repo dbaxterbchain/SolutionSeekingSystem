@@ -2,6 +2,7 @@
 import { Image } from 'astro:assets';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
+import Icon from '../components/Icon.astro';
 import { pillars, glossary, systemDefinition } from '../data/concepts';
 import { glossaryTermSet, learningArticle } from '../lib/schema';
 import livingSystemLoop from '../assets/living-system-loop.png';
@@ -108,7 +109,7 @@ const aims = [
             {
               pillars.map((p) => (
                 <li class="flex gap-3">
-                  <span class="text-xl" aria-hidden="true">{p.icon}</span>
+                  <Icon name={p.icon} class="mt-0.5 h-6 w-6 shrink-0 text-brand-500" />
                   <span>
                     <span class="block font-semibold text-ink-800">{p.name}</span>
                     <span class="text-sm text-slate-600">{p.description}</span>
