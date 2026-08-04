@@ -21,6 +21,16 @@ rules, so demos and real output stay consistent).
   parentheses (sparingly). Never substitute a spaced hyphen (` - `) or `--`.
 - **No en dashes (`–`) between words.** Use a plain hyphen: `parent-child dynamic`,
   `15-20 minutes`.
+- **No counted-pair headings.** "One system, three parts", "Three lines, one of them a
+  slot", "Two blues and a navy", "Three faces, all free". This reads as AI even when the
+  count is accurate, and the same rhythm arrives without numbers: "Give it room, and a
+  floor". Say what the section actually contains instead: "What the system is made of",
+  "How every name is built", "What each colour is for", "How much space it needs".
+
+  The tell is the **paired cadence**, not the number. A plain count that carries
+  information is fine ("Three steps to a real solution"), and so is naming a real thing
+  ("12 Wisdom Principles"). Watch for the same shape in body copy, where it hides as a
+  trailing flourish: "the SEEKING word, and little else".
 - Fine to keep: curly quotes/apostrophes, `·` middots in labels, `→` arrows in link text,
   ellipses.
 - Watch for other tells while writing: "delve", "It's not just X, it's Y" constructions,

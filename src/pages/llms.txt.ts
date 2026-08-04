@@ -80,6 +80,7 @@ export const GET: APIRoute = async ({ site }) => {
     `- [FAQ](${abs('/faq')}): what the system is, what is free, how the AI assistants work, pricing, privacy, and team use`,
     `- [For Business](${abs('/for-business')}): the team dashboard, specialized agents, and white-label pages for organizations`,
     `- [About / origin story](${abs('/about')}): why Beanchain Coffee built the system`,
+    `- [Design guide](${abs('/design')}): logo files and variants, colour, typography, usage rules, and downloadable brand assets`,
     `- [Complete Guide (PDF)](${abs('/solution-seeking-complete-guide.pdf')}): the full source guide as a free download (a human-facing page about it, with an email option, is at ${abs('/guide')})`,
     `- [Full methodology as one file](${abs('/llms-full.txt')})`,
     '',

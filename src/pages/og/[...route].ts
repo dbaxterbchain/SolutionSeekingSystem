@@ -73,6 +73,11 @@ const pages: Record<string, OgPage> = {
     title: 'Pricing',
     description: `Most of the system is free forever. Unlimited conversations with the Guide and Mentor are ${PLANS.monthly.priceLabel} a month, or ${PLANS.annual.priceLabel} a year.`,
   },
+  design: {
+    title: 'Design guide',
+    description:
+      'The brand: logo files and variants, colour, typography, usage rules, and downloadable assets.',
+  },
   faq: {
     title: 'Frequently asked questions',
     description:
