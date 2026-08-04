@@ -31,6 +31,15 @@ export interface ModeLanding {
   pickerBlurb: string;
   /** 3–5 concrete "when this helps" bullets. */
   exampleSituations: string[];
+  /**
+   * Tappable openers for the empty chat. Distinct from `exampleSituations`, and
+   * not interchangeable with them: these are written in the FIRST person and
+   * must read as a message this visitor could send as-is, because tapping one
+   * drops it straight into the composer for them to add detail to. The bullets
+   * above are written about the reader ("Your teenager has..."), which is right
+   * for a "when this helps" list and wrong in a message box.
+   */
+  starters: string[];
   /** ChatView welcome line for the embedded chat. */
   welcome: string;
   /** Demo collection ids to link as worked examples. */
@@ -56,6 +65,11 @@ export const MODES: ModeLanding[] = [
       'You lost your temper and want to repair it well',
       'You and your child see a rule completely differently',
     ],
+    starters: [
+      'My teenager has stopped talking to me and I don’t know what changed.',
+      'We have the same fight about screen time every single week.',
+      'I lost my temper with my kid and I want to repair it properly.',
+    ],
     welcome:
       'Hi, I’m the Solution Seeking Guide, in Parent mode. Tell me a bit about what’s going on with your child (how old they are and what’s been happening), and we’ll work through it step by step.',
     mentorCta:
@@ -76,6 +90,11 @@ export const MODES: ModeLanding[] = [
       'A capable student has suddenly disengaged',
       'A conversation with a parent is looming and you want to get it right',
       'You reacted in front of the class and want to repair it',
+    ],
+    starters: [
+      'A student in my class keeps derailing lessons and warnings aren’t working.',
+      'I have a meeting with a parent coming up and I want to get it right.',
+      'One of my strongest students has suddenly checked out.',
     ],
     welcome:
       'Hi, I’m the Solution Seeking Guide, in Teacher mode. Tell me a bit about the situation (the student’s age and what’s been happening), and we’ll work through it together.',
@@ -98,6 +117,11 @@ export const MODES: ModeLanding[] = [
       'You want to repair a moment that went badly',
       'A decision you disagree about keeps getting postponed',
     ],
+    starters: [
+      'My partner and I keep having the same argument and nothing changes.',
+      'Something has been building for weeks and I don’t know how to bring it up.',
+      'We had a fight that went badly and I want to repair it.',
+    ],
     welcome:
       'Hi, I’m the Solution Seeking Guide, in Partner mode. Tell me a bit about what’s been happening between you two, and we’ll take it one step at a time.',
     relatedDemoIds: ['home-chores'],
@@ -118,6 +142,11 @@ export const MODES: ModeLanding[] = [
       'Money or inheritance has made every conversation tense',
       'You need a boundary with a family member who won’t hear it',
     ],
+    starters: [
+      'Caring for my parent has fallen mostly on me and I’m resentful about it.',
+      'There was a blowup at a family gathering and nobody has addressed it.',
+      'I need to set a boundary with a family member who won’t hear it.',
+    ],
     welcome:
       'Hi, I’m the Solution Seeking Guide, in Family mode. Tell me a bit about who this is with and what’s been going on, and we’ll work through it together.',
   },
@@ -137,6 +166,11 @@ export const MODES: ModeLanding[] = [
       'A friendship is drifting and you don’t want to let it go silently',
       'You messed up and want to make it right',
     ],
+    starters: [
+      'A friend said something that hurt and I keep replaying it.',
+      'I’m always the one who reaches out, and I’m tired of it.',
+      'I let a friend down and I want to make it right.',
+    ],
     welcome:
       'Hi, I’m the Solution Seeking Guide, in Friend mode. Tell me a bit about the friendship and what happened, and we’ll figure out what, if anything, to do about it.',
   },
@@ -155,6 +189,11 @@ export const MODES: ModeLanding[] = [
       'You need to give feedback that’s been building for too long',
       'A behavior is affecting the rest of the team',
       'You’re worried a good person is about to quit',
+    ],
+    starters: [
+      'Someone on my team is underperforming and I don’t know why yet.',
+      'I need to give feedback I’ve been putting off for months.',
+      'I think one of my best people is about to quit.',
     ],
     welcome:
       'Hi, I’m the Solution Seeking Guide, in Manager mode. Tell me a bit about the situation with your team member, and we’ll prepare a conversation that’s fair to everyone, including you.',
@@ -178,6 +217,11 @@ export const MODES: ModeLanding[] = [
       'You disagree about how shared work should be done',
       'You’re tempted to escalate to your manager but not sure you should',
     ],
+    starters: [
+      'A co-worker keeps dropping handoffs and it lands on me.',
+      'Someone snapped at me in a meeting and it’s been awkward since.',
+      'We disagree about how our shared work should be done.',
+    ],
     welcome:
       'Hi, I’m the Solution Seeking Guide, in Co-worker mode. Tell me a bit about what’s been happening between you two, and we’ll work out a way through it.',
     relatedDemoIds: ['coworker-snapped'],
@@ -197,6 +241,11 @@ export const MODES: ModeLanding[] = [
       'Meetings keep collapsing into fights about what’s fair',
       'A veteran feels taken for granted and is pulling away',
       'An ideological rift is hiding inside a logistics argument',
+    ],
+    starters: [
+      'Two committed members are clashing and it’s splitting our group.',
+      'Our meetings keep collapsing into arguments about what’s fair.',
+      'A long-time volunteer feels taken for granted and is pulling away.',
     ],
     welcome:
       'Hi, I’m the Solution Seeking Guide, in Organizer mode. Tell me a bit about your group and what’s been happening, and we’ll work through it in a way that keeps people in the room.',

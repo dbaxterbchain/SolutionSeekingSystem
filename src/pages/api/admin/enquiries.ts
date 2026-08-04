@@ -4,7 +4,7 @@ import { supabaseAdmin } from '../../../lib/server/supabaseAdmin';
 
 export const prerender = false;
 
-/** Team enquiries from /pricing. `ip_hash` is never selected. */
+/** Team enquiries from /for-business. `ip_hash` is never selected. */
 const COLUMNS = 'id, name, email, team_size, note, handled, created_at';
 
 export const GET: APIRoute = async ({ request }) => {

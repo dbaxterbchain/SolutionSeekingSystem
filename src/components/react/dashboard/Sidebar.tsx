@@ -39,6 +39,9 @@ export default function Sidebar({
   canCreate,
   showDocuments,
   clientView,
+  upsell,
+  onUpgrade,
+  upgradeBusy,
   memberships,
   activeOrgId,
   onSelectOrg,
@@ -71,6 +74,10 @@ export default function Sidebar({
   showDocuments: boolean;
   /** The stripped-down view for a client seat in the active org. */
   clientView: boolean;
+  /** Free tier: show what a subscription adds, rather than an empty rail. */
+  upsell: boolean;
+  onUpgrade: () => void;
+  upgradeBusy: boolean;
   memberships: OrgOption[];
   /** The active workspace: null = Personal, else an org id. */
   activeOrgId: string | null;
@@ -295,6 +302,26 @@ export default function Sidebar({
       </div>
 
       <div className="space-y-1.5 border-t border-slate-100 pt-3">
+        {/* The free tier's rail is otherwise just Guide, Mentor, and history,
+            which shows what the dashboard is without ever saying what the
+            subscription adds to it. Name the missing half, in place. */}
+        {upsell && (
+          <div className="mb-1 rounded-xl border border-brand-100 bg-brand-50/60 p-3">
+            <p className="text-xs font-semibold text-ink-800">Add your own assistants</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600">
+              A subscription adds unlimited messages, assistants grounded in your own documents,
+              and a document library.
+            </p>
+            <button
+              type="button"
+              onClick={onUpgrade}
+              disabled={upgradeBusy}
+              className="btn-primary mt-2.5 w-full text-xs disabled:opacity-60"
+            >
+              {upgradeBusy ? 'Opening checkout…' : 'See what you get'}
+            </button>
+          </div>
+        )}
         {canCreate && (
           <button
             type="button"

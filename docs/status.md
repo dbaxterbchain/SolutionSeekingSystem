@@ -1,6 +1,7 @@
 # Project Status
 
-_Last updated: 2026-07-29 (client role, per-member sharing, assistant templates)_
+_Last updated: 2026-08-03 (ad landing conversion: live composer in the HTML, starters,
+/for-business enquiry form, method-page CTAs, free-tier dashboard)_
 
 ## At a glance
 
@@ -434,6 +435,9 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       **Landing pages**: on a 390px phone the hero ate 639px and the chat sat 1.3 screens down.
       The situations card moved below the chat, the hero was trimmed to 471px, and a
       "Start the conversation" button jumps to a `#chat` anchor that clears the sticky header.
+      (That button was removed on 2026-08-03: being `sm:hidden` it only ever fired on mobile,
+      and the fold is better bought by cutting the hero than by adding a button to it. The
+      `#chat` anchor stays, deep-linkable.)
       Trust signals (shared `ProvenanceBand`, and testimonials when they exist) sit **below** the
       chat, because anything above it pushes the composer off the screen.
       **Email capture at the wall**: `UpgradeAnonCard` now offers the guide by email as a
@@ -624,8 +628,81 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       publishable key is fully denied on `assistant_shares`. Screenshots in
       [docs/features/client-role-and-sharing/](features/client-role-and-sharing/).
       **Deploy note: run `npx supabase db push` (0028 + 0029) before this branch deploys.**
+- [x] **Ad landing conversion: closed the CTA breaks in both campaigns** (2026-08-03). A review
+      of 30 days of Search data found both campaigns paying for clicks that landed somewhere
+      that could not accept the action the ad promised. Business: 58 clicks, $164.74, $2.84 CPC,
+      **0 form starts and 0 conversions**. Consumer: 104 clicks, 89 `mode_viewed`, **1
+      `first_message_sent`**, 0 signups.
+      **The cause the ad account could not see:** `<ChatView>` is server-rendered by
+      `client:load` while `useSession()` is still `loading`, so its early-return "Loading…" card
+      was the ONLY thing in the static HTML of every chat page. Confirmed against a real build:
+      `dist/practice/{guide,mentor,modes/*}/index.html` each contained one `Loading…` and zero
+      composer markup. A visitor arriving on "type your situation" got a hero and a grey box
+      until the React chunk downloaded and Supabase read localStorage, which on a cold phone is
+      the whole visit. The loading card is gone; `loading` now renders the real shell with a
+      live composer (sending already mints the anonymous session, and `/api/chat` is still the
+      only gate). Asserted at the HTML level, since that is what caught it.
+      **That exposed a latent hydration mismatch** and fixing it was mandatory: `contextId` and
+      `authNotice` were initialised by reading `window`, so the client's first render disagreed
+      with the server's and React threw the island away and rebuilt it. Invisible while the
+      loading card short-circuited both renders. Both now initialise from props/null and resolve
+      from the URL in a mount effect.
+      **One-tap starters.** Three first-person openers per mode (new `starters` field, distinct
+      from the second-person `exampleSituations`), plus generic sets for /practice/guide and
+      /practice/mentor. Tapping FILLS the composer and focuses it rather than sending: with only
+      3 free anonymous messages, spending one on a canned line costs a third of the trial and
+      starts the conversation with something the visitor did not say. `starter_clicked` pairs
+      with `first_message_sent` so the choice is measured, not assumed.
+      **Mobile first screen.** The `sm:hidden` "Start the conversation" jump button is deleted
+      (it was mobile-only, so the 4 `cta_clicked` in the report measured almost nothing), the
+      hero intro and price line are desktop-only (the chat's own badge already says "3 free
+      messages, no account needed"), and the mode band no longer repeats a mode the page itself
+      is named after. Verified at 390x844: composer, all three starters and the badge in the
+      first viewport.
+      **/for-business can finally take an answer.** `TeamEnquiryForm` was orphaned in `f05051c`
+      when `TeamCheckout` replaced it on /pricing#team; both CTAs pointed there, so an ad saying
+      "tell us about your team" handed people a price list with a 5-seat minimum. The form is
+      mounted at `#contact` on the page itself, self-serve checkout stays one click away, and
+      `team_enquiry_started` fires explicitly rather than depending on GA4 enhanced measurement.
+      Submissions land in /admin → Enquiries with an unhandled count and a "Mark handled"
+      toggle (verified with a real submission), so the row is the record and the alert email is
+      only the notification: an unset `TEAM_ENQUIRY_TO` costs the ping, never the lead.
+      **The method-first surface had no exit.** /principles (index + 12) and /protocol (index +
+      steps) contained no path into the product at all, while the 12 Principles sitelink is the
+      highest-CTR asset in the account (1,444 impr, 2.98%, beating "Try the Guide" nearly 2:1).
+      A shared `TryItBand` now closes all of them, carrying one fixed framing: the Communication
+      Protocol is how a conversation reaches real understanding and a solution that holds, and
+      the Wisdom Principles are what support it. A band of links, not an embedded chat, because
+      these pages carry the organic traffic and the chat bundle would cost their LCP.
+      **The dashboard is no longer subscriber-only.** A signed-in free account gets the Guide,
+      the Mentor, every mode and its own history on the normal free allowance; assistants,
+      documents and attachments stay behind the subscription and the rail says what a
+      subscription adds. No server change was needed (`/api/chat` already refuses `assistant_id`
+      and attachments for non-subscribers), and the free tier no longer fires the two `/api/`
+      calls it would only be 403'd for. An account is still required: it is the step this page
+      exists to be worth taking.
+      **Also fixed:** `for-business.astro` shipped `data-track-cta="for-business"`, a value that
+      is not in `CtaLocation` — `initDomTracking` cast whatever it found straight to the type.
+      `CTA_LOCATIONS` is now a runtime array with a DEV warning, so the next one is caught.
+      Verified end to end in a real browser on the local stack (signed out at 390x844, an
+      anonymous send, a real `team_enquiries` row, a free account, an exhausted free account,
+      and a returning subscriber). Screenshots in
+      [docs/features/ad-landing-conversion/](features/ad-landing-conversion/).
+      **GTM/GA4 UI work still outstanding, and the events do nothing until it is done:** add
+      `starter_clicked` and `team_enquiry_started` to the custom-event trigger regex; add Data
+      Layer Variables and custom dimensions for `index` and for `mode`; and mark
+      `team_enquiry_submitted` as a **key event** plus a Google Ads conversion action. Two of
+      those were pre-existing holes found while walking the checklist, not new work:
+      `mode` was unregistered while `anon_chat_started`/`first_message_sent`/`starter_clicked`
+      were all sending it (so "which mode converts" was never answerable), and
+      `team_enquiry_submitted` was not a key event, which means **the Business campaign had no
+      conversion it could ever record** and was bidding against silence. All documented in
+      [deployment.md](deployment.md#4-ga4-ui-setup).
 - [ ] Then: SEO/community/AEO channels. The paid test is now live and corrected (see above);
       re-evaluate at day 7 / day 21 against the decision rules in the build sheet.
+- [ ] **Ads pass, after this deploys:** repoint the Business final URL to
+      `/for-business#contact`, fix the "Talk to Us" sitelink that served 0 impressions in 30
+      days, and reconcile the "No Signup" / "No Account" copy against the 3-message reality.
 
 ## Open questions / decisions
 

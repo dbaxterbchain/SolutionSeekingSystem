@@ -1,0 +1,56 @@
+---
+import type { CtaLocation } from '../lib/analytics';
+
+/**
+ * The way out of a method page and into the product.
+ *
+ * /principles (index plus twelve pages) and /protocol (index plus its steps)
+ * carried no path into the Guide at all. That is the largest set of dead ends on
+ * the site, and paid search proved it expensive: the "12 Principles" sitelink is
+ * the highest-CTR asset in the whole account, beating "Try the Guide" nearly two
+ * to one. People want to understand the method before they will touch the
+ * product, and every one of them landed somewhere they could only read.
+ *
+ * The framing is fixed and the same on every page that uses this: the
+ * Communication Protocol is how a conversation reaches real understanding and a
+ * solution that holds, and the Wisdom Principles are what support it.
+ *
+ * A band of links, deliberately not an embedded chat: these are static content
+ * pages that carry the organic search traffic, and shipping the chat bundle onto
+ * every one of them would cost their LCP to save a click.
+ */
+interface Props {
+  /** Analytics location. Must exist in CTA_LOCATIONS (src/lib/analytics.ts). */
+  ctaLocation: CtaLocation;
+  heading: string;
+  body: string;
+  primary: { href: string; label: string };
+  secondary: { href: string; label: string };
+}
+
+const { ctaLocation, heading, body, primary, secondary } = Astro.props;
+---
+
+<section class="rounded-2xl border border-brand-100 bg-brand-50/60 p-6 sm:p-8">
+  <p class="eyebrow">How it works</p>
+  <h2 class="mt-2 font-heading text-2xl font-bold text-ink-800">{heading}</h2>
+  <p class="mt-3 max-w-2xl leading-relaxed text-slate-600">{body}</p>
+  <div class="mt-6 flex flex-wrap items-center gap-3">
+    <a
+      href={primary.href}
+      class="btn-primary"
+      data-track-cta={ctaLocation}
+      data-track-label={primary.label}
+    >
+      {primary.label}
+    </a>
+    <a
+      href={secondary.href}
+      class="btn-secondary"
+      data-track-cta={ctaLocation}
+      data-track-label={secondary.label}
+    >
+      {secondary.label}
+    </a>
+  </div>
+</section>

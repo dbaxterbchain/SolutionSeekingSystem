@@ -3,6 +3,7 @@ import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageHero from '../../components/PageHero.astro';
 import PrincipleCard from '../../components/PrincipleCard.astro';
+import TryItBand from '../../components/TryItBand.astro';
 import { breadcrumbs, collectionPage } from '../../lib/schema';
 
 const principles = (await getCollection('principles')).sort(
@@ -57,5 +58,15 @@ const schemas = [
       sufficient on its own; each supports the others in creating a balanced approach to
       conflict resolution and collaboration.
     </p>
+
+    <div class="mt-14">
+      <TryItBand
+        ctaLocation="principles_index"
+        heading="Twelve principles, one protocol"
+        body="The principles are the foundation. The Communication Protocol is what you actually run: three steps that take a hard conversation to real understanding and a solution both sides will keep. The Guide runs it with you, on something you are dealing with right now."
+        primary={{ href: '/practice/guide', label: 'Try it on a real situation' }}
+        secondary={{ href: '/protocol', label: 'See the Communication Protocol' }}
+      />
+    </div>
   </div>
 </BaseLayout>

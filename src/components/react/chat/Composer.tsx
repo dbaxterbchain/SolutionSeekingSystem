@@ -17,6 +17,7 @@ export default function Composer({
   streaming,
   placeholder,
   disabled = false,
+  focusToken,
   children,
 }: {
   value: string;
@@ -26,6 +27,13 @@ export default function Composer({
   streaming: boolean;
   placeholder: string;
   disabled?: boolean;
+  /**
+   * Bump this to move the cursor into the box, at the end of whatever is there.
+   * A token rather than a ref so callers don't have to reach past this
+   * component to reach its textarea. 0 and undefined mean "leave it alone", so
+   * this never steals focus on mount.
+   */
+  focusToken?: number;
   children?: ReactNode;
 }) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -41,6 +49,16 @@ export default function Composer({
     ta.style.height = 'auto';
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
   }, [value]);
+
+  // Caller asked for the cursor. Put it at the END, so text dropped in from a
+  // starter reads as something to continue rather than something to overwrite.
+  useEffect(() => {
+    if (!focusToken) return;
+    const ta = inputRef.current;
+    if (!ta) return;
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+  }, [focusToken]);
 
   return (
     <form

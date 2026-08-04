@@ -15,28 +15,46 @@ import type { AgentId } from './chatSessions';
  *   iOS hand-off) and biases any ad bidding built on it.
  */
 
-/** Where a CTA lives. A closed set, so "which button" stays analyzable. */
-export type CtaLocation =
-  | 'home_hero'
-  | 'home_proof'
-  | 'home_closing'
-  | 'nav'
-  | 'footer'
-  | 'practice_assistants'
-  | 'practice_modes'
-  | 'practice_demos'
-  | 'guide_page'
-  | 'mentor_page'
-  | 'mode_page'
-  | 'mode_page_mentor'
-  | 'demo_page_sidebar'
-  | 'demo_page_end'
-  | 'paywall_card'
-  | 'account_subscription'
-  | 'pricing_monthly'
-  | 'pricing_annual'
-  | 'pricing_team'
-  | 'dashboard_upsell';
+/**
+ * Where a CTA lives. A closed set, so "which button" stays analyzable.
+ *
+ * An ARRAY, not a bare union, because `data-track-cta` attributes on static
+ * Astro pages are strings that TypeScript never sees: initDomTracking() below
+ * used to cast whatever it found straight to this type. `/for-business` shipped
+ * `data-track-cta="for-business"` that way and reported a location that does not
+ * exist here, with no error anywhere. The runtime list lets DEV say so.
+ */
+export const CTA_LOCATIONS = [
+  'home_hero',
+  'home_proof',
+  'home_closing',
+  'nav',
+  'footer',
+  'practice_assistants',
+  'practice_modes',
+  'practice_demos',
+  'guide_page',
+  'mentor_page',
+  'mode_page',
+  'mode_page_mentor',
+  'demo_page_sidebar',
+  'demo_page_end',
+  'paywall_card',
+  'account_subscription',
+  'pricing_monthly',
+  'pricing_annual',
+  'pricing_team',
+  'dashboard_upsell',
+  'for_business_hero',
+  'for_business_contact',
+  // The method-first pages, which paid sitelinks send curious visitors to.
+  'principles_index',
+  'principle_page',
+  'protocol_index',
+  'protocol_page',
+] as const;
+
+export type CtaLocation = (typeof CTA_LOCATIONS)[number];
 
 /** Which allowance the user is spending. */
 export type Tier = 'anon' | 'free' | 'subscriber';
@@ -67,6 +85,18 @@ export type AnalyticsEvent =
   | { event: 'checkout_started'; plan: PlanId; cta_location: CtaLocation; value: number; currency: 'USD' }
   | { event: 'checkout_abandoned' }
   | { event: 'checkout_success_viewed' }
+  /**
+   * A visitor tapped a suggested opener in an empty chat. The blank composer is
+   * the step the consumer funnel dies on, so this is the pair that tells us
+   * whether the starters fix it: starter_clicked -> first_message_sent.
+   */
+  | { event: 'starter_clicked'; agent: AgentId; mode?: string; index: number }
+  /**
+   * Someone began filling the team enquiry form. Fired explicitly rather than
+   * relying on GA4 enhanced measurement's form_start, so the top of the business
+   * funnel does not depend on a setting in another product.
+   */
+  | { event: 'team_enquiry_started' }
   /** Demand signal for the team tier, which is deliberately not self-serve yet. */
   | { event: 'team_enquiry_submitted' }
   /** An address joined the list (the delivery email is on its way). */
@@ -200,9 +230,17 @@ export function initDomTracking(): void {
   document.addEventListener('click', (e) => {
     const el = (e.target as Element | null)?.closest?.('[data-track-cta]') as HTMLElement | null;
     if (!el) return;
+    const location = el.dataset.trackCta ?? '';
+    if (import.meta.env.DEV && !(CTA_LOCATIONS as readonly string[]).includes(location)) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[analytics] data-track-cta="${location}" is not in CTA_LOCATIONS. ` +
+          'Add it there, or the event reports a location nothing can group by.'
+      );
+    }
     track({
       event: 'cta_clicked',
-      cta_location: el.dataset.trackCta as CtaLocation,
+      cta_location: location as CtaLocation,
       cta_label: el.dataset.trackLabel ?? el.textContent?.trim().slice(0, 60) ?? '',
       destination: el.getAttribute('href') ?? undefined,
     });

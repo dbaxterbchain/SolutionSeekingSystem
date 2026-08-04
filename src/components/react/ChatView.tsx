@@ -24,6 +24,7 @@ import { FREE_ACCOUNT_MESSAGES, FREE_ANON_MESSAGES, priceCopy } from '../../data
 import { getCaptchaToken, prewarmCaptcha } from '../../lib/turnstile';
 import MessageBubble, { looksLikeDocument } from './chat/MessageBubble';
 import Composer from './chat/Composer';
+import Starters from './chat/Starters';
 import { streamChat } from '../../lib/chatStream';
 
 const FREE_LIMIT = FREE_ACCOUNT_MESSAGES;
@@ -69,9 +70,19 @@ interface Props {
    * dedicated variant pages. A ?context= URL param takes precedence.
    */
   initialContext?: string;
+  /**
+   * First-person openers offered in the empty conversation. Passed in by the
+   * page (from src/data/modes.ts on a mode page) rather than looked up here, so
+   * the landing copy stays out of the chat client bundle.
+   */
+  starters?: string[];
 }
 
 type Gate =
+  /**
+   * Nothing known yet. This is what the SERVER renders, so it must never block
+   * the composer: see the note above the render below.
+   */
   | { kind: 'loading' }
   /** No session yet. The composer is live: sending signs them in anonymously. */
   | { kind: 'anon-idle' }
@@ -117,22 +128,37 @@ function toGate(entitlement: ClientEntitlement | null): Gate {
   }
 }
 
-export default function ChatView({ agent, agentName, welcome, initialContext }: Props) {
+export default function ChatView({
+  agent,
+  agentName,
+  welcome,
+  initialContext,
+  starters,
+}: Props) {
   const { session, user, loading } = useSession();
   const [gate, setGate] = useState<Gate>({ kind: 'loading' });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatId, setChatId] = useState<string | null>(null);
-  // Named context seeding the conversation. New conversations take it from
-  // ?context= (falling back to the initialContext prop); resumed ones take it
-  // from the saved row, which is authoritative whenever ?chat= is present.
-  const [contextId, setContextId] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('chat')) return null;
-    const id = params.get('context') ?? initialContext ?? null;
-    return getContextMeta(id, agent) ? id : null;
-  });
+  /**
+   * Named context seeding the conversation. New conversations take it from
+   * ?context= (falling back to the initialContext prop); resumed ones take it
+   * from the saved row, which is authoritative whenever ?chat= is present.
+   *
+   * The initial value MUST NOT depend on `window`. This component is
+   * server-rendered, and the URL only exists on one of the two sides: reading it
+   * here made the client's first render disagree with the server's (mode band
+   * present vs absent), and React threw the server HTML away and rebuilt the
+   * whole island. That was invisible while a "Loading…" card short-circuited
+   * both renders, and became a hydration error the moment the real chat shipped
+   * in the HTML. The prop is the one seed both sides can agree on; the URL
+   * override is applied on mount, below.
+   */
+  const [contextId, setContextId] = useState<string | null>(() =>
+    getContextMeta(initialContext, agent) ? (initialContext ?? null) : null
+  );
   const [input, setInput] = useState('');
+  /** Bumped to move the cursor into the composer (see Composer's focusToken). */
+  const [focusToken, setFocusToken] = useState(0);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
@@ -145,8 +171,14 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
    * already has an account of its own) the provider bounces them here with the
    * reason in the URL. Nothing read it, so the card simply appeared to do
    * nothing. Read it on mount and say what happened.
+   *
+   * Set from an effect, not a state initializer: it reads the URL (server and
+   * client would disagree) and rewrites it with replaceState, which is a side
+   * effect that has no business running during a render.
    */
-  const [authNotice] = useState(() => readOAuthRedirectError());
+  const [authNotice, setAuthNotice] = useState<{ code: string | null; message: string } | null>(
+    null
+  );
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const { confirm, dialog } = useDialog();
@@ -190,6 +222,23 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
       active = false;
     };
   }, [loading, session?.access_token, user?.id]);
+
+  /**
+   * Everything that has to read the URL, done once on mount so the first client
+   * render can stay identical to the server's. See the note on contextId.
+   */
+  useEffect(() => {
+    setAuthNotice(readOAuthRedirectError());
+    const params = new URLSearchParams(window.location.search);
+    // A resumed conversation carries its own context on the saved row, which is
+    // authoritative; the effect below applies it.
+    if (params.get('chat')) {
+      setContextId(null);
+      return;
+    }
+    const id = params.get('context');
+    if (id && getContextMeta(id, agent)) setContextId(id);
+  }, []);
 
   // Resume a conversation from ?chat=<id>.
   useEffect(() => {
@@ -266,6 +315,16 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     // Pass the session explicitly: useSession() has not re-rendered yet, so
     // `session` is still null on this pass.
     void deliver([...messages, { role: 'user', content: text }], active);
+  };
+
+  /**
+   * A suggested opener was tapped. Fill the composer and hand over the cursor;
+   * deliberately NOT a send. See the note in chat/Starters.tsx.
+   */
+  const pickStarter = (text: string, index: number) => {
+    setInput(text);
+    setFocusToken((n) => n + 1);
+    track({ event: 'starter_clicked', agent, mode: contextId ?? undefined, index });
   };
 
   /** Re-send the transcript after a failure (the user message is already in it). */
@@ -500,7 +559,13 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
   };
 
   const contextMeta = getContextMeta(contextId, agent);
-  const isAnonUser = user?.is_anonymous === true || gate.kind === 'anon-idle';
+  /**
+   * Nobody we can attach history to (yet). Includes the pre-hydration pass,
+   * where there is no user because the session hasn't been read: showing a
+   * History button in the server-rendered HTML and then taking it away is worse
+   * than showing it a beat late.
+   */
+  const isAnonUser = !user || user.is_anonymous === true || gate.kind === 'anon-idle';
 
   const currentTier: Tier =
     gate.kind === 'subscriber' ? 'subscriber' : isAnonUser ? 'anon' : 'free';
@@ -523,13 +588,22 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
     if (chatId) rememberFeedbackAsked(chatId);
   };
 
-  if (loading || (user && gate.kind === 'loading')) {
-    return (
-      <div className="rounded-3xl border border-slate-100 bg-white p-8 text-center text-sm text-slate-500 shadow-card">
-        Loading…
-      </div>
-    );
-  }
+  /*
+   * There is deliberately NO "Loading…" early return here.
+   *
+   * This component is server-rendered (client:load) while useSession() is still
+   * loading, so whatever it returns on that first pass is what ships in the
+   * static HTML of every mode page, /practice/guide and /practice/mentor. It
+   * used to return a grey "Loading…" card, which meant a visitor arriving from
+   * an ad that says "type your situation" got a hero and a placeholder box, with
+   * no composer anywhere on the page, until the React chunk downloaded and
+   * Supabase read localStorage. On a cold phone that is the whole visit.
+   *
+   * So `loading` renders the real thing instead: a live composer, no badge (the
+   * badges below all require a resolved gate), and no History button. Sending is
+   * safe from that state, because send() creates the anonymous session itself
+   * and /api/chat is the only thing that decides what anyone may do.
+   */
 
   // Only when anonymous chat isn't possible at all (Supabase unconfigured, or
   // the anonymous sign-in was refused). Everyone else gets a live composer.
@@ -643,8 +717,16 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
         </div>
       )}
 
-      {/* Active named context */}
-      {contextMeta && (
+      {/*
+        Active named context, but NOT when it only repeats the page around it.
+        A mode page already says "Parent mode" in its eyebrow and its H1, and the
+        status bar above carries the mode selector, so a third announcement of it
+        was pure chrome sitting between a visitor and the composer, on the one
+        screen where that space decides whether they ever type. It still shows on
+        /practice/guide and after a demo hand-off, where the context is genuinely
+        news.
+      */}
+      {contextMeta && contextId !== initialContext && (
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 border-b border-slate-100 bg-brand-50/60 px-5 py-2.5">
           <span className="rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-semibold text-brand-700">
             {contextMeta.label}
@@ -654,9 +736,12 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
       )}
 
       {/* Transcript */}
-      <div className="max-h-[32rem] space-y-4 overflow-y-auto px-5 py-6">
+      <div className="max-h-[32rem] space-y-4 overflow-y-auto px-5 py-4 sm:py-6">
         {messages.length === 0 && (
-          <p className="text-sm leading-relaxed text-slate-500">{welcome}</p>
+          <>
+            <p className="text-sm leading-relaxed text-slate-500">{welcome}</p>
+            {starters && <Starters starters={starters} onPick={pickStarter} />}
+          </>
         )}
         {messages.map((m, i) => (
           <MessageBubble
@@ -746,6 +831,7 @@ export default function ChatView({ agent, agentName, welcome, initialContext }: 
           onSend={send}
           onStop={() => abortRef.current?.abort()}
           streaming={streaming}
+          focusToken={focusToken}
           placeholder={`Message the ${agentName}…`}
         />
       )}
