@@ -33,6 +33,42 @@ export default {
           800: '#16276B',
           900: '#0F1B4D',
         },
+        /*
+         * The solution. Gold marks the thing the whole system is for: the third
+         * protocol step, the outcome of a tool, the moment something is found.
+         * The palette is otherwise all cool blues, so the one warm colour is the
+         * one that means "you got there" rather than a decorative accent.
+         *
+         * Used sparingly on purpose. If gold appears everywhere it stops meaning
+         * arrival and becomes another brand colour.
+         *
+         * SCOPED DELIBERATELY, for two reasons that are easy to forget later:
+         *
+         * 1. `gold` (500) is 1.58:1 on white and 8.66:1 on ink-800. It is a
+         *    DARK-BACKGROUND colour. On light surfaces it is a shape, never
+         *    type; 800 and 900 are the steps that pass text on white.
+         * 2. Amber already means "warning" in eleven components, and amber-200
+         *    is close enough to this that they read as one family. Gold is
+         *    never a status colour.
+         *
+         * `sky` remains the accent (the SEEKING word). This is a supporting
+         * colour, not a fourth pillar. Full rules and live ratios on /design.
+         */
+        gold: {
+          DEFAULT: '#F2C879',
+          50: '#FDF7ED',
+          100: '#FAEED6',
+          200: '#F7E0B6',
+          300: '#F4D59A',
+          400: '#F2CE8A',
+          500: '#F2C879',
+          600: '#E2AF50',
+          // 800 is tuned darker than an even ramp would put it (4.27 -> 4.68 on
+          // white) so "800 and darker are safe for text on white" is a clean rule.
+          700: '#CE9427',
+          800: '#956D23',
+          900: '#775922',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

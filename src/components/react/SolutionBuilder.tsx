@@ -242,7 +242,9 @@ export default function SolutionBuilder() {
           {summaryText}
         </pre>
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <button type="button" onClick={copy} className="btn bg-white text-ink-800 hover:bg-brand-50">
+          {/* Gold, on the one action that matters, at the moment the tool hands
+              back a result. 8.66:1 against ink-800; see /design. */}
+          <button type="button" onClick={copy} className="btn bg-gold-500 text-ink-800 hover:bg-gold-400">
             {copied ? 'Copied ✓' : 'Copy the check'}
           </button>
           <SaveButton
