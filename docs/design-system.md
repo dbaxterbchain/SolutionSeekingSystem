@@ -26,7 +26,10 @@ being installed.
 Originals, committed and never edited:
 
 - [`images/Logo/SolutionSeekingLogo.svg`](../images/Logo/) — the master
-- [`images/ExamplesOfTypography/`](../images/ExamplesOfTypography/) — the typographic lockups
+- [`images/ExamplesOfTypography/`](../images/ExamplesOfTypography/) — the original raster
+  lockups. **Archive only, no longer shipped.** The lockups on /design are now set in the
+  brand faces and outlined (see below), which reads better, scales, and takes a qualifier
+  anyone can extend. These stay as the record of what the brand was.
 
 Everything in `public/brand/` is **generated** from those by
 [`scripts/build-brand-assets.mjs`](../scripts/build-brand-assets.mjs). Run it by hand and
@@ -36,7 +39,14 @@ commit the output; it is deliberately not part of `npm run build`:
 node scripts/build-brand-assets.mjs
 ```
 
-Two things worth knowing before touching it:
+Three things worth knowing before touching it:
+
+- **The typographic lockups are SET, not copied.** `Solution` in Poppins, `SEEKING` in
+  Anton, then a qualifier, converted to outlines with `opentype.js` so a downloaded file
+  carries no font dependency. This is the one place the guide deliberately does not hand
+  back the original artwork: the original was a picture of a lockup, and this is the
+  lockup itself. The LOGO's own wordmark is still never re-typeset, because that is
+  artwork rather than typesetting.
 
 - **The master's gradients are embedded raster masks, not SVG gradients.** The mark
   cannot be recoloured from that file and does not survive being shrunk to a favicon.

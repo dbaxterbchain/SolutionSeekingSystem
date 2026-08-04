@@ -23,25 +23,29 @@
  *     mark we have, and it is what every flat and single-colour variant below is
  *     built from.
  *
- * Nothing here re-typesets the wordmark in Poppins. Poppins is the brand face
- * for NEW material; the logo itself ships as the outlines it was drawn as.
+ * The LOGO's own wordmark is never re-typeset: it ships as the outlines it was
+ * drawn as. The standalone typographic LOCKUPS are a different thing, and those
+ * are now set in the brand faces rather than shipped as the original rasters.
+ * See the note above buildLockups().
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { crc32, deflateRawSync } from 'node:zlib';
+import opentype from 'opentype.js';
 import sharp from 'sharp';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT = join(ROOT, 'public/brand');
 const PUBLIC = join(ROOT, 'public');
 const MASTER = join(ROOT, 'images/Logo/SolutionSeekingLogo.svg');
-const LOCKUP_DIR = join(ROOT, 'images/ExamplesOfTypography');
+const FONTS = join(ROOT, 'src/assets/fonts');
 
 /** Brand colours. Must match `tailwind.config.mjs`; see /design. */
 const COLOR = {
   brand: '#5271FF', // brand-500, the front S
   brandBack: '#A3B2FF', // brand-300, the S behind it
+  sky: '#3D9BF0', // sky-500, the SEEKING word
   ink: '#16276B',
   white: '#FFFFFF',
   black: '#000000',
@@ -476,20 +480,141 @@ async function tile(destPath, size, fill) {
     .toFile(destPath);
 }
 
-/** The exact original lockup rasters, renamed. No re-rendering. */
-function copyLockups() {
-  const map = {
-    // The base two-tier lockup: no qualifier under SEEKING.
-    'SolutionSeeking.png': 'lockup-solution-seeking.png',
-    'ssGuide.png': 'lockup-guide.png',
-    'ssMentor.png': 'lockup-mentor.png',
-    'SolutionSeekingABeanchainProcess.png': 'lockup-beanchain-process.png',
-  };
-  for (const [src, dest] of Object.entries(map)) {
-    const from = join(LOCKUP_DIR, src);
-    if (!existsSync(from)) throw new Error(`Missing original lockup: ${from}`);
-    writeFileSync(join(OUT, dest), readFileSync(from));
-    log(`copy ${dest}  (exact original: ${src})`);
+// ── Typographic lockups ─────────────────────────────────────────────────────
+
+/**
+ * The lockups are SET, not copied.
+ *
+ * They used to ship as the original rasters from images/ExamplesOfTypography/.
+ * Those are retired: the brand faces render the same three-tier formula better,
+ * they scale, they carry a qualifier slot anyone can extend, and a PNG of type
+ * is a dead end for whoever has to place it. This is the one place the guide
+ * deliberately does NOT hand back the original artwork, because the original was
+ * a picture of a lockup and this is the lockup itself.
+ *
+ * Set in the brand faces and CONVERTED TO OUTLINES, so a downloaded file needs
+ * no font installed. The logo's own wordmark is still never re-typeset: that is
+ * artwork, this is typesetting, and they are different jobs.
+ */
+// parse(), not loadSync(): the latter is deprecated in this version and returns
+// undefined rather than throwing, which surfaces much later as a null font.
+const face = (file) => {
+  const font = opentype.parse(readFileSync(join(FONTS, file)).buffer);
+  if (!font?.getPath) throw new Error(`Could not parse font: ${file}`);
+  return font;
+};
+
+const FACE = {
+  solution: face('Poppins-Medium.ttf'),
+  seeking: face('Anton-Regular.ttf'),
+  qualifier: face('Poppins-Medium.ttf'),
+};
+
+/** Proportions carried over from the live specimen on /design. */
+const LOCKUP = { solution: 96, seeking: 192, qualifier: 76, tracking: 0.2, gap: 0.04 };
+
+/**
+ * One line of type as outlines, optionally letterspaced.
+ *
+ * Letterspacing has to be applied glyph by glyph: opentype lays out a whole
+ * string at the font's own advances, with no tracking parameter.
+ */
+function line(font, text, size, tracking = 0) {
+  const extra = size * tracking;
+  if (!extra) {
+    return { d: font.getPath(text, 0, 0, size).toPathData(2), width: font.getAdvanceWidth(text, size) };
+  }
+  let x = 0;
+  let d = '';
+  for (const ch of [...text]) {
+    d += `${font.getPath(ch, x, 0, size).toPathData(2)} `;
+    x += font.getAdvanceWidth(ch, size) + extra;
+  }
+  return { d: d.trim(), width: x - extra };
+}
+
+/** Bounding box of path data, by rendering-free parsing of its coordinates. */
+function pathBounds(d) {
+  const nums = (d.match(/-?\d*\.?\d+/g) || []).map(Number);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let i = 0; i + 1 < nums.length; i += 2) {
+    minX = Math.min(minX, nums[i]);
+    maxX = Math.max(maxX, nums[i]);
+    minY = Math.min(minY, nums[i + 1]);
+    maxY = Math.max(maxY, nums[i + 1]);
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+const shift = (d, dx, dy) =>
+  `<path d="${d}" transform="translate(${Math.round(dx * 100) / 100}, ${Math.round(dy * 100) / 100})"/>`;
+
+/**
+ * Stack the lines, centred, tight to their real ink.
+ *
+ * Stacked on measured bounding boxes rather than font metrics: Anton's ascent
+ * dwarfs Poppins', so metric-based leading leaves a visible hole under
+ * "Solution" and none under the qualifier.
+ */
+function lockup(qualifier) {
+  const parts = [
+    { ...line(FACE.solution, 'Solution', LOCKUP.solution), fill: COLOR.ink },
+    { ...line(FACE.seeking, 'SEEKING', LOCKUP.seeking), fill: COLOR.sky },
+  ];
+  if (qualifier) {
+    // A short qualifier is set as a letterspaced cap line, the way SYSTEM reads
+    // in the master. A long one is a phrase and would look absurd tracked out.
+    const long = qualifier.length > 8;
+    parts.push({
+      ...line(
+        FACE.qualifier,
+        long ? qualifier : qualifier.toUpperCase(),
+        long ? LOCKUP.qualifier * 0.62 : LOCKUP.qualifier,
+        long ? 0 : LOCKUP.tracking
+      ),
+      fill: COLOR.ink,
+    });
+  }
+
+  const boxes = parts.map((p) => pathBounds(p.d));
+  const widest = Math.max(...boxes.map((b) => b.maxX - b.minX));
+  const gap = LOCKUP.seeking * LOCKUP.gap;
+
+  let y = 0;
+  const body = parts
+    .map((p, i) => {
+      const b = boxes[i];
+      const dx = (widest - (b.maxX - b.minX)) / 2 - b.minX;
+      const dy = y - b.minY;
+      y += b.maxY - b.minY + gap;
+      return `<g fill="${p.fill}">${shift(p.d, dx, dy)}</g>`;
+    })
+    .join('');
+
+  const height = y - gap;
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${Math.ceil(widest)} ${Math.ceil(height)}"`,
+    ` width="${Math.ceil(widest)}" height="${Math.ceil(height)}"`,
+    ` role="img" aria-label="Solution Seeking${qualifier ? ` ${qualifier}` : ''}">`,
+    `<title>Solution Seeking${qualifier ? ` ${qualifier}` : ''}</title>`,
+    body,
+    `</svg>`,
+  ].join('');
+}
+
+const LOCKUPS = [
+  ['lockup-solution-seeking', null],
+  ['lockup-system', 'System'],
+  ['lockup-guide', 'Guide'],
+  ['lockup-mentor', 'Mentor'],
+  ['lockup-beanchain-process', 'A Beanchain Process'],
+];
+
+async function buildLockups() {
+  for (const [name, qualifier] of LOCKUPS) {
+    writeFileSync(join(OUT, `${name}.svg`), lockup(qualifier));
+    log(`svg  ${name}.svg`);
+    await raster(`${name}.svg`, [1200]);
   }
 }
 
@@ -640,8 +765,8 @@ log('svg  favicon.svg  (was a different, approximated mark)');
 await tile(join(PUBLIC, 'apple-touch-icon.png'), 180, 0.66);
 log('png  apple-touch-icon.png  (was the full logo, wordmark illegible)');
 
-console.log('\n Typographic lockups');
-copyLockups();
+console.log('\n Typographic lockups (set in the brand faces, outlined)');
+await buildLockups();
 
 console.log('\n Archive');
 makeZip();
