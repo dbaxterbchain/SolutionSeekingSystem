@@ -52,6 +52,7 @@ export const CTA_LOCATIONS = [
   'principle_page',
   'protocol_index',
   'protocol_page',
+  'design_guide',
 ] as const;
 
 export type CtaLocation = (typeof CTA_LOCATIONS)[number];

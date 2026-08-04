@@ -1,7 +1,7 @@
 # Project Status
 
-_Last updated: 2026-08-03 (ad landing conversion: live composer in the HTML, starters,
-/for-business enquiry form, method-page CTAs, free-tier dashboard)_
+_Last updated: 2026-08-03 (public design guide at /design and a generated brand asset
+set; before that, the ad landing conversion pass)_
 
 ## At a glance
 
@@ -698,6 +698,33 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
       `team_enquiry_submitted` was not a key event, which means **the Business campaign had no
       conversion it could ever record** and was bidding against silence. All documented in
       [deployment.md](deployment.md#4-ga4-ui-setup).
+- [x] **Public design guide at /design, and a real brand asset set** (2026-08-03). One URL to
+      hand anyone working with us: logo files and variants, colour, typography, clearspace and
+      minimum sizes, a misuse grid, a live UI kit, permissions, and a zip of everything.
+      Colour and type are **imported from `tailwind.config.mjs`** and rendered from it, so the
+      guide cannot drift from what the site actually builds with.
+      **Assets are derived from the supplied artwork, never redrawn**
+      ([`scripts/build-brand-assets.mjs`](../scripts/build-brand-assets.mjs), run by hand and
+      its output committed). Pulling the master apart turned up more than expected:
+      its gradients are **embedded raster masks**, so the mark cannot be recoloured or shrunk
+      from that file, while its wordmark is clean outlined vector and is now extracted exactly
+      as `wordmark.svg` (the site had no vector wordmark at all).
+      **The mark is two S shapes, offset**, each drawn from two chevron strokes whose real
+      geometry lives in the master's clip paths. Confirmed by rendering the pairings: any other
+      pairing produces two meaningless half-shapes. Flat variants therefore keep the two S's
+      apart deliberately, with a second tone or a knocked-out gap, because a single flat colour
+      fuses them into one blob that stops reading as the logo. Flattening also exposes arm
+      terminals that the master's gradients fade away, so exactly two corners per S (the ones
+      where the S's cross) are rounded to mirror the curve already on the inside of that bend.
+      Rounding every corner was tried first and is wrong: it softens the S's genuine outer tips
+      and the mark goes bulbous.
+      **Two live icons were wrong and are rebuilt from the same geometry:** `favicon.svg` drew a
+      different, approximated mark (one S in three paths, angular where the master is rounded),
+      and `apple-touch-icon.png` was the entire logo shrunk to 180px with the wordmark an
+      illegible smudge. Their paths are unchanged, so nothing referencing them moves.
+      Also settled the long-open **brand fonts** question (see below), and rewrote
+      [design-system.md](design-system.md) down to the repo-only details, pointing at /design
+      for everything else.
 - [ ] Then: SEO/community/AEO channels. The paid test is now live and corrected (see above);
       re-evaluate at day 7 / day 21 against the decision rules in the build sheet.
 - [ ] **Ads pass, after this deploys:** repoint the Business final URL to
@@ -706,7 +733,11 @@ Lead audience: **workplace leaders**. Full plan (5 phases + channel strategy) wa
 
 ## Open questions / decisions
 
-- Brand fonts — buy licensed faces or keep the free stand-ins?
+- ~~Brand fonts — buy licensed faces or keep the free stand-ins?~~ **Settled 2026-08-03:**
+  Anton, Poppins and Inter are the brand faces, not placeholders. All three are
+  open-licensed, so anyone we work with can use them without buying anything, and the logo
+  ships as outlines so the mark never depends on a font being installed. Documented on
+  [/design](https://solutionseeking.com/design).
 - Whether to add a print stylesheet for the guide.
 - ~~Where (if anywhere) to store AI conversation data in Phase 3.~~ → Decided: Supabase
   `chat_sessions` table, user-owned with Row-Level Security; users can delete

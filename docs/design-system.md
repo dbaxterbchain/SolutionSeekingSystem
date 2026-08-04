@@ -1,55 +1,68 @@
 # Design System
 
-Derived from the Solution Seeking logo and typography examples in `images/`.
+**The design guide is a page on the site: [/design](https://solutionseeking.com/design)**
+([src/pages/design.astro](../src/pages/design.astro)). It is public and meant to be handed
+to anyone: colour, typography, logo files and variants, usage rules, permissions, and a
+download of every asset. Send people there rather than here.
 
-## Color tokens
+This file covers only what a public page should not: where things live in the repo.
 
-Defined in `tailwind.config.mjs` (and mirrored as CSS vars in `src/styles/global.css`).
+## Where the tokens actually live
 
-| Token | Hex | Use |
-|-------|-----|-----|
-| `brand` (500) | `#5271FF` | Primary — logo mark, "Solution" wordmark, buttons, links |
-| `sky` (500) | `#3D9BF0` | Bright accent — the "SEEKING" word |
-| `ink` (800) | `#16276B` | Deep navy — headings, high-emphasis text |
-| white / slate | — | Backgrounds and body text |
+| What | File | Notes |
+|---|---|---|
+| Colour, fonts, shadows | [`tailwind.config.mjs`](../tailwind.config.mjs) | `/design` **imports this** and renders the swatches from it, so the page cannot drift from the build. Change a token here and the guide updates itself. |
+| Component classes | [`src/styles/global.css`](../src/styles/global.css) | `.container-page`, `.btn*`, `.eyebrow`, `.prose-sss` |
+| Fonts | [`BaseLayout.astro`](../src/layouts/BaseLayout.astro) | Anton, Poppins, Inter from Google Fonts |
+| Concept icon names | [`src/lib/icons.ts`](../src/lib/icons.ts) | artwork in `src/assets/icons/`, rendered by `Icon.astro` |
 
-`brand` and `ink` ship full 50–900 scales for hover/border/subtle-background use.
+**Typefaces are settled.** Anton (display), Poppins (headings, wordmark) and Inter (body)
+are the brand faces, not placeholders. All three are open-licensed, so an outside
+collaborator needs no licence. The logo ships as outlines and never depends on a font
+being installed.
 
-## Typography
+## Brand assets
 
-Loaded from Google Fonts in `BaseLayout.astro`. These are **close free stand-ins** for the
-logo type — confirm/replace with the real licensed faces when ready (tracked in
-[status.md](status.md)).
+Originals, committed and never edited:
 
-| Family | Role | Tailwind class |
-|--------|------|----------------|
-| **Anton** | Display / impact numbers | `font-display` |
-| **Poppins** | Headings, wordmark | `font-heading` |
-| **Inter** | Body text | `font-sans` (default) |
+- [`images/Logo/SolutionSeekingLogo.svg`](../images/Logo/) — the master
+- [`images/ExamplesOfTypography/`](../images/ExamplesOfTypography/) — the typographic lockups
 
-## Reusable classes
+Everything in `public/brand/` is **generated** from those by
+[`scripts/build-brand-assets.mjs`](../scripts/build-brand-assets.mjs). Run it by hand and
+commit the output; it is deliberately not part of `npm run build`:
 
-In `src/styles/global.css` under `@layer components`:
+```bash
+node scripts/build-brand-assets.mjs
+```
 
-- `.container-page` — centered max-width page gutter
-- `.btn`, `.btn-primary`, `.btn-secondary`, `.btn-ghost` — buttons
-- `.eyebrow` — small uppercase section label
-- `.prose-sss` — long-form Markdown styling (used by protocol + tool bodies)
-- `.shadow-card` / `.shadow-card-hover` — the standard card elevation
+Two things worth knowing before touching it:
+
+- **The master's gradients are embedded raster masks, not SVG gradients.** The mark
+  cannot be recoloured from that file and does not survive being shrunk to a favicon.
+  Its wordmark, though, is clean outlined vector, and the script extracts it exactly.
+- **The mark is two S shapes, offset**, each drawn as two chevron strokes whose real
+  geometry lives in the master's clip paths. Flat variants have to keep the two apart
+  (a second tone, or a knocked-out gap) or they fuse into one shape that stops reading
+  as the logo. The script also rounds the chevron corners, because flattening exposes
+  arm terminals that the master's gradients fade away.
+
+`public/favicon.svg` and `public/apple-touch-icon.png` are generated too. Both were
+previously wrong: the favicon drew a different, approximated mark, and the touch icon was
+the whole logo shrunk until the wordmark was a smudge.
 
 ## Components (`src/components/`)
 
 | Component | Purpose |
-|-----------|---------|
-| `Logo.astro` | Inline SVG mark + wordmark; `variant="light"` for dark backgrounds |
-| `Header.astro` | Sticky nav with active states + mobile menu |
-| `Footer.astro` | Links, resources, copyright/trademark |
+|---|---|
+| `Logo.astro` | The compact horizontal lockup used in the header and footer. `variant="light"` for dark backgrounds. Note this is **not** the master lockup; both are approved, and `/design` explains when to use which. |
+| `Header.astro` / `Footer.astro` | Sticky nav with active states; footer links, resources, trademark |
 | `PageHero.astro` | Standard inner-page header (eyebrow + title + intro) |
+| `Icon.astro` | Inline concept icons, coloured by `currentColor` |
 | `PrincipleCard.astro` | Card for the principle grids |
 | `ProtocolDiagram.astro` | The 3-step protocol visual |
 | `StepNav.astro` | Prev/next navigation for sequential content |
-
-## Brand assets
-
-In `public/brand/`: `logo.svg`, `logo.png`, `wordmark.png`. The favicon (`public/favicon.svg`)
-is a simplified brand mark. Originals are kept in `images/` at the repo root.
+| `TryItBand.astro` | The "how it works" CTA closing principle and protocol pages |
+| `ProvenanceBand.astro` | Trust signals under the assistants |
+| `Testimonials.astro` / `DemoExcerpt.astro` | Social proof, and demo pull-quotes |
+| `JsonLd.astro` | Renders schema objects from `src/lib/schema.ts` |

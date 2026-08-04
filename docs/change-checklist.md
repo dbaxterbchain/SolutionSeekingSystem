@@ -14,6 +14,10 @@ stale docs, no orphaned pages, no broken prompt cache.
 - [ ] **New user-facing copy contains no AI tells** — above all, no em dashes (`—`) and no
       en dashes between words; see the "Voice & punctuation" section in
       [content-guide.md](content-guide.md). Quick audit: search changed files for `—`.
+- [ ] **Headings say what the section contains, not how many things are in it.** No
+      "One system, three parts" / "Three faces, all free" / "Give it room, and a floor".
+      The paired cadence is the tell, with or without the numbers. Quick audit on changed
+      headings: `grep -oE '<h[123][^>]*>(One|Two|Three|Four|Five|Six|Seven|Eight|Nine|Ten|[0-9]+) '`
 - [ ] **Does this add a step to the funnel?** If a change adds a CTA, a signup path, a
       gate, or a checkout entry point, it needs an event. Static links: add
       `data-track-cta="<location>" data-track-label="..."` (the delegated listener in

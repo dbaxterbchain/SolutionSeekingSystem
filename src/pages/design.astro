@@ -1,0 +1,580 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PageHero from '../components/PageHero.astro';
+import Icon from '../components/Icon.astro';
+import { ICON_NAMES } from '../lib/icons';
+import { breadcrumbs } from '../lib/schema';
+import tailwind from '../../tailwind.config.mjs';
+
+/**
+ * The public design guide.
+ *
+ * Colours and typefaces are READ FROM `tailwind.config.mjs` rather than retyped
+ * here. A brand page that keeps its own copy of the palette is wrong within a
+ * month of the first token change, and wrong in the worst way: confidently, in
+ * public, to the people we handed it to.
+ */
+// Tailwind's own config type has every key optional, so narrow once here rather
+// than casting at each use. If the shape ever changes this throws at build time,
+// which is the right moment to find out.
+const palette = (tailwind.theme?.extend?.colors ?? {}) as Record<string, Record<string, string>>;
+const brand = palette.brand;
+const sky = palette.sky;
+const ink = palette.ink;
+if (!brand || !sky || !ink) {
+  throw new Error('tailwind.config.mjs no longer defines brand/sky/ink; /design reads them.');
+}
+
+const CORE = [
+  { token: 'brand-500', hex: brand[500], use: 'Primary. Buttons, links, the front S of the mark.' },
+  { token: 'sky-500', hex: sky[500], use: 'Accent. Reserved for the SEEKING word.' },
+  { token: 'ink-800', hex: ink[800], use: 'Headings and high-emphasis text.' },
+  { token: 'brand-300', hex: brand[300], use: 'The S behind the front one, in flat artwork.' },
+  { token: 'brand-50', hex: brand[50], use: 'Tinted panels and section backgrounds.' },
+];
+
+const RAMP = ['50', '100', '200', '300', '400', '500', '600', '700', '800', '900'];
+
+/** The qualifier slot of the lockup. Deliberately shown as a list, because it is one. */
+const QUALIFIERS = ['System', 'Guide', 'Mentor', 'A Beanchain Process'];
+
+const FACES = [
+  {
+    name: 'Anton',
+    role: 'Display',
+    css: 'font-display',
+    note: 'The SEEKING word, and impact numbers. One weight, used sparingly.',
+    sample: 'SEEKING',
+    className: 'font-display text-5xl text-sky-500',
+  },
+  {
+    name: 'Poppins',
+    role: 'Headings',
+    css: 'font-heading',
+    note: 'Headings, the wordmark, and the qualifier line.',
+    sample: 'Solution',
+    className: 'font-heading text-5xl font-bold text-ink-800',
+  },
+  {
+    name: 'Inter',
+    role: 'Body',
+    css: 'font-sans',
+    note: 'Everything you actually read. The default, so it needs no class.',
+    sample: 'Understand yourself, understand each other, then seek a solution.',
+    className: 'font-sans text-lg text-slate-700',
+  },
+];
+
+/** Downloads. `note` says what each file is FOR, because that is the hard part. */
+const LOGO_FILES = [
+  {
+    name: 'Full logo',
+    file: 'logo',
+    svg: '/brand/logo.svg',
+    png: '/brand/logo-2048.png',
+    note: 'The master. Mark and wordmark, with the original gradients. Use this wherever there is room.',
+  },
+  {
+    name: 'Wordmark',
+    file: 'wordmark',
+    svg: '/brand/wordmark.svg',
+    png: '/brand/wordmark-1600.png',
+    note: 'Type only, as vector outlines. For places the mark is already present or too small to read.',
+  },
+  {
+    name: 'Mark, colour',
+    file: 'mark-color',
+    svg: '/brand/mark-color.svg',
+    png: '/brand/mark-color-1024.png',
+    note: 'Flat two-tone. The gradients cannot survive small sizes, so this is the mark below about 96px.',
+  },
+  {
+    name: 'Mark, one colour',
+    file: 'mark-mono-brand',
+    svg: '/brand/mark-mono-brand.svg',
+    png: '/brand/mark-mono-ink-512.png',
+    note: 'Single ink, with a gap holding the two S shapes apart. For stamps, embroidery, and one-colour print.',
+  },
+  {
+    name: 'Mark, reversed',
+    file: 'mark-mono-white',
+    svg: '/brand/mark-mono-white.svg',
+    png: '/brand/mark-mono-white-512.png',
+    note: 'White, for dark backgrounds and photography. Never recolour the standard mark to fake this.',
+  },
+];
+
+const LOCKUPS = [
+  { name: 'Solution Seeking', file: '/brand/lockup-solution-seeking.png' },
+  { name: 'Guide', file: '/brand/lockup-guide.png' },
+  { name: 'Mentor', file: '/brand/lockup-mentor.png' },
+  { name: 'A Beanchain Process', file: '/brand/lockup-beanchain-process.png' },
+];
+
+const MISUSE = [
+  { title: 'Do not stretch it', why: 'Scale both dimensions together, always.' },
+  { title: 'Do not recolour it', why: 'The two blues are the identity. Use a supplied variant instead.' },
+  { title: 'Do not add effects', why: 'No shadows, outlines, bevels, or glows. The mark already has depth.' },
+  { title: 'Do not rotate it', why: 'The S reads as an S at one angle only.' },
+  { title: 'Do not rebuild the wordmark', why: 'Poppins is close, not identical. Use the supplied outlines.' },
+  { title: 'Do not crowd it', why: 'Keep the clearspace below free of type, edges, and other marks.' },
+];
+
+const SECTIONS = [
+  { id: 'lockup', label: 'The lockup' },
+  { id: 'logo', label: 'Logo files' },
+  { id: 'clearspace', label: 'Clearspace' },
+  { id: 'misuse', label: 'Misuse' },
+  { id: 'color', label: 'Colour' },
+  { id: 'type', label: 'Typography' },
+  { id: 'ui', label: 'UI kit' },
+  { id: 'icons', label: 'Icons' },
+  { id: 'permissions', label: 'Permissions' },
+];
+
+const site = Astro.site ?? Astro.url;
+const title = 'Design guide';
+const description =
+  'The Solution Seeking System brand: logo files, colour, typography, usage rules, and downloadable assets.';
+const schemas = [
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Design guide', path: '/design' },
+  ]),
+];
+---
+
+<BaseLayout title={title} description={description} schemas={schemas}>
+  <PageHero
+    eyebrow="Brand and design"
+    title="Design guide"
+    intro="Everything needed to represent Solution Seeking correctly: the logo and its variants, the colours, the typefaces, and the rules that keep it recognisable. Written to be handed to someone outside the team."
+  >
+    <div class="mt-8 flex flex-wrap items-center gap-3">
+      <a
+        href="/brand/solution-seeking-brand-assets.zip"
+        class="btn-primary"
+        download
+        data-track-cta="design_guide"
+        data-track-label="Download all assets"
+      >
+        Download all assets
+      </a>
+      <a href="#permissions" class="btn-secondary">Read the usage terms</a>
+    </div>
+  </PageHero>
+
+  {/* Jump nav. A reference document is scanned, not read. */}
+  <nav aria-label="Sections" class="border-b border-slate-100 bg-white/80 backdrop-blur">
+    <div class="container-page flex gap-x-5 gap-y-2 overflow-x-auto py-3.5 text-sm">
+      {
+        SECTIONS.map((s) => (
+          <a
+            href={`#${s.id}`}
+            class="whitespace-nowrap font-medium text-slate-500 transition-colors hover:text-brand-600"
+          >
+            {s.label}
+          </a>
+        ))
+      }
+    </div>
+  </nav>
+
+  <div class="container-page space-y-24 py-16 sm:space-y-28 sm:py-20">
+    <!-- ── The lockup formula ─────────────────────────────────────────────── -->
+    <section id="lockup" class="scroll-mt-24">
+      <p class="eyebrow">The lockup</p>
+      <h2 class="mt-2 font-heading text-3xl font-bold text-ink-800">How every name is built</h2>
+      <p class="mt-4 max-w-2xl leading-relaxed text-slate-600">
+        Every name in the system is built the same way: <strong class="font-semibold text-ink-800">Solution</strong>
+        in Poppins, <strong class="font-semibold text-ink-800">SEEKING</strong> in Anton, then a qualifier.
+        Only the third line changes, which is what makes a new one obviously ours.
+      </p>
+
+      <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {
+          QUALIFIERS.map((q) => (
+            <div class="rounded-2xl border border-slate-100 bg-white p-6 text-center shadow-card">
+              <p class="font-heading text-2xl font-medium leading-none text-ink-800">Solution</p>
+              <p class="font-display text-5xl leading-[0.95] tracking-tight text-sky-500">SEEKING</p>
+              <p
+                class:list={[
+                  'font-heading text-ink-800',
+                  q.length > 8
+                    ? 'mt-1 text-sm font-medium'
+                    : 'text-xl font-medium uppercase tracking-[0.2em]',
+                ]}
+              >
+                {q}
+              </p>
+            </div>
+          ))
+        }
+      </div>
+      <p class="mt-4 text-sm text-slate-500">
+        Set live in the brand faces on this page. The supplied lockup files below are the
+        original artwork, and those are what to place in a document.
+      </p>
+
+      <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {
+          LOCKUPS.map((l) => (
+            <a
+              href={l.file}
+              download
+              class="group rounded-2xl border border-slate-100 bg-white p-5 shadow-card transition-all hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-card-hover"
+            >
+              <img
+                src={l.file}
+                alt={`Solution Seeking ${l.name} lockup`}
+                loading="lazy"
+                class="h-24 w-full object-contain"
+              />
+              <p class="mt-4 text-sm font-semibold text-ink-800">{l.name}</p>
+              <p class="mt-0.5 text-xs text-slate-500 group-hover:text-brand-600">PNG</p>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <!-- ── Logo files ─────────────────────────────────────────────────────── -->
+    <section id="logo" class="scroll-mt-24">
+      <p class="eyebrow">Logo files</p>
+      <h2 class="mt-2 font-heading text-3xl font-bold text-ink-800">The mark and its variants</h2>
+      <p class="mt-4 max-w-2xl leading-relaxed text-slate-600">
+        The mark is two S shapes, one behind the other and offset. In the master they are told
+        apart by a gradient; every flat variant below keeps them apart another way, because a
+        single flat colour fuses them into one shape and stops reading as the logo.
+      </p>
+
+      <div class="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {
+          LOGO_FILES.map((f) => (
+            <div class="flex flex-col rounded-2xl border border-slate-100 bg-white shadow-card">
+              <div
+                class:list={[
+                  'flex h-44 items-center justify-center rounded-t-2xl p-8',
+                  f.file === 'mark-mono-white' ? 'bg-ink-800' : 'bg-slate-50/70',
+                ]}
+              >
+                <img
+                  src={f.svg}
+                  alt={`${f.name} variant of the Solution Seeking logo`}
+                  loading="lazy"
+                  class="max-h-full max-w-full object-contain"
+                />
+              </div>
+              <div class="flex flex-1 flex-col p-5">
+                <h3 class="font-semibold text-ink-800">{f.name}</h3>
+                <p class="mt-1.5 flex-1 text-sm leading-relaxed text-slate-600">{f.note}</p>
+                <div class="mt-4 flex gap-2">
+                  <a href={f.svg} download class="btn-secondary px-4 py-2 text-xs">
+                    SVG
+                  </a>
+                  <a href={f.png} download class="btn-secondary px-4 py-2 text-xs">
+                    PNG
+                  </a>
+                </div>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+
+      <div class="mt-6 rounded-2xl border border-slate-100 bg-slate-50/70 p-6">
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Also included</h3>
+        <p class="mt-2 text-sm leading-relaxed text-slate-600">
+          App icons at 16, 32, 48, 180, 192 and 512px, and a 1024px social avatar on a brand tile.
+          All in the download.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── Clearspace ─────────────────────────────────────────────────────── -->
+    <section id="clearspace" class="scroll-mt-24">
+      <p class="eyebrow">Clearspace and size</p>
+      <h2 class="mt-2 font-heading text-3xl font-bold text-ink-800">How much space it needs</h2>
+
+      <div class="mt-10 grid gap-6 lg:grid-cols-2">
+        <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-card sm:p-8">
+          <div class="flex items-center justify-center rounded-xl bg-brand-50/60 p-6">
+            {/* The clearspace rule, drawn rather than described. */}
+            <div class="relative border border-dashed border-brand-300 p-[12%]">
+              <img src="/brand/mark-color.svg" alt="" class="h-24 w-auto" />
+              <span
+                class="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white px-2 text-xs font-semibold text-brand-600"
+                >½ the mark's height</span
+              >
+            </div>
+          </div>
+          <h3 class="mt-6 font-semibold text-ink-800">Clearspace</h3>
+          <p class="mt-1.5 text-sm leading-relaxed text-slate-600">
+            Keep clear space on every side equal to half the mark's height. Nothing enters it:
+            not type, not a page edge, not another logo.
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-card sm:p-8">
+          <div class="flex items-end justify-center gap-8 rounded-xl bg-brand-50/60 p-6">
+            <div class="text-center">
+              <img src="/brand/mark-color.svg" alt="" class="mx-auto h-6 w-auto" />
+              <p class="mt-3 text-xs font-semibold text-ink-800">24px</p>
+              <p class="text-xs text-slate-500">mark, minimum</p>
+            </div>
+            <div class="text-center">
+              <img src="/brand/wordmark.svg" alt="" class="mx-auto h-5 w-auto" />
+              <p class="mt-3 text-xs font-semibold text-ink-800">120px</p>
+              <p class="text-xs text-slate-500">full logo, minimum</p>
+            </div>
+          </div>
+          <h3 class="mt-6 font-semibold text-ink-800">Minimum sizes</h3>
+          <p class="mt-1.5 text-sm leading-relaxed text-slate-600">
+            Below 24px wide the two S shapes stop separating. Below 120px the wordmark's third
+            line stops being legible, so use the mark alone instead of shrinking the lockup.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Misuse ─────────────────────────────────────────────────────────── -->
+    <section id="misuse" class="scroll-mt-24">
+      <p class="eyebrow">Misuse</p>
+      <h2 class="mt-2 font-heading text-3xl font-bold text-ink-800">What not to do</h2>
+      <p class="mt-4 max-w-2xl leading-relaxed text-slate-600">
+        If a variant you need is not in the download, ask rather than making one.
+      </p>
+      <div class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          MISUSE.map((m) => (
+            <div class="rounded-2xl border border-slate-100 bg-white p-5 shadow-card">
+              <p class="flex items-start gap-2.5 font-semibold text-ink-800">
+                <span
+                  aria-hidden="true"
+                  class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-50 text-xs font-bold text-red-600"
+                >
+                  ✕
+                </span>
+                {m.title}
+              </p>
+              <p class="mt-2 pl-[1.9rem] text-sm leading-relaxed text-slate-600">{m.why}</p>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <!-- ── Colour ─────────────────────────────────────────────────────────── -->
+    <section id="color" class="scroll-mt-24">
+      <p class="eyebrow">Colour</p>
+      <h2 class="mt-2 font-heading text-3xl font-bold text-ink-800">What each colour is for</h2>
+      <p class="mt-4 max-w-2xl leading-relaxed text-slate-600">
+        Read from the same config the site is built from, so these values cannot drift from what
+        is actually shipping.
+      </p>
+
+      <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          CORE.map((c) => (
+            <div class="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-card">
+              <div class="h-28" style={`background:${c.hex}`} />
+              <div class="p-5">
+                <div class="flex items-baseline justify-between gap-3">
+                  <p class="font-semibold text-ink-800">{c.token}</p>
+                  <code class="text-sm text-slate-500">{c.hex.toUpperCase()}</code>
+                </div>
+                <p class="mt-2 text-sm leading-relaxed text-slate-600">{c.use}</p>
+              </div>
+            </div>
+          ))
+        }
+      </div>
+
+      <h3 class="mt-12 text-sm font-semibold uppercase tracking-wide text-slate-500">
+        Full brand ramp
+      </h3>
+      <div class="mt-4 overflow-x-auto">
+        <div class="flex min-w-[36rem]">
+          {
+            RAMP.map((step) => (
+              <div class="flex-1">
+                <div class="h-16" style={`background:${brand[step]}`} />
+                <p class="mt-2 text-center text-xs font-medium text-slate-500">{step}</p>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Typography ─────────────────────────────────────────────────────── -->
+    <section id="type" class="scroll-mt-24">
+      <p class="eyebrow">Typography</p>
+      <h2 class="mt-2 font-heading text-3xl font-bold text-ink-800">The typefaces and where they go</h2>
+      <p class="mt-4 max-w-2xl leading-relaxed text-slate-600">
+        Anton, Poppins and Inter are all open-licensed and available from Google Fonts, so
+        anyone working with us can install them without buying anything. The logo itself is
+        supplied as outlines and never depends on a font being present.
+      </p>
+
+      <div class="mt-10 space-y-5">
+        {
+          FACES.map((f) => (
+            <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-card sm:p-8">
+              <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h3 class="font-semibold text-ink-800">{f.name}</h3>
+                <span class="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700">
+                  {f.role}
+                </span>
+                <code class="text-xs text-slate-500">{f.css}</code>
+              </div>
+              <p class="mt-1.5 text-sm leading-relaxed text-slate-600">{f.note}</p>
+              <p class:list={['mt-5 break-words', f.className]}>{f.sample}</p>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <!-- ── UI kit ─────────────────────────────────────────────────────────── -->
+    <section id="ui" class="scroll-mt-24">
+      <p class="eyebrow">UI kit</p>
+      <h2 class="mt-2 font-heading text-3xl font-bold text-ink-800">The pieces the site is built from</h2>
+      <p class="mt-4 max-w-2xl leading-relaxed text-slate-600">
+        Live components with their class names, defined in
+        <code class="rounded bg-slate-100 px-1.5 py-0.5 text-sm">src/styles/global.css</code>.
+      </p>
+
+      <div class="mt-10 grid gap-6 lg:grid-cols-2">
+        <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-card sm:p-8">
+          <h3 class="font-semibold text-ink-800">Buttons</h3>
+          <div class="mt-5 flex flex-wrap items-center gap-3">
+            <span class="btn-primary">Primary</span>
+            <span class="btn-secondary">Secondary</span>
+            <span class="btn-ghost">Ghost</span>
+          </div>
+          <p class="mt-5 text-xs text-slate-500">
+            <code>.btn-primary</code> · <code>.btn-secondary</code> · <code>.btn-ghost</code>
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-card sm:p-8">
+          <h3 class="font-semibold text-ink-800">Section label</h3>
+          <p class="eyebrow mt-5">How it works</p>
+          <p class="mt-5 text-xs text-slate-500">
+            <code>.eyebrow</code>, small caps at 0.18em tracking. Opens most sections.
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-card sm:p-8">
+          <h3 class="font-semibold text-ink-800">Card elevation</h3>
+          <div class="mt-5 flex flex-wrap gap-4">
+            <div class="rounded-xl bg-white p-5 text-sm text-slate-600 shadow-card">shadow-card</div>
+            <div class="rounded-xl bg-white p-5 text-sm text-slate-600 shadow-card-hover">
+              shadow-card-hover
+            </div>
+          </div>
+          <p class="mt-5 text-xs text-slate-500">
+            Both are tinted navy rather than grey, so shadows sit in the palette.
+          </p>
+        </div>
+
+        <div class="rounded-2xl border border-slate-100 bg-white p-6 shadow-card sm:p-8">
+          <h3 class="font-semibold text-ink-800">Page width</h3>
+          <div class="mt-5 rounded-xl bg-brand-50/60 p-4">
+            <div class="rounded-lg border border-dashed border-brand-300 px-4 py-6 text-center text-sm text-brand-700">
+              max-w-6xl, 20px gutter
+            </div>
+          </div>
+          <p class="mt-5 text-xs text-slate-500">
+            <code>.container-page</code> wraps every section on the site.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Icons ──────────────────────────────────────────────────────────── -->
+    <section id="icons" class="scroll-mt-24">
+      <p class="eyebrow">Icons</p>
+      <h2 class="mt-2 font-heading text-3xl font-bold text-ink-800">Concept icons</h2>
+      <p class="mt-4 max-w-2xl leading-relaxed text-slate-600">
+        Drawn for the parts of the system rather than picked from a set. They inherit the
+        surrounding text colour, so they take a brand colour wherever they sit.
+      </p>
+      <div class="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        {
+          ICON_NAMES.map((name) => (
+            <div class="flex flex-col items-center gap-3 rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-card">
+              <Icon name={name} class="h-9 w-9 text-brand-500" />
+              <code class="text-xs text-slate-500">{name}</code>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <!-- ── Permissions ────────────────────────────────────────────────────── -->
+    <section id="permissions" class="scroll-mt-24">
+      <p class="eyebrow">Permissions</p>
+      <h2 class="mt-2 font-heading text-3xl font-bold text-ink-800">What you may do with these</h2>
+      <div class="mt-8 grid gap-6 lg:grid-cols-2">
+        <div class="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-6 sm:p-8">
+          <h3 class="font-semibold text-ink-800">Yes, without asking</h3>
+          <ul class="mt-4 space-y-2.5 text-sm leading-relaxed text-slate-700">
+            <li class="relative pl-6">
+              <span class="absolute left-0 top-2 h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+              Use the marks, unmodified, to refer or link to us.
+            </li>
+            <li class="relative pl-6">
+              <span class="absolute left-0 top-2 h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+              Show them in an article, a deck, or a list of tools you use.
+            </li>
+            <li class="relative pl-6">
+              <span class="absolute left-0 top-2 h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+              Build materials for a team already using the system.
+            </li>
+          </ul>
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-card sm:p-8">
+          <h3 class="font-semibold text-ink-800">Ask first</h3>
+          <ul class="mt-4 space-y-2.5 text-sm leading-relaxed text-slate-700">
+            <li class="relative pl-6">
+              <span class="absolute left-0 top-2 h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+              Anything that suggests we endorse, partner with, or built your product.
+            </li>
+            <li class="relative pl-6">
+              <span class="absolute left-0 top-2 h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+              Use in your own logo, product name, app icon, or domain.
+            </li>
+            <li class="relative pl-6">
+              <span class="absolute left-0 top-2 h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+              Modified marks, or a variant that is not in the download.
+            </li>
+            <li class="relative pl-6">
+              <span class="absolute left-0 top-2 h-1.5 w-1.5 rounded-full bg-slate-400"></span>
+              Merchandise, or anything sold.
+            </li>
+          </ul>
+        </div>
+      </div>
+      <p class="mt-6 max-w-3xl text-sm leading-relaxed text-slate-500">
+        The Solution Seeking System&trade; and related terms are trademarks of Beanchain Coffee
+        LLC. These assets are provided for identifying and referring to the system, and using
+        them does not transfer any rights in them. When something is not covered here, write to
+        us and ask: the answer is usually yes.
+      </p>
+      <div class="mt-8 flex flex-wrap gap-3">
+        <a href="/for-business#contact" class="btn-primary">Ask about using the marks</a>
+        <a
+          href="/brand/solution-seeking-brand-assets.zip"
+          class="btn-secondary"
+          download
+          data-track-cta="design_guide"
+          data-track-label="Download all assets (footer)"
+        >
+          Download all assets
+        </a>
+      </div>
+    </section>
+  </div>
+</BaseLayout>
