@@ -6,6 +6,17 @@ import { breadcrumbs, webApplication } from '../../lib/schema';
 import { MODES } from '../../data/modes';
 import { PLANS, priceCopy } from '../../data/pricing';
 
+/**
+ * Openers for the empty chat. Relationship-neutral, unlike the mode pages'
+ * (src/data/modes.ts), because this page serves whoever arrives without having
+ * picked a mode. Same rule though: first person, and sendable as written.
+ */
+const starters = [
+  'I keep having the same argument with someone and nothing changes.',
+  'I have a hard conversation coming up and I don’t know how to open it.',
+  'Something was said to me last week and I still can’t let it go.',
+];
+
 const site = Astro.site ?? Astro.url;
 const schemas = [
   webApplication(site, {
@@ -57,6 +68,7 @@ const schemas = [
         agent="guide"
         agentName="Guide"
         welcome="Hi, I'm the Solution Seeking Guide. I can walk you through the Communication Protocol to help with a specific interpersonal challenge. Tell me a bit about what's going on, or just say hello and we'll take it from there."
+        starters={starters}
       />
       <section class="mt-14">
         <p class="eyebrow mb-2">Modes</p>

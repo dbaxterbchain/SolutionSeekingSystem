@@ -16,7 +16,7 @@ import {
 } from '../../lib/chatSessions';
 import { getContextMeta, MODE_CONTEXTS } from '../../lib/contexts';
 import { track, getGaIds, type Tier } from '../../lib/analytics';
-import { PLANS, priceCopy } from '../../data/pricing';
+import { FREE_ACCOUNT_MESSAGES, priceCopy } from '../../data/pricing';
 import { getFirstTouch } from '../../lib/attribution';
 import { streamChat } from '../../lib/chatStream';
 import { listDocuments, uploadAndRegister, type DocumentMeta } from '../../lib/documents';
@@ -65,6 +65,14 @@ export default function DashboardView() {
   const [chatId, setChatId] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false); // saved chat's assistant is gone
   const [input, setInput] = useState('');
+  /**
+   * Free messages left, for the badge. Seeded from the entitlement lookup and
+   * then kept current by the stream's own meta, so the count a free user sees
+   * comes from the same authority that enforces it.
+   */
+  const [freeRemaining, setFreeRemaining] = useState<number | null>(null);
+  /** The free allowance ran out. Only reachable on the free tier. */
+  const [paywalled, setPaywalled] = useState(false);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
@@ -93,8 +101,45 @@ export default function DashboardView() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const { confirm, dialog } = useDialog();
 
-  const isSubscriber = entitlement?.kind === 'subscriber';
-  const canUseDashboard = isSubscriber || failed;
+  /**
+   * A signed-in account with no subscription behind it.
+   *
+   * The dashboard used to refuse these people outright and show them a price. It
+   * is now their home too, in reduced form: the Guide and the Mentor, every
+   * mode, and their saved history, spending the same free allowance they would
+   * spend on a mode page. Everything a subscription is actually for (specialized
+   * assistants, the document library, organizations, white-label) stays behind
+   * the subscription.
+   *
+   * This is the missing rung between "typed three messages anonymously" and
+   * "pays every month": somewhere worth making an account for that is not just a
+   * checkout page wearing a different hat.
+   */
+  const isFreeTier = entitlement?.kind === 'free' || entitlement?.kind === 'blocked';
+  /**
+   * May this browser load dashboard data at all? It no longer asks about
+   * entitlement, only about identity: history, assistants, and documents are all
+   * RLS-scoped to the signed-in user, so a free account loading them gets
+   * exactly its own (usually empty) rows. An anonymous session has nothing to
+   * load and no account to attach it to.
+   */
+  const canUseDashboard = Boolean(user) && user?.is_anonymous !== true;
+
+  // Seed the badge (and the wall) from the entitlement lookup. The stream's meta
+  // takes over from here; see deliver().
+  useEffect(() => {
+    if (!entitlement) return;
+    if (entitlement.kind === 'free') {
+      setFreeRemaining(entitlement.remaining);
+      setPaywalled(false);
+    } else if (entitlement.kind === 'blocked') {
+      setFreeRemaining(0);
+      setPaywalled(true);
+    } else {
+      setFreeRemaining(null);
+      setPaywalled(false);
+    }
+  }, [entitlement]);
 
   const assistant = selection.kind === 'assistant' ? selection.assistant : null;
   const agent: AgentId = selection.kind === 'assistant' ? selection.assistant.base_agent : selection.agent;
@@ -119,10 +164,15 @@ export default function DashboardView() {
         (assistant?.shared || (assistant?.member_share_ids.length ?? 0) > 0) &&
         memberships.some((m) => m.orgId === assistant.org_id && m.role === 'manager')
     );
-  // Authoring (creating assistants, the document library) is off only for
-  // client-only users; fails OPEN when the entitlement lookup failed, because
-  // the server is the real gate (see the note on canUseDashboard).
-  const canAuthor = entitlement?.kind === 'subscriber' ? entitlement.authoring !== false : true;
+  // Authoring (creating assistants, the document library) is off for client-only
+  // users and for the free tier; it fails OPEN when the entitlement lookup
+  // failed, because the server is the real gate (see the note on isFreeTier).
+  const canAuthor =
+    entitlement === null
+      ? true
+      : entitlement.kind === 'subscriber'
+        ? entitlement.authoring !== false
+        : false;
   const canCreateHere = activeOrgId ? activeRole !== 'client' : canAuthor;
   const canUseDocsHere = canCreateHere;
   // A client's uploads (chat attachments) always land in their Personal
@@ -132,10 +182,25 @@ export default function DashboardView() {
   const refreshRecents = () => {
     listChatSessions(activeOrgId).then(setRecents).catch(() => setRecents([]));
   };
+  /*
+   * Assistants and documents are subscriber features, and /api/assistants and
+   * /api/documents refuse anyone else with a 403. Now that the free tier reaches
+   * this component, asking anyway would put two failed requests in the console on
+   * every free dashboard load: noise that reads like a broken page, for answers
+   * we already know. Settle them locally as empty instead.
+   */
   const refreshDocuments = () => {
+    if (isFreeTier) {
+      setDocuments([]);
+      return;
+    }
     listDocuments(docsOrgId).then(setDocuments).catch(() => setDocuments([]));
   };
   const refreshAssistants = () => {
+    if (isFreeTier) {
+      setAssistantsData({ mine: [], shared: [], memberships: [] });
+      return;
+    }
     fetchAssistants(activeOrgId)
       .then(setAssistantsData)
       .catch(() => setAssistantsData({ mine: [], shared: [], memberships: [] }));
@@ -156,11 +221,15 @@ export default function DashboardView() {
   // Load everything for the active workspace, and reload whenever it changes.
   useEffect(() => {
     if (!user || !canUseDashboard || !workspaceResolved) return;
+    // Wait for the entitlement answer first. WHAT we are allowed to ask for
+    // depends on it (see refreshAssistants), and asking before we know earns a
+    // 403 that we then have to pretend we expected.
+    if (entLoading && !failed) return;
     refreshRecents();
     refreshDocuments();
     refreshAssistants();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, canUseDashboard, workspaceResolved, activeOrgId]);
+  }, [user?.id, canUseDashboard, workspaceResolved, activeOrgId, entLoading, failed, isFreeTier]);
 
   // Drop a stored org the user no longer belongs to (back to Personal).
   useEffect(() => {
@@ -476,7 +545,7 @@ export default function DashboardView() {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
-    const tier: Tier = 'subscriber';
+    const tier: Tier = isFreeTier ? 'free' : 'subscriber';
     const userMessages = next.filter((m) => m.role === 'user').length;
     if (userMessages === 1) {
       track({ event: 'first_message_sent', agent, tier, mode: activeContext ?? undefined });
@@ -496,6 +565,9 @@ export default function DashboardView() {
               : {}),
         },
         signal: ctrl.signal,
+        onMeta: (meta) => {
+          if (meta.freeRemaining !== null) setFreeRemaining(meta.freeRemaining);
+        },
         onDelta: (textSoFar) => setMessages([...next, { role: 'assistant', content: textSoFar }]),
       });
 
@@ -512,7 +584,17 @@ export default function DashboardView() {
           return;
         case 'subscription_required':
           setMessages(next);
-          setError('Your subscription is no longer active. Check your account to restore access.');
+          // Two different people hit this. Someone on the free tier has simply
+          // run out of their allowance, which is the expected end of a trial and
+          // wants the wall, not an error. A subscriber hitting it means their
+          // subscription actually lapsed, which is news and wants the error.
+          if (isFreeTier) {
+            track({ event: 'free_limit_reached', tier: 'free', agent });
+            setFreeRemaining(0);
+            setPaywalled(true);
+          } else {
+            setError('Your subscription is no longer active. Check your account to restore access.');
+          }
           return;
         case 'unauthorized':
           setMessages(next);
@@ -591,13 +673,20 @@ export default function DashboardView() {
     );
   }
 
+  /*
+   * An account is still required, and deliberately so. Everything the dashboard
+   * is for (history that survives, work you can come back to) needs somewhere to
+   * attach it, and an anonymous visitor has nowhere. Making an account is the
+   * step this page exists to be worth taking, so it stays the one wall here.
+   */
   if (!session || !user || user.is_anonymous) {
     return (
       <Card>
         <span className="text-3xl" aria-hidden="true">🔐</span>
         <h2 className="mt-3 font-heading text-xl font-bold text-ink-800">Sign in to open your dashboard</h2>
         <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600">
-          The dashboard is where subscribers keep their assistants, conversations, and documents together.
+          Your dashboard keeps the Guide, the Mentor, and every conversation you have with them in
+          one place. A free account is enough to open it.
         </p>
         <a href={accountLink({ next: '/dashboard' })} className="btn-primary mt-5 inline-block">
           Sign in or create an account
@@ -606,30 +695,15 @@ export default function DashboardView() {
     );
   }
 
-  if (!canUseDashboard) {
-    return (
-      <Card>
-        <span className="text-3xl" aria-hidden="true">✨</span>
-        <h2 className="mt-3 font-heading text-xl font-bold text-ink-800">The dashboard is part of a subscription</h2>
-        <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-600">
-          Subscribe for unlimited conversations with the Guide and Mentor, every mode, saved history, document
-          uploads, and specialized assistants. It is {PLANS.monthly.priceLabel} a month, cancel anytime.
-        </p>
-        <button type="button" onClick={startCheckout} disabled={checkoutBusy} className="btn-primary mt-5 disabled:opacity-60">
-          {checkoutBusy ? 'Opening checkout…' : priceCopy.subscribeCta}
-        </button>
-        <p className="mt-3 text-xs text-slate-500">
-          Or{' '}
-          <a href="/pricing" className="font-semibold text-brand-600 hover:text-brand-700">
-            see all plans
-          </a>
-          , including annual.
-        </p>
-        {error && <p className="mt-3 text-sm text-amber-700">{error}</p>}
-        {dialog}
-      </Card>
-    );
-  }
+  /*
+   * There is no longer a "subscribe to see the dashboard" wall here.
+   *
+   * A signed-in free user gets the real thing, reduced: the Guide, the Mentor,
+   * every mode, and their own history, spending the same free allowance they
+   * would spend anywhere else on the site. The wall arrives where it actually
+   * bites (out of messages, or reaching for a subscriber feature), which is a
+   * place they have already seen the product work. `isFreeTier` above says why.
+   */
 
   // ── The dashboard ───────────────────────────────────────────────────────────
 
@@ -713,6 +787,9 @@ export default function DashboardView() {
           canCreate={canCreateHere}
           showDocuments={canUseDocsHere}
           clientView={activeRole === 'client'}
+          upsell={isFreeTier}
+          onUpgrade={() => void startCheckout()}
+          upgradeBusy={checkoutBusy}
           memberships={memberships}
           activeOrgId={activeOrgId}
           onSelectOrg={selectWorkspace}
@@ -777,11 +854,18 @@ export default function DashboardView() {
               )
             )}
           </div>
-          {messages.length > 0 && (
-            <button type="button" onClick={newConversation} className="btn-ghost text-xs">
-              New conversation
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {isFreeTier && freeRemaining !== null && (
+              <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700">
+                {freeRemaining} of {FREE_ACCOUNT_MESSAGES} free messages left
+              </span>
+            )}
+            {messages.length > 0 && (
+              <button type="button" onClick={newConversation} className="btn-ghost text-xs">
+                New conversation
+              </button>
+            )}
+          </div>
         </div>
 
         {contextMeta && (
@@ -837,27 +921,57 @@ export default function DashboardView() {
           </div>
         )}
 
-        <Composer
-          value={input}
-          onChange={setInput}
-          onSend={send}
-          onStop={() => abortRef.current?.abort()}
-          streaming={streaming}
-          placeholder={`Message ${assistant ? assistant.name : `the ${agentName}`}…`}
-        >
-          <AttachControl
-            documents={documents}
-            selected={pendingAttachments}
-            onChange={setPendingAttachments}
-            onUpload={async (file) => {
-              const doc = await uploadAndRegister(file, docsOrgId);
-              refreshDocuments();
-              return doc;
-            }}
-            onManage={() => setDocumentsOpen(true)}
-            disabled={streaming}
-          />
-        </Composer>
+        {paywalled ? (
+          <div className="border-t border-slate-100 p-6 text-center">
+            <h3 className="font-heading text-lg font-bold text-ink-800">
+              {priceCopy.paywallHeading}
+            </h3>
+            <p className="mx-auto mt-1.5 max-w-md text-sm leading-relaxed text-slate-600">
+              {priceCopy.paywallBody}
+            </p>
+            <button
+              type="button"
+              onClick={startCheckout}
+              disabled={checkoutBusy}
+              className="btn-primary mt-4 disabled:opacity-60"
+            >
+              {checkoutBusy ? 'Opening checkout…' : priceCopy.subscribeCta}
+            </button>
+            <p className="mt-3 text-xs text-slate-500">
+              Or{' '}
+              <a href="/pricing" className="font-semibold text-brand-600 hover:text-brand-700">
+                see all plans
+              </a>
+              , including annual.
+            </p>
+          </div>
+        ) : (
+          <Composer
+            value={input}
+            onChange={setInput}
+            onSend={send}
+            onStop={() => abortRef.current?.abort()}
+            streaming={streaming}
+            placeholder={`Message ${assistant ? assistant.name : `the ${agentName}`}…`}
+          >
+            {/* Attachments are a subscriber feature, and /api/chat refuses them
+                for anyone else. Don't offer what the server will reject. */}
+            {!isFreeTier && (
+              <AttachControl
+                documents={documents}
+                selected={pendingAttachments}
+                onChange={setPendingAttachments}
+                onUpload={async (file) => {
+                  const doc = await uploadAndRegister(file, docsOrgId);
+                  refreshDocuments();
+                  return doc;
+                }}
+                onManage={() => setDocumentsOpen(true)}
+                disabled={streaming}
+              />
+            )}
+          </Composer>
+        )}
       </div>
 
       <DocumentsPanel

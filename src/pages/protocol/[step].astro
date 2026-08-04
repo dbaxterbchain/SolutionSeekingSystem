@@ -2,6 +2,7 @@
 import { getCollection, render } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import StepNav from '../../components/StepNav.astro';
+import TryItBand from '../../components/TryItBand.astro';
 import { breadcrumbs, learningArticle } from '../../lib/schema';
 
 export async function getStaticPaths() {
@@ -99,6 +100,18 @@ const schemas = [
           </a>
         </div>
       </aside>
+    </div>
+
+    {/* Outside the article on purpose: `.prose-sss a` underlines every link it
+        contains, which would fight the band's buttons. */}
+    <div class="mt-14">
+      <TryItBand
+        ctaLocation="protocol_page"
+        heading="Run this step on something real"
+        body="Reading a step is one thing. Using it in the middle of an actual disagreement, when you are the one who is upset, is another. The Guide walks you through the whole protocol on your own situation, and the Wisdom Principles this step rests on are there whenever you want the reasoning."
+        primary={{ href: '/practice/guide', label: 'Talk to the Guide' }}
+        secondary={{ href: '/principles', label: 'Read the Wisdom Principles' }}
+      />
     </div>
   </div>
 </BaseLayout>

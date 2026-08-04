@@ -2,6 +2,7 @@
 import { Image } from 'astro:assets';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import PageHero from '../components/PageHero.astro';
+import TeamEnquiryForm from '../components/react/TeamEnquiryForm.tsx';
 import { breadcrumbs, organization } from '../lib/schema';
 import dashboardImg from '../assets/marketing/dashboard.png';
 import specializedAgentImg from '../assets/marketing/specialized-agent.png';
@@ -70,11 +71,20 @@ const schemas = [
     title="Bring the Solution Seeking System to your team"
     intro="The same Guide and Mentor your people already trust, plus a shared dashboard, assistants grounded in your own documents, and white-label pages on your own domain."
   >
+    {/*
+      Both CTAs point at #contact ON THIS PAGE, not /pricing#team.
+
+      The ads that buy this page say "Tell us about your team". They used to land
+      on a price list with a per-seat checkout and a five seat minimum, which is
+      an answer to a question nobody asked: 58 clicks, $164.74, and not one form
+      start, because there was no form anywhere in the path. /pricing#team keeps
+      its self-serve checkout for people who already know what they want.
+    */}
     <div class="mt-8 flex flex-wrap gap-3">
       <a
-        href="/pricing#team"
+        href="#contact"
         class="btn-primary"
-        data-track-cta="for-business"
+        data-track-cta="for_business_hero"
         data-track-label="Talk to us (hero)"
       >
         Talk to us
@@ -115,21 +125,33 @@ const schemas = [
     }
   </div>
 
-  <section class="border-t border-slate-100 bg-brand-50/50">
-    <div class="container-page py-16 text-center sm:py-20">
-      <h2 class="font-heading text-3xl font-bold text-ink-800">Ready to bring it to your team?</h2>
-      <p class="mx-auto mt-4 max-w-xl text-lg leading-relaxed text-slate-600">
-        Tell us about your team and we will get you set up, from seats to a white-label page on
-        your own domain.
+  {/* scroll-mt-24 so the sticky header doesn't sit on top of the heading when
+      an ad or a CTA lands someone directly on #contact. */}
+  <section id="contact" class="scroll-mt-24 border-t border-slate-100 bg-brand-50/50">
+    <div class="container-page py-16 sm:py-20">
+      <div class="mx-auto max-w-xl text-center">
+        <h2 class="font-heading text-3xl font-bold text-ink-800">
+          Ready to bring it to your team?
+        </h2>
+        <p class="mt-4 text-lg leading-relaxed text-slate-600">
+          Tell us about your team and we will get you set up, from seats to a white-label page
+          on your own domain.
+        </p>
+      </div>
+      <div class="mx-auto mt-8 max-w-xl rounded-2xl border border-slate-100 bg-white p-6 shadow-card sm:p-8">
+        <TeamEnquiryForm client:visible />
+      </div>
+      <p class="mx-auto mt-5 max-w-xl text-center text-sm text-slate-500">
+        Know what you need already?
+        <a
+          href="/pricing#team"
+          class="font-semibold text-brand-600 hover:text-brand-700"
+          data-track-cta="for_business_contact"
+          data-track-label="Buy seats directly"
+        >
+          Buy seats directly →
+        </a>
       </p>
-      <a
-        href="/pricing#team"
-        class="btn-primary mt-8 inline-block"
-        data-track-cta="for-business"
-        data-track-label="Talk to us (footer)"
-      >
-        Talk to us
-      </a>
     </div>
   </section>
 </BaseLayout>

@@ -766,9 +766,15 @@ Netlify env changes only reach Functions after a **redeploy**.
 1. **Tag → Google Tag**, Measurement ID = your `G-...`, trigger **All Pages**.
 2. **Variables → New → Data Layer Variable**, one per event parameter. The "Data Layer
    Variable Name" must match the key we push exactly:
-   `cta_location`, `cta_label`, `destination`, `agent`, `tier`, `plan`, `mode_id`,
-   `demo_id`, `method`, `from_anon`, `message_index`, `value`, `currency`,
+   `cta_location`, `cta_label`, `destination`, `agent`, `tier`, `plan`, `mode`, `mode_id`,
+   `demo_id`, `method`, `from_anon`, `message_index`, `index`, `value`, `currency`,
    `source`, `helpful`, `consented`.
+
+   > `mode` and `mode_id` are two different parameters and both are needed. `mode_id` is
+   > carried by `mode_viewed`; `mode` is carried by `anon_chat_started`,
+   > `first_message_sent` and `starter_clicked`. `mode` was missing from this list while
+   > three events were already sending it, so mode-level attribution on the events that
+   > matter most was unreportable.
 3. **Trigger → Custom Event**, event name (regex enabled). **This must list EVERY event in
    the union in [`src/lib/analytics.ts`](../src/lib/analytics.ts).** An event missing from
    this regex is pushed to the dataLayer and then dies there: it never reaches GA4, and
@@ -780,7 +786,7 @@ Netlify env changes only reach Functions after a **redeploy**.
    > you add an event to the union, add it here in the same breath.
 
    ```
-   ^(cta_clicked|demo_viewed|mode_viewed|signup_started|signup_completed|anon_chat_started|first_message_sent|message_sent|free_limit_reached|checkout_started|checkout_abandoned|checkout_success_viewed|team_enquiry_submitted|email_captured|feedback_given|testimonial_submitted)$
+   ^(cta_clicked|demo_viewed|mode_viewed|signup_started|signup_completed|anon_chat_started|starter_clicked|first_message_sent|message_sent|free_limit_reached|checkout_started|checkout_abandoned|checkout_success_viewed|team_enquiry_started|team_enquiry_submitted|email_captured|feedback_given|testimonial_submitted)$
    ```
 
    One trigger for everything is far easier to maintain than one per event.
@@ -808,10 +814,22 @@ Netlify env changes only reach Functions after a **redeploy**.
 ### 4. GA4 UI setup
 
 - **Admin → Events → Mark as key event**: `subscription_completed`, `signup_completed`,
-  `checkout_started`, `free_limit_reached`, `first_message_sent`, `email_captured`.
+  `checkout_started`, `free_limit_reached`, `first_message_sent`, `email_captured`,
+  `team_enquiry_submitted`.
+
+  > `team_enquiry_submitted` was missing here, and it is the **only** conversion the Business
+  > campaign can produce: that campaign sells seats through a conversation, not a checkout, so
+  > with this unmarked it had nothing to convert on and nothing to bid toward. Import it to
+  > Google Ads as a conversion action too, or the campaign optimises against silence.
+
 - **Admin → Custom definitions → Create custom dimension** (event-scoped) for
-  `cta_location`, `tier`, `plan`, `agent`, `mode_id`, `demo_id`, `source`. Without this, the
-  parameters are collected but **cannot be reported on**.
+  `cta_location`, `tier`, `plan`, `agent`, `mode`, `mode_id`, `demo_id`, `source`, `index`.
+  Without this, the parameters are collected but **cannot be reported on**.
+
+  > `mode` is not `mode_id`. `mode_id` rides `mode_viewed` (which mode page was seen); `mode`
+  > rides `anon_chat_started`, `first_message_sent` and `starter_clicked` (which mode someone
+  > actually started talking in). `mode` was never registered, so "which mode converts" has
+  > been unanswerable for every event that matters.
 - **Admin → Product links → Search Console** — link it, or "which query led to a
   subscription" stays unanswerable.
 - **Admin → Data Streams → your stream → Configure tag settings → List unwanted referrals:

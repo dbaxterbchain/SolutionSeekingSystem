@@ -15,7 +15,13 @@ const clean = (value: unknown, max: number): string =>
 /** Deliberately permissive: rejecting valid addresses is worse than storing a typo. */
 const looksLikeEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
 
-/** Team plan enquiries from /pricing. Stored, and emailed so they aren't missed. */
+/**
+ * Team plan enquiries from /for-business.
+ *
+ * The ROW is the record: it lands in `team_enquiries` and shows up in /admin →
+ * Enquiries with an unhandled count, so nothing is lost if the alert below never
+ * sends. The email is the notification, not the storage.
+ */
 export const POST: APIRoute = async ({ request, clientAddress }) => {
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body) return json({ error: 'bad_request' }, 400);

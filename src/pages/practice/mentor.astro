@@ -11,6 +11,16 @@ const mentorModes = MODES.filter((m) =>
   CHAT_CONTEXTS.find((c) => c.id === m.id)?.agents.includes('mentor')
 );
 
+/**
+ * Openers for the empty chat. The Mentor teaches the system rather than running
+ * one conversation, so these are questions about the method, not situations.
+ */
+const starters = [
+  'What is the Communication Protocol, and how do I actually run it?',
+  'How do I build this into how my team works, not just one conversation?',
+  'Which Wisdom Principle should I start with, and why?',
+];
+
 const site = Astro.site ?? Astro.url;
 const schemas = [
   webApplication(site, {
@@ -61,6 +71,7 @@ const schemas = [
         agent="mentor"
         agentName="Mentor"
         welcome="Hi, I'm the Solution Seeking Mentor. Ask me anything about the system: how the protocol works, what a principle means in practice, or how to adapt the tools to your team."
+        starters={starters}
       />
       <section class="mt-14">
         <p class="eyebrow mb-2">Modes</p>

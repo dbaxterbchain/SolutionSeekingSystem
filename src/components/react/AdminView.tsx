@@ -684,7 +684,7 @@ function EnquiriesTab({
 }) {
   if (!rows) return <p className="text-sm text-slate-400">Loading…</p>;
   if (rows.length === 0) {
-    return <Empty>No team enquiries yet. The form is on /pricing.</Empty>;
+    return <Empty>No team enquiries yet. The form is on /for-business.</Empty>;
   }
 
   return (

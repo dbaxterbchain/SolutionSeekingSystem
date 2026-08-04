@@ -2,6 +2,7 @@
 import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageHero from '../../components/PageHero.astro';
+import TryItBand from '../../components/TryItBand.astro';
 import { protocolSteps } from '../../data/concepts';
 import { protocolHowTo } from '../../lib/schema';
 
@@ -74,5 +75,15 @@ const usage = [
         }
       </div>
     </section>
+
+    <div class="mt-20">
+      <TryItBand
+        ctaLocation="protocol_index"
+        heading="Run the protocol on something real"
+        body="Reading the three steps is one thing. Using them in the middle of an actual disagreement, when you are the one who is upset, is another. The Guide walks you through the protocol on your own situation, and the Wisdom Principles behind it are there whenever you want the reasoning."
+        primary={{ href: '/practice/guide', label: 'Talk to the Guide' }}
+        secondary={{ href: '/principles', label: 'Read the Wisdom Principles' }}
+      />
+    </div>
   </div>
 </BaseLayout>

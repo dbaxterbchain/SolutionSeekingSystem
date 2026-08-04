@@ -1,17 +1,40 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useSession } from '../../lib/useSession';
 import { track } from '../../lib/analytics';
 
 const inputClass =
   'w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100';
 
-/** Team plan enquiries. Fulfilment is by hand, which is the point: it tells us
- *  whether self-serve seats are worth building before we build them. */
+/**
+ * Team plan enquiries, on /for-business.
+ *
+ * This used to live on /pricing#team and was replaced there by the self-serve
+ * per-seat checkout. That was right for /pricing and wrong for the business
+ * funnel: an organization deciding whether the Solution Seeking System fits
+ * their team has questions before they have a seat count, and the paid ads
+ * explicitly invite them to ask. Self-serve checkout still exists and is still
+ * linked from here; this is the path for everyone who is not ready for it.
+ */
 export default function TeamEnquiryForm() {
   const { session } = useSession();
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const started = useRef(false);
+
+  /**
+   * Top of the business funnel, fired once when someone actually starts typing.
+   *
+   * Explicit rather than leaning on GA4 enhanced measurement's form_start: the
+   * whole reason this form is back on the site is that the Business campaign
+   * reported zero form starts, and that number needs to come from us rather than
+   * from a checkbox in another product.
+   */
+  const noteStarted = () => {
+    if (started.current) return;
+    started.current = true;
+    track({ event: 'team_enquiry_started' });
+  };
 
   const submit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -64,7 +87,8 @@ export default function TeamEnquiryForm() {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3">
+    // onInput on the form, so typing in any field below counts as a start.
+    <form onSubmit={submit} onInput={noteStarted} className="space-y-3">
       {/* Honeypot: hidden from people, irresistible to bots. Hidden with an
           inline style rather than a class so the server and client markup match
           exactly (a class-only rule left React warning about a hydration
