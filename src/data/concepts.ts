@@ -60,7 +60,9 @@ export const glossary: Term[] = [
 export interface Pillar {
   name: string;
   description: string;
-  icon: string;
+  /** Custom line icon (src/assets/icons). Each pillar is also a Wisdom
+   * Principle, so it shares that principle's artwork. */
+  icon: IconName;
 }
 
 /** The Four Pillars of Understanding. */
@@ -68,22 +70,22 @@ export const pillars: Pillar[] = [
   {
     name: 'Patience',
     description: 'To understand a perspective other than your own takes time.',
-    icon: '⏳',
+    icon: 'patience',
   },
   {
     name: 'Vulnerability',
     description: 'Openness is required to share needs and fears.',
-    icon: '🪞',
+    icon: 'vulnerability',
   },
   {
     name: 'Bravery',
     description: 'Honest conversations often require courage.',
-    icon: '🦁',
+    icon: 'bravery',
   },
   {
     name: 'Compassion',
     description: 'Understanding someone does not require agreement, only care.',
-    icon: '❤️',
+    icon: 'compassion',
   },
 ];
 

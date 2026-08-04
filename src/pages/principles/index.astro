@@ -4,6 +4,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageHero from '../../components/PageHero.astro';
 import PrincipleCard from '../../components/PrincipleCard.astro';
 import TryItBand from '../../components/TryItBand.astro';
+import { principleIcon } from '../../lib/icons';
 import { breadcrumbs, collectionPage } from '../../lib/schema';
 
 const principles = (await getCollection('principles')).sort(
@@ -45,7 +46,7 @@ const schemas = [
             order={p.data.order}
             title={p.data.title}
             tagline={p.data.tagline}
-            icon={p.data.icon}
+            icon={principleIcon(p.id)}
             href={`/principles/${p.id}`}
             image={p.data.illustration}
           />
