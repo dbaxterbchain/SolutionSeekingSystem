@@ -31,5 +31,8 @@
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3",
     "unpdf": "^1.6.2"
+  },
+  "devDependencies": {
+    "opentype.js": "^2.0.0"
   }
 }
