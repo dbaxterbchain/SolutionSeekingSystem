@@ -31,9 +31,24 @@ affects scope or status. Docs index: [docs/README.md](docs/README.md).
   `subscriptions`/`ai_usage`.
 - Content is Zod-validated collections in `src/content/` — authoring formats are in
   [docs/content-guide.md](docs/content-guide.md).
-- **No em dashes (—) in user-facing copy** — pages, content, demo transcripts, prompts,
-  error messages. They read as an AI tell. Use a comma, period, colon, or parentheses,
-  or split the sentence. Full rules: "Voice & punctuation" in docs/content-guide.md.
+- **Nothing we publish should read as though a machine wrote it.** That is the actual
+  rule, and everything below is a symptom of breaking it, not a separate rule.
+
+  **Fix the sentence, never the character.** No em dashes (—) in user-facing copy:
+  pages, content, alt text, error messages. But swapping one in for a comma and moving
+  on is the wrong fix, because the result is a comma splice, and a page of comma splices
+  reads *more* like a machine than the dash did. Read the sentence, work out what the
+  dash was doing, and rewrite it so it still lands. Usually that means a full stop and
+  two sentences. Sometimes a colon, or parentheses, or dropping the aside entirely
+  because it was padding. Audit with `grep -rn "—" src/`, then edit with your brain.
+
+  This applies to migrated content too. Search-and-replace across somebody's published
+  writing is exactly the automated-sounding edit the rule exists to prevent.
+
+  **The other tells**, same treatment: "delve", "It's not just X, it's Y", "Moreover" and
+  "Furthermore", every list item opening the same way, and relentless triplets. Prefer
+  plain, specific sentences. When a sentence sounds off, the fix is a better sentence,
+  not a substituted token.
 
 ## Commands
 
