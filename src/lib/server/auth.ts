@@ -20,3 +20,15 @@ export function json(body: unknown, status = 200): Response {
     headers: { 'Content-Type': 'application/json' },
   });
 }
+
+/**
+ * JSON that must never be cached by any intermediary: one user's private
+ * state. Every /api/course/* response uses this, the way adminJson does for
+ * the admin routes.
+ */
+export function privateJson(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+  });
+}
