@@ -48,7 +48,7 @@ export const POST: APIRoute = async ({ request }) => {
         // branch it would fall into the personal path below, which expects a
         // subscription and would only log a warning.
         if (session.metadata?.purchase_intent === 'course') {
-          await handleCourseCheckoutEvent(session, event, new URL(request.url).origin);
+          await handleCourseCheckoutEvent(session, event);
           break;
         }
 
@@ -97,7 +97,7 @@ export const POST: APIRoute = async ({ request }) => {
         // flows are card-only and never see these events.
         const session = event.data.object;
         if (session.metadata?.purchase_intent === 'course') {
-          await handleCourseCheckoutEvent(session, event, new URL(request.url).origin);
+          await handleCourseCheckoutEvent(session, event);
         }
         break;
       }

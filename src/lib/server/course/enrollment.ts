@@ -5,7 +5,9 @@ import { getUserFromRequest } from '../auth';
 import { trackCourseEnrolled } from '../ga4';
 import { internalAlertTo, sendEmail } from '../email';
 import { coursePurchaseEmail, courseDuplicatePaymentAlertEmail } from '../courseEmail';
-import { COURSE, COURSE_TOKENS } from '../../../data/course';
+import { CANONICAL_ORIGIN } from '../../canonical';
+import { courseCopy } from '../../course/copy';
+import { COURSE } from '../../../data/course';
 import {
   entitlementFromRow,
   enrollFromSession,
@@ -188,11 +190,12 @@ export async function recordCheckoutCreated(
  * two async payment events whenever metadata.purchase_intent is 'course'.
  * Throws on a database failure so the route 500s and Stripe retries into the
  * idempotency above; email and analytics failures are logged, never thrown.
+ * Email links use CANONICAL_ORIGIN, not the webhook request's origin, which
+ * is Stripe's and has nothing to do with the buyer's site.
  */
 export async function handleCourseCheckoutEvent(
   session: Stripe.Checkout.Session,
-  event: { id: string; type: string },
-  origin: string
+  event: { id: string; type: string }
 ): Promise<void> {
   const facts = paidSessionFacts(session, new Date());
   if (!facts) {
@@ -200,7 +203,10 @@ export async function handleCourseCheckoutEvent(
     return;
   }
 
-  if (session.payment_status !== 'paid') {
+  // no_payment_required covers a 100% promotion code or a hand-made session:
+  // no money moves, but the sale is final, so it enrolls like any other paid session.
+  const paid = session.payment_status === 'paid' || session.payment_status === 'no_payment_required';
+  if (!paid) {
     const kind = event.type === 'checkout.session.async_payment_failed' ? 'payment_failed' : 'payment_pending';
     await recordPaymentSignal(enrollmentStore, facts, event.id, kind);
     console.log(`course checkout ${session.id}: ${kind}`);
@@ -221,7 +227,7 @@ export async function handleCourseCheckoutEvent(
       currency: (session.currency ?? 'usd').toUpperCase(),
       transactionId: session.id,
     });
-    await sendPurchaseEmail(facts.userId, enrollment?.id ?? session.id, session, origin);
+    await sendPurchaseEmail(facts.userId, enrollment?.id ?? session.id, session);
     return;
   }
 
@@ -235,7 +241,7 @@ export async function handleCourseCheckoutEvent(
         outcome === 'duplicate_payment'
           ? 'They already had access and paid again, probably from a second tab.'
           : 'Their access was revoked and they paid again. Access stays revoked.',
-      adminUrl: `${origin}/admin`,
+      adminUrl: `${CANONICAL_ORIGIN}/admin`,
     });
     await sendEmail({ to: internalAlertTo(), ...mail, idempotencyKey: `course-duplicate/${session.id}` });
   }
@@ -244,20 +250,23 @@ export async function handleCourseCheckoutEvent(
 async function sendPurchaseEmail(
   userId: string,
   enrollmentId: string,
-  session: Stripe.Checkout.Session,
-  origin: string
+  session: Stripe.Checkout.Session
 ): Promise<void> {
   // The account's address, not what they typed at Stripe: the link needs a sign-in.
+  // A transient getUserById error still leaves the customer_details fallback
+  // usable, so only the absence of an address is fatal here.
   const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
   const to = data?.user?.email || session.customer_details?.email || null;
-  if (error || !to) {
+  if (!to) {
     console.error('course purchase email: no address for', userId, error?.message);
     return;
   }
   const mail = coursePurchaseEmail({
     courseTitle: COURSE.title,
-    courseUrl: `${origin}/course/learn/`,
-    supportEmail: COURSE_TOKENS.support_contact ?? 'hello@solutionseeking.com',
+    courseUrl: `${CANONICAL_ORIGIN}/course/learn/`,
+    supportEmail: courseCopy('{{support_contact}}'),
   });
-  await sendEmail({ to, ...mail, idempotencyKey: `course-purchase/${enrollmentId}` });
+  // Keyed per purchase, not just per enrollment: a refund-then-repurchase inside
+  // Resend's 24h idempotency window must still send a second confirmation.
+  await sendEmail({ to, ...mail, idempotencyKey: `course-purchase/${enrollmentId}/${session.id}` });
 }

@@ -25,6 +25,7 @@ export function coursePurchaseEmail(opts: { courseTitle: string; courseUrl: stri
     `Open your course: ${opts.courseUrl}`,
     '',
     'Sign in with the same email address you used at checkout. Stripe sends your receipt separately.',
+    '',
     `Questions about access? Write to ${opts.supportEmail}.`,
     '',
     'Beanchain Coffee LLC',
