@@ -141,15 +141,25 @@ export function validateCatalog(input: CatalogInput): Catalog {
       cursor = lesson.next;
     }
     const last = orderedIds[orderedIds.length - 1];
-    if (last !== lastLessonId) err(`Lesson chain must end at ${lastLessonId} (ends at ${last})`);
+    if (last !== lastLessonId) {
+      err(
+        orderedIds.length === 0
+          ? `Lesson chain must end at ${lastLessonId} (the chain is empty: v01 is missing)`
+          : `Lesson chain must end at ${lastLessonId} (ends at ${last})`
+      );
+    }
     for (const l of lessons) {
       if (!visited.has(l.id)) err(`Lesson ${l.id} is not reachable from v01 via "next"`);
     }
-    orderedIds.forEach((id, i) => {
+    // Only the first mismatch is reported: one broken link shifts every
+    // following position, so reporting all of them just repeats one problem.
+    for (let i = 0; i < orderedIds.length; i++) {
+      const id = orderedIds[i];
       if (id !== expectedLessonIds[i]) {
-        err(`Lesson ${id} is at position ${i + 1} in the chain but its id says ${id}`);
+        err(`Lesson chain position ${i + 1} should be ${expectedLessonIds[i]} (found ${id})`);
+        break;
       }
-    });
+    }
   }
 
   // Modules along the chain: ascending, contiguous, non-empty.

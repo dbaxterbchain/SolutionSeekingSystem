@@ -30,6 +30,10 @@ create table if not exists public.course_enrollments (
   check (source <> 'stripe' or stripe_checkout_session_id is not null)
 );
 
+-- Refund webhooks look up the enrollment by payment intent.
+create index if not exists course_enrollments_payment_intent_idx
+  on public.course_enrollments (stripe_payment_intent_id) where stripe_payment_intent_id is not null;
+
 -- Append-only audit of every access change and payment signal, and the
 -- processed-once ledger for course webhook deliveries.
 create table if not exists public.course_enrollment_events (
@@ -51,9 +55,9 @@ create table if not exists public.course_enrollment_events (
 create index if not exists course_enrollment_events_user_idx
   on public.course_enrollment_events (user_id, created_at desc);
 create index if not exists course_enrollment_events_enrollment_idx
-  on public.course_enrollment_events (enrollment_id);
+  on public.course_enrollment_events (enrollment_id) where enrollment_id is not null;
 create index if not exists course_enrollment_events_actor_idx
-  on public.course_enrollment_events (actor_user_id);
+  on public.course_enrollment_events (actor_user_id) where actor_user_id is not null;
 create unique index if not exists course_enrollment_events_event_idx
   on public.course_enrollment_events (stripe_event_id) where stripe_event_id is not null;
 
@@ -116,6 +120,8 @@ begin
   if old.practice_state <> 'none' and new.practice_state = 'none' then
     new.practice_state := old.practice_state;
   end if;
+  -- The optimistic-concurrency token never moves backwards.
+  if new.revision < old.revision then new.revision := old.revision; end if;
   new.first_opened_at := old.first_opened_at;
   return new;
 end $$;

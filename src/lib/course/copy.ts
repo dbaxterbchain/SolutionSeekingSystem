@@ -22,7 +22,7 @@ export function courseCopy(template: string, ctx: CopyContext = {}): string {
   const tokens = ctx.tokens ?? COURSE_TOKENS;
 
   const out = template.replace(TOKEN_RE, (_match, name: string) => {
-    if (!(name in tokens)) throw new Error(`Unknown course copy token {{${name}}}`);
+    if (!Object.hasOwn(tokens, name)) throw new Error(`Unknown course copy token {{${name}}}`);
     if (name === 'course_price' && status !== 'open') {
       throw new Error('{{course_price}} may only be rendered when PUBLIC_COURSE_STATUS is open');
     }

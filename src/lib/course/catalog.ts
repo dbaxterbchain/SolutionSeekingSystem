@@ -1,5 +1,6 @@
 import { getCollection } from 'astro:content';
 import { COURSE, COURSE_STATUS } from '../../data/course';
+import { assertLaunchSettings } from './copy';
 import { validateCatalog, type Catalog } from './validate';
 
 /**
@@ -12,11 +13,18 @@ let cached: Promise<Catalog> | null = null;
 
 export function getCourseCatalog(): Promise<Catalog> {
   if (cached && !import.meta.env.DEV) return cached;
-  cached = load();
+  cached = load().catch((e) => {
+    cached = null;
+    throw e;
+  });
   return cached;
 }
 
 async function load(): Promise<Catalog> {
+  // Runs before any collection is read, so an `open` build fails on a missing
+  // launch setting regardless of which pages the build happens to touch.
+  assertLaunchSettings();
+
   const [lessons, modules, worksheets] = await Promise.all([
     getCollection('courseLessons'),
     getCollection('courseModules'),

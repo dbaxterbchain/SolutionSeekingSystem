@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validateCatalog } from '../validate';
-import { PUBLISHED_FIELDS, buildInput, check, withLesson, withModule } from './fixtures';
+import { FULL_BODY, PUBLISHED_FIELDS, buildInput, check, withLesson, withModule } from './fixtures';
 
 describe('validateCatalog', () => {
   it('accepts a valid draft catalog and derives sequence, order and minutes', () => {
@@ -37,6 +37,15 @@ describe('validateCatalog', () => {
     expect(() => validateCatalog(withLesson(buildInput(), 'v39', { next: undefined }))).toThrow(
       /must end at v40/
     );
+
+    // One broken link shifts every later position; only the first is reported.
+    let message = '';
+    try {
+      validateCatalog(withLesson(buildInput(), 'v04', { next: 'v06' }));
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message.match(/should be/g)).toHaveLength(1);
   });
 
   it('rejects a missing or extra lesson', () => {
@@ -181,5 +190,122 @@ describe('validateCatalog', () => {
     expect(() => validateCatalog(withLesson(buildInput(), 'v04', { worksheet: 'w-m03' }))).toThrow(
       /v04: worksheet must be w-m02/
     );
+  });
+
+  it('gates edited on streamUid, durationMin, and approvals.edit', () => {
+    const base = {
+      status: 'edited' as const,
+      body: FULL_BODY,
+      streamUid: '5d5bc37ffcf54c9b82e996823bffbb81',
+      durationMin: 8,
+      approvals: { copy: '2026-09-12 DB', edit: '2026-09-20 BC' },
+    };
+    expect(() =>
+      validateCatalog(withLesson(buildInput(), 'v04', { ...base, streamUid: null }))
+    ).toThrow(/streamUid is required/);
+    expect(() =>
+      validateCatalog(withLesson(buildInput(), 'v04', { ...base, durationMin: 0 }))
+    ).toThrow(/durationMin must be at least 1/);
+    expect(() =>
+      validateCatalog(
+        withLesson(buildInput(), 'v04', { ...base, approvals: { copy: '2026-09-12 DB' } })
+      )
+    ).toThrow(/approvals.edit is required/);
+  });
+
+  it('gates captioned on approvals.captions when the transcript is present', () => {
+    const input = withLesson(buildInput(), 'v04', {
+      status: 'captioned',
+      body: FULL_BODY,
+      streamUid: '5d5bc37ffcf54c9b82e996823bffbb81',
+      durationMin: 8,
+      approvals: { copy: '2026-09-12 DB', edit: '2026-09-20 BC' },
+    });
+    expect(() => validateCatalog(input)).toThrow(/approvals.captions is required/);
+  });
+
+  it('lets v39 (orientation) pass approved with an empty exercise, model response, and self-review', () => {
+    const body = [
+      '## Outcome',
+      'Outcome text.',
+      '',
+      '## Key points',
+      '- One point.',
+      '',
+      '## Exercise',
+      '',
+      '## Model response',
+      '',
+      '## Self-review',
+      '',
+      '## Transcript',
+      '',
+    ].join('\n');
+    const input = withLesson(buildInput(), 'v39', {
+      status: 'approved',
+      body,
+      approvals: { copy: '2026-09-12 DB' },
+    });
+    expect(() => validateCatalog(input)).not.toThrow();
+  });
+
+  it('lets v40 (plan) pass approved with an empty model response and self-review, but still requires the exercise', () => {
+    const bodyWithExercise = [
+      '## Outcome',
+      'Outcome text.',
+      '',
+      '## Key points',
+      '- One point.',
+      '',
+      '## Exercise',
+      'Write your plan.',
+      '',
+      '## Model response',
+      '',
+      '## Self-review',
+      '',
+      '## Transcript',
+      '',
+    ].join('\n');
+    const passing = withLesson(buildInput(), 'v40', {
+      status: 'approved',
+      body: bodyWithExercise,
+      approvals: { copy: '2026-09-12 DB' },
+    });
+    expect(() => validateCatalog(passing)).not.toThrow();
+
+    const withoutExercise = withLesson(buildInput(), 'v40', {
+      status: 'approved',
+      body: bodyWithExercise.replace('Write your plan.', ''),
+      approvals: { copy: '2026-09-12 DB' },
+    });
+    expect(() => validateCatalog(withoutExercise)).toThrow(/Exercise is empty/);
+  });
+
+  it('lets a placeholder-video lesson pass edited without approvals.edit', () => {
+    const input = withLesson(buildInput(), 'v04', {
+      status: 'edited',
+      body: FULL_BODY,
+      streamUid: '5d5bc37ffcf54c9b82e996823bffbb81',
+      durationMin: 8,
+      videoPlaceholder: true,
+      approvals: { copy: '2026-09-12 DB' },
+    });
+    expect(() => validateCatalog(input)).not.toThrow();
+  });
+
+  it('rejects a placeholder video on the preview lesson once the course is public', () => {
+    const input = withLesson({ ...buildInput(), courseStatus: 'preview' }, 'v05', {
+      ...PUBLISHED_FIELDS,
+      videoPlaceholder: true,
+    });
+    expect(() => validateCatalog(input)).toThrow(
+      /the preview lesson cannot use a placeholder video once the course is public/
+    );
+  });
+
+  it('validates a published preview lesson when the course is open', () => {
+    const input = withLesson({ ...buildInput(), courseStatus: 'open' }, 'v05', PUBLISHED_FIELDS);
+    expect(() => validateCatalog(input)).not.toThrow();
   });
 });
