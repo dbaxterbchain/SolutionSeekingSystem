@@ -15,6 +15,12 @@ interface ImportMetaEnv {
   /** Cloudflare Stream, for the course videos; see src/lib/server/course/stream.ts. */
   readonly CLOUDFLARE_STREAM_API_TOKEN?: string;
   readonly CLOUDFLARE_STREAM_CUSTOMER_CODE?: string;
+  /** Assessment grading; see src/lib/server/course/workerTrigger.ts and netlify/functions/course-grade.mts. */
+  readonly COURSE_WORKER_SECRET?: string;
+  readonly COURSE_GRADER_MODE?: string;
+  readonly COURSE_GRADER_MODEL?: string;
+  readonly COURSE_AWARDS_ENABLED?: string;
+  readonly COURSE_SAMPLE_FORMS?: string;
   readonly SUPABASE_SERVICE_ROLE_KEY: string;
 }
 
