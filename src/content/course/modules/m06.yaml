@@ -1,0 +1,26 @@
+title: Use the Leadership Tools
+summary: >-
+  Choose and use One-on-Ones, Feedback, Targeted Conversations, and Solution
+  Seeking Sessions.
+worksheet: w-m06
+# Explanations are interim wording from the course brief. David replaces each
+# one with the matching expected-answer text from the Module 6 workbook.
+checks:
+  - question: Where should a known complex concern be raised?
+    choices:
+      - Inside an apparently open One-on-One without advance notice.
+      - In a transparent invitation to an appropriate Targeted Conversation or Session.
+    answer: 2
+    explanation: >-
+      One-on-Ones are the participant's space. A concern you already know is
+      complex deserves a transparent invitation to the tool built for it, so
+      the other person can prepare.
+  - question: Which distinguishes a Solution Seeking Session?
+    choices:
+      - More formal written preparation, a factual record, and explicit progress review.
+      - A requirement that participants agree with the organizer.
+    answer: 1
+    explanation: >-
+      A Session adds structure for serious or persistent concerns: written
+      preparation, a factual recap, and a review of progress. It never requires
+      anyone to agree with the organizer.

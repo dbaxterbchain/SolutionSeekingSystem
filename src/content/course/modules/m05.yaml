@@ -1,0 +1,26 @@
+title: Work through difficult moments
+summary: >-
+  Repair a tense exchange, respond to a request for time, respect participation
+  limits, and revisit recurring problems.
+worksheet: w-m05
+# Explanations are interim wording from the course brief. David replaces each
+# one with the matching expected-answer text from the Module 5 workbook.
+checks:
+  - question: A person declines a voluntary conversation. What is appropriate?
+    choices:
+      - Force the conversation to complete the protocol.
+      - Respect the choice and consider a proportionate next action.
+    answer: 2
+    explanation: >-
+      Participation is voluntary. Respect the decline, and choose a next step
+      that fits the situation, which may mean waiting, using a different tool,
+      or seeking other support.
+  - question: A clear trial was used and did not help. What is the next focus?
+    choices:
+      - Evaluate the results, revisit understanding if needed, and agree on a revision.
+      - Repeat it indefinitely without checking the participants' experience.
+    answer: 1
+    explanation: >-
+      A trial that did not help is information. Look at what happened, check
+      whether the problem was understood correctly, and agree on the next
+      revision together.

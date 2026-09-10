@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Coming soon (course placeholder clip)</title>
+<!--
+  The stand-in clip that plays in a lesson whose real video is not filmed yet.
+  Rendered to MP4 by scripts/render-placeholder-video.mjs, which serves the repo
+  root over http so the brand fonts and SVGs load from their real locations.
+
+  Every movement is a pure function of time: window.seek(t) lays out the frame
+  for second t, so the renderer can step through it deterministically. There is
+  no CSS animation anywhere on purpose. The caption cues (window.CUES) share the
+  same timeline, so the VTT can never drift from the picture.
+
+  Colours are the brand tokens from tailwind.config.mjs: ink-800 to a near-black
+  ink for the ground (the same ramp as the social cards in src/pages/og), brand-500
+  for the accent bar, brand-200 for eyebrows, sky-500 for SEEKING. Gold is absent
+  by design: it means arrival, and this card is about waiting.
+-->
+<style>
+  @font-face { font-family: 'Poppins'; font-weight: 500; src: url('/src/assets/fonts/Poppins-Medium.ttf') format('truetype'); }
+  @font-face { font-family: 'Poppins'; font-weight: 700; src: url('/src/assets/fonts/Poppins-Bold.ttf') format('truetype'); }
+  @font-face { font-family: 'Anton'; font-weight: 400; src: url('/src/assets/fonts/Anton-Regular.ttf') format('truetype'); }
+
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #0A1234; }
+  .stage {
+    position: relative; width: 1920px; height: 1080px; overflow: hidden;
+    background: linear-gradient(135deg, #16276B 0%, #0A1234 100%);
+    font-family: Poppins, system-ui, sans-serif; color: #FFFFFF;
+    -webkit-font-smoothing: antialiased;
+  }
+  .glow {
+    position: absolute; left: -400px; top: -400px; width: 1800px; height: 1800px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(59, 83, 240, 0.34) 0%, rgba(59, 83, 240, 0) 62%);
+    will-change: transform;
+  }
+  .bar { position: absolute; left: 0; top: 0; width: 20px; height: 1080px; background: #5271FF; transform-origin: top; }
+
+  .scene {
+    position: absolute; left: 200px; top: 0; width: 1560px; height: 1080px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .el { opacity: 0; will-change: opacity, transform; }
+
+  .logo-row { display: flex; align-items: center; gap: 72px; }
+  .mark { width: 241px; height: 300px; display: block; }
+  .mark-small { width: 160px; height: 200px; display: block; }
+  .lockup { width: 559px; height: 250px; display: block; }
+  .lockup svg { width: 100%; height: 100%; display: block; }
+
+  .eyebrow {
+    font-weight: 700; font-size: 32px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: #C6D0FF; margin: 0;
+  }
+  .logo-eyebrow { margin-top: 48px; }
+
+  .headline {
+    font-family: Anton, Poppins, sans-serif; font-weight: 400; font-size: 120px; line-height: 1.08;
+    letter-spacing: 0.005em; color: #FFFFFF; margin: 0 0 40px;
+  }
+  .body { font-weight: 500; font-size: 52px; line-height: 1.4; color: #C6D0FF; max-width: 1340px; margin: 0; }
+  .body + .body { margin-top: 20px; }
+
+  .steps { margin-top: 44px; display: flex; flex-direction: column; gap: 36px; }
+  .step { display: flex; align-items: flex-start; gap: 34px; font-weight: 500; font-size: 60px; line-height: 1.2; color: #FFFFFF; margin: 0; }
+  /* The dot sits on the first line's centre, so a wrapped step keeps it in place. */
+  .step::before { content: ''; width: 18px; height: 18px; margin-top: 27px; border-radius: 50%; background: #7E90FF; flex: none; }
+
+  .url { font-weight: 700; font-size: 76px; line-height: 1.1; letter-spacing: -0.01em; color: #FFFFFF; margin: 40px 0 24px; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="glow" id="glow"></div>
+  <div class="bar" id="bar"></div>
+
+  <!-- Scene 1: the brand -->
+  <section class="scene">
+    <div class="logo-row">
+      <img class="mark el" id="mark1" src="/public/brand/mark-mono-white.svg" alt="">
+      <div class="lockup el" id="lockup" data-svg="/public/brand/lockup-solution-seeking.svg" data-recolor="#16276B:#FFFFFF"></div>
+    </div>
+    <p class="eyebrow logo-eyebrow el" id="eyebrow1">Video course</p>
+  </section>
+
+  <!-- Scene 2: what is happening -->
+  <section class="scene">
+    <h1 class="headline el" id="headline">This video is coming soon</h1>
+    <p class="body el" id="body1">We're filming the course a lesson at a time over the coming months.</p>
+    <p class="body el" id="body2">Everything else in this lesson is ready to use now.</p>
+  </section>
+
+  <!-- Scene 3: what to do meanwhile -->
+  <section class="scene">
+    <p class="eyebrow el" id="eyebrow3">While you wait</p>
+    <div class="steps">
+      <p class="step el" id="step1">Read the key points</p>
+      <p class="step el" id="step2">Work the exercise</p>
+      <p class="step el" id="step3">Compare your thinking with the model response</p>
+    </div>
+  </section>
+
+  <!-- Scene 4: end card -->
+  <section class="scene">
+    <img class="mark-small el" id="mark4" src="/public/brand/mark-mono-white.svg" alt="">
+    <p class="url el" id="url">solutionseeking.com</p>
+    <p class="eyebrow el" id="eyebrow4">Video course</p>
+  </section>
+</div>
+
+<script>
+  // Seconds. The renderer reads DURATION and CUES; keep every number here.
+  window.DURATION = 26;
+
+  // [id, inStart, outStart, options]. Each element fades and rises in over
+  // IN_DUR from inStart, then fades and lifts out over OUT_DUR from outStart.
+  const IN_DUR = 0.9;
+  const OUT_DUR = 0.55;
+  const TIMELINE = [
+    ['mark1',    0.30, 4.60, { rise: 0, scale: 0.96 }],
+    ['lockup',   0.80, 4.60, { rise: 24 }],
+    ['eyebrow1', 1.40, 4.60, { rise: 16 }],
+
+    ['headline', 5.20, 13.00, { rise: 32 }],
+    ['body1',    6.00, 13.00, { rise: 24 }],
+    ['body2',    8.60, 13.00, { rise: 24 }],
+
+    ['eyebrow3', 13.60, 20.60, { rise: 16 }],
+    ['step1',    14.20, 20.60, { rise: 24 }],
+    ['step2',    15.30, 20.60, { rise: 24 }],
+    ['step3',    16.40, 20.60, { rise: 24 }],
+
+    ['mark4',    21.20, 99, { rise: 0, scale: 0.96 }],
+    ['url',      21.70, 99, { rise: 24 }],
+    ['eyebrow4', 22.20, 99, { rise: 16 }],
+  ];
+
+  // Caption cues for the WebVTT track: the on-screen text, in reading order.
+  // One cue per scene, spanning it, so the track mirrors the picture without
+  // stacking overlapping cues in the player.
+  window.CUES = [
+    { start: 0.8,  end: 4.6,  text: 'Solution Seeking. Video course.' },
+    { start: 5.2,  end: 13.0, text: "This video is coming soon. We're filming the course a lesson at a time over the coming months. Everything else in this lesson is ready to use now." },
+    { start: 13.6, end: 20.6, text: 'While you wait: read the key points, work the exercise, and compare your thinking with the model response.' },
+    { start: 21.2, end: 26.0, text: 'solutionseeking.com' },
+  ];
+
+  const clamp01 = (x) => Math.max(0, Math.min(1, x));
+  const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+  const easeIn = (x) => x * x;
+  const progress = (t, start, dur, ease) => ease(clamp01((t - start) / dur));
+
+  window.seek = function seek(t) {
+    // A soft brand-blue highlight drifts across the ground over the whole clip,
+    // so the card is never a still image between transitions.
+    const drift = clamp01(t / window.DURATION);
+    document.getElementById('glow').style.transform = `translate(${(drift * 900).toFixed(1)}px, ${(drift * 420).toFixed(1)}px)`;
+    document.getElementById('bar').style.transform = `scaleY(${progress(t, 0, 0.9, easeOut)})`;
+    for (const [id, inStart, outStart, opts] of TIMELINE) {
+      const el = document.getElementById(id);
+      const kIn = progress(t, inStart, IN_DUR, easeOut);
+      const kOut = progress(t, outStart, OUT_DUR, easeIn);
+      const rise = opts.rise ?? 24;
+      const scale = opts.scale ?? 1;
+      const y = (1 - kIn) * rise - kOut * 18;
+      const s = scale + (1 - scale) * kIn;
+      el.style.opacity = (kIn * (1 - kOut)).toFixed(4);
+      el.style.transform = `translateY(${y.toFixed(2)}px) scale(${s.toFixed(4)})`;
+    }
+  };
+
+  // Inline the outlined lockup so its "Solution" can be white on the dark
+  // ground (the shipped file is set in ink for light surfaces). The geometry is
+  // untouched: only the fill named in data-recolor changes.
+  window.READY = (async () => {
+    for (const host of document.querySelectorAll('[data-svg]')) {
+      const res = await fetch(host.dataset.svg);
+      if (!res.ok) throw new Error(`Could not load ${host.dataset.svg}: ${res.status}`);
+      let svg = await res.text();
+      const [from, to] = (host.dataset.recolor || '').split(':');
+      if (from && to) svg = svg.split(`fill="${from}"`).join(`fill="${to}"`);
+      host.innerHTML = svg;
+    }
+    await document.fonts.ready;
+    seek(0);
+  })();
+</script>
+</body>
+</html>

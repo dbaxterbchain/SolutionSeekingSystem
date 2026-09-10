@@ -3,8 +3,11 @@
  * inlining values into the build output at build time (Netlify's secrets
  * scanner flags inlined secret values, and inlined keys go stale on
  * rotation); process.env covers the Netlify Functions runtime.
+ *
+ * `import.meta.env` is undefined in a plain Netlify function bundle (the
+ * course grading worker), so it is read defensively.
  */
 export function serverEnv(name: string): string {
-  const fromMeta = (import.meta.env as Record<string, string | undefined>)[name];
-  return fromMeta ?? process.env[name] ?? '';
+  const meta = (import.meta as { env?: Record<string, string | undefined> }).env;
+  return meta?.[name] ?? process.env[name] ?? '';
 }

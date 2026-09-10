@@ -1,0 +1,25 @@
+title: Apply the complete system
+summary: >-
+  Follow complete fictional cases at work, at home, and in a community group,
+  including what happens after the agreement.
+worksheet: w-m08
+# Explanations are interim wording from the course brief. David replaces each
+# one with the matching expected-answer text from the Module 8 workbook.
+checks:
+  - question: Which is stronger evidence of Mutual Understanding?
+    choices:
+      - A calm tone alone.
+      - Each participant correcting and confirming a summary.
+    answer: 2
+    explanation: >-
+      Calm is welcome but proves nothing about understanding. Each person
+      correcting and then confirming the other's summary is the evidence.
+  - question: Why include follow-up after an agreement?
+    choices:
+      - To examine implementation, effectiveness, fairness, and the next revision.
+      - To show that a first agreement always solves the problem permanently.
+    answer: 1
+    explanation: >-
+      Follow-up checks whether the agreement was carried out, whether it helped,
+      whether it was fair, and what to revise next. A first agreement is a
+      trial, not a permanent fix.

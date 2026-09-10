@@ -1,0 +1,27 @@
+title: Mutual Understanding
+summary: >-
+  Share clearly, listen carefully, and check each person's perspective through
+  questions and corrected summaries.
+worksheet: w-m03
+# Explanations are interim wording from the course brief. David replaces each
+# one with the matching expected-answer text from the Module 3 workbook.
+checks:
+  - question: Someone corrects your summary. What should you do next?
+    choices:
+      - Ask what is missing and revise it to reflect their meaning.
+      - Keep the original wording and move to solutions.
+    answer: 1
+    explanation: >-
+      A correction is the point of summarizing. Ask what you missed, revise the
+      summary in their words, and check again before moving on.
+  - question: >-
+      Both people understand each other but prefer different solutions. Has
+      understanding necessarily failed?
+    choices:
+      - Yes, they must hold the same opinion.
+      - No, accurate understanding can coexist with disagreement.
+    answer: 2
+    explanation: >-
+      Mutual Understanding means each person can state the other's perspective
+      accurately. Agreeing on what to do comes later, and honest disagreement
+      about the best solution is not a failure of understanding.

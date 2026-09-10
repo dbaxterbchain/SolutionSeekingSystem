@@ -1,0 +1,30 @@
+title: Introspection
+summary: >-
+  Work through all seven Introspection steps. Examine assumptions, name
+  feelings, and prepare useful questions.
+worksheet: w-m02
+# Explanations are interim wording from the course brief. David replaces each
+# one with the matching expected-answer text from the Module 2 workbook.
+checks:
+  - question: >-
+      In "Brian interrupted because he does not respect me," what needs
+      checking?
+    choices:
+      - The assertion about his motive.
+      - Nothing. The interruption proves the motive.
+    answer: 1
+    explanation: >-
+      The interruption is an observation. The reason behind it is an assumption
+      about Brian's motive, and it stays an assumption until Brian confirms or
+      corrects it.
+  - question: >-
+      Does forgiveness require immediate trust or saying the harm did not
+      matter?
+    choices:
+      - Yes, otherwise it is incomplete.
+      - No, understanding can coexist with boundaries and accountability.
+    answer: 2
+    explanation: >-
+      Forgiveness releases resentment so you can understand the other person.
+      It does not erase the harm, restore trust on its own, or remove the need
+      for boundaries and accountability.

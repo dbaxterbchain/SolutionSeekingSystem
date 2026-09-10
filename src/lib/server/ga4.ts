@@ -23,37 +23,39 @@ interface SubscriptionEvent {
   /** Amount in dollars (Stripe reports cents). */
   value: number;
   currency: string;
-  /** Stripe Checkout Session id — GA4 dedupes retries on this. */
+  /** Stripe Checkout Session id. GA4 dedupes retries on this. */
+  transactionId: string;
+}
+
+interface CourseEnrolledEvent {
+  clientId: string;
+  sessionId?: string;
+  courseId: string;
+  value: number;
+  currency: string;
   transactionId: string;
 }
 
 /**
- * Fire `subscription_completed`. Best-effort: a failure here must never fail
- * the webhook, or Stripe will retry a delivery we already processed.
+ * Send one Measurement Protocol event. Best-effort: a failure here must never
+ * fail the webhook, or Stripe will retry a delivery we already processed.
  */
-export async function trackSubscriptionCompleted(e: SubscriptionEvent): Promise<void> {
+async function sendEvent(name: string, clientId: string, params: Record<string, unknown>): Promise<void> {
   const measurementId = serverEnv('PUBLIC_GA4_MEASUREMENT_ID');
   const apiSecret = serverEnv('GA4_API_SECRET');
   if (!measurementId || !apiSecret) {
-    console.warn('GA4 not configured; skipping subscription_completed');
+    console.warn(`GA4 not configured; skipping ${name}`);
     return;
   }
 
   const url = `${MP_ENDPOINT}?measurement_id=${encodeURIComponent(measurementId)}&api_secret=${encodeURIComponent(apiSecret)}`;
   const body = {
-    client_id: e.clientId,
+    client_id: clientId,
     events: [
       {
-        name: 'subscription_completed',
-        params: {
-          plan: e.plan,
-          value: e.value,
-          currency: e.currency,
-          transaction_id: e.transactionId,
-          ...(e.sessionId ? { session_id: e.sessionId } : {}),
-          // Required, or GA4 attributes the event to no session at all.
-          engagement_time_msec: 1,
-        },
+        name,
+        // engagement_time_msec is required, or GA4 attributes the event to no session at all.
+        params: { ...params, engagement_time_msec: 1 },
       },
     ],
   };
@@ -66,4 +68,27 @@ export async function trackSubscriptionCompleted(e: SubscriptionEvent): Promise<
   } catch (err) {
     console.error('GA4 measurement protocol request failed', err);
   }
+}
+
+/** Fire `subscription_completed`. */
+export async function trackSubscriptionCompleted(e: SubscriptionEvent): Promise<void> {
+  await sendEvent('subscription_completed', e.clientId, {
+    plan: e.plan,
+    value: e.value,
+    currency: e.currency,
+    transaction_id: e.transactionId,
+    ...(e.sessionId ? { session_id: e.sessionId } : {}),
+  });
+}
+
+/** Fire `course_enrolled`, the course's conversion of record. Only on enrolled and reinstated. */
+export async function trackCourseEnrolled(e: CourseEnrolledEvent): Promise<void> {
+  await sendEvent('course_enrolled', e.clientId, {
+    course_id: e.courseId,
+    plan: 'course',
+    value: e.value,
+    currency: e.currency,
+    transaction_id: e.transactionId,
+    ...(e.sessionId ? { session_id: e.sessionId } : {}),
+  });
 }

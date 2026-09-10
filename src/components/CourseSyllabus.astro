@@ -1,0 +1,31 @@
+---
+import type { PublicCurriculum } from '../lib/course/curriculum';
+
+interface Props {
+  curriculum: PublicCurriculum;
+}
+const { curriculum } = Astro.props;
+---
+
+<ol class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  {
+    curriculum.modules.map((m) => (
+      <li class="flex flex-col rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
+        <p class="eyebrow">Module {m.order}</p>
+        <h3 class="mt-2 font-heading text-lg font-bold text-ink-800">{m.title}</h3>
+        <p class="mt-2 text-sm leading-relaxed text-slate-600">{m.summary}</p>
+        <p class="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          {m.lessons.length} {m.lessons.length === 1 ? 'lesson' : 'lessons'}
+        </p>
+        <ul class="mt-2 space-y-1 text-sm text-slate-700">
+          {m.lessons.map((l) => (
+            <li class="relative pl-4">
+              <span class="absolute left-0 top-[0.6em] h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-brand-400" />
+              {l.title}
+            </li>
+          ))}
+        </ul>
+      </li>
+    ))
+  }
+</ol>

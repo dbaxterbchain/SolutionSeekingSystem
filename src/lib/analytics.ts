@@ -53,6 +53,16 @@ export const CTA_LOCATIONS = [
   'protocol_index',
   'protocol_page',
   'design_guide',
+  // faq.astro has carried data-track-cta="faq" since the FAQ shipped; listed now.
+  'faq',
+  // The video course.
+  'home_course',
+  'pricing_course',
+  'practice_course',
+  'course_hero',
+  'course_close',
+  'course_preview',
+  'course_dashboard',
 ] as const;
 
 export type CtaLocation = (typeof CTA_LOCATIONS)[number];
@@ -60,7 +70,7 @@ export type CtaLocation = (typeof CTA_LOCATIONS)[number];
 /** Which allowance the user is spending. */
 export type Tier = 'anon' | 'free' | 'subscriber';
 
-export type PlanId = 'monthly' | 'annual' | 'team';
+export type PlanId = 'monthly' | 'annual' | 'team' | 'course';
 
 /**
  * Where an email address was captured.
@@ -86,6 +96,10 @@ export type AnalyticsEvent =
   | { event: 'checkout_started'; plan: PlanId; cta_location: CtaLocation; value: number; currency: 'USD' }
   | { event: 'checkout_abandoned' }
   | { event: 'checkout_success_viewed' }
+  /** The course sales page rendered (or the dashboard's buy state, when hidden). */
+  | { event: 'course_viewed'; course_id: string; sale_status: 'hidden' | 'preview' | 'open' }
+  /** Back from Stripe and the enrollment is confirmed by the server. Fired once. */
+  | { event: 'enrollment_ready'; course_id: string }
   /**
    * A visitor tapped a suggested opener in an empty chat. The blank composer is
    * the step the consumer funnel dies on, so this is the pair that tells us

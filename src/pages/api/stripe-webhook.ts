@@ -4,12 +4,14 @@ import { supabaseAdmin } from '../../lib/server/supabaseAdmin';
 import { getStripe } from '../../lib/server/stripe';
 import { serverEnv } from '../../lib/server/env';
 import { trackSubscriptionCompleted } from '../../lib/server/ga4';
+import { handleCourseCheckoutEvent } from '../../lib/server/course/enrollment';
 
 export const prerender = false;
 
 /**
  * Stripe webhook — the ONLY writer of subscription entitlement state.
  * Register in the Stripe dashboard for: checkout.session.completed,
+ * checkout.session.async_payment_succeeded, checkout.session.async_payment_failed,
  * customer.subscription.created / .updated / .deleted.
  */
 export const POST: APIRoute = async ({ request }) => {
@@ -40,6 +42,15 @@ export const POST: APIRoute = async ({ request }) => {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object;
+
+        // A course purchase. Runs FIRST: a course session carries user_id in
+        // its metadata just like a personal subscription does, so without this
+        // branch it would fall into the personal path below, which expects a
+        // subscription and would only log a warning.
+        if (session.metadata?.purchase_intent === 'course') {
+          await handleCourseCheckoutEvent(session, event);
+          break;
+        }
 
         // A Teams purchase: create the organization and its first manager.
         // This branch runs FIRST because team sessions carry no user_id at
@@ -77,6 +88,17 @@ export const POST: APIRoute = async ({ request }) => {
           currency: (session.currency ?? 'usd').toUpperCase(),
           transactionId: session.id,
         });
+        break;
+      }
+      case 'checkout.session.async_payment_succeeded':
+      case 'checkout.session.async_payment_failed': {
+        // Delayed payment methods (bank debits) complete the session first and
+        // settle later. Only the course sells with them today; the subscription
+        // flows are card-only and never see these events.
+        const session = event.data.object;
+        if (session.metadata?.purchase_intent === 'course') {
+          await handleCourseCheckoutEvent(session, event);
+        }
         break;
       }
       case 'customer.subscription.created':

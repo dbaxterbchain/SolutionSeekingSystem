@@ -1,0 +1,55 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import StepNav from '../../../../components/StepNav.astro';
+import { getCourseCatalog } from '../../../../lib/course/catalog';
+import { hasShell } from '../../../../lib/course/visibility';
+
+/**
+ * Prerendered public shell for one lesson, like /dashboard: it carries only
+ * public metadata (the sales page lists the same titles). Everything a learner
+ * pays for (transcript, exercise, model response, video token) comes from
+ * /api/course/lesson behind the bearer token, in the LessonView island that
+ * Phase 1c mounts here. Draft lessons have no shell at all.
+ */
+export async function getStaticPaths() {
+  const catalog = await getCourseCatalog();
+  const link = (id: string | null) => {
+    const lesson = id ? catalog.byId[id] : undefined;
+    return lesson && hasShell(lesson)
+      ? { title: lesson.title, href: `/course/learn/lessons/${lesson.id}` }
+      : undefined;
+  };
+  return catalog.lessons.filter(hasShell).map((lesson) => ({
+    params: { id: lesson.id },
+    props: {
+      title: lesson.title,
+      outcome: lesson.sections.outcome,
+      moduleTitle: catalog.modules[lesson.moduleOrder - 1].title,
+      moduleOrder: lesson.moduleOrder,
+      order: lesson.order,
+      prev: link(lesson.prevId),
+      next: link(lesson.nextId),
+    },
+  }));
+}
+
+const { title, outcome, moduleTitle, moduleOrder, order, prev, next } = Astro.props;
+---
+
+<BaseLayout title={title} description={outcome} noindex>
+  <div class="container-page py-10">
+    <p class="eyebrow">Module {moduleOrder}, {moduleTitle}. Lesson {order}</p>
+    <h1 class="mt-3 text-3xl font-extrabold tracking-tight text-ink-800 sm:text-4xl">{title}</h1>
+    <p class="mt-4 max-w-prose text-lg leading-relaxed text-slate-600">{outcome}</p>
+    <div class="mt-8 rounded-2xl border border-slate-100 bg-white p-6 text-slate-700 shadow-card">
+      <p>
+        The lesson player is on its way. Enrolled learners will watch, practice, and mark this
+        lesson complete right here.
+      </p>
+      <p class="mt-3">
+        <a class="font-semibold text-brand-700 hover:underline" href="/course/learn/">Back to your course</a>
+      </p>
+    </div>
+    <StepNav prev={prev} next={next} />
+  </div>
+</BaseLayout>

@@ -127,3 +127,16 @@ export const priceCopy = {
   paywallHeading: `You've used your ${FREE_ACCOUNT_MESSAGES} free messages`,
   paywallBody: `Subscribe for ${PLANS.monthly.priceLabel}/month to get unlimited conversations with both the Guide and the Mentor. Cancel anytime.`,
 };
+
+/**
+ * The video course: a one-time purchase, separate from the subscription, and
+ * deliberately NOT a PlanId. resolvePlan() iterates PLANS and must keep
+ * rejecting anything that is not a self-serve subscription; the course has
+ * its own resolver (src/lib/server/course/offer.ts) and checkout endpoint.
+ *
+ * Null until the launch price exists in Stripe. While it is null the sales
+ * page refuses to render a price (see courseCopy in src/lib/course/copy.ts),
+ * so a provisional number can never leak into a build.
+ */
+export const COURSE_PRICE: { priceLabel: string; priceAmount: string; currency: 'USD' } | null =
+  null;

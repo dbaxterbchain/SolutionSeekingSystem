@@ -1,0 +1,27 @@
+title: Build a Living System
+summary: >-
+  Build participant feedback and review into the routines, processes, and tools
+  you use together.
+worksheet: w-m07
+# Explanations are interim wording from the course brief. David replaces each
+# one with the matching expected-answer text from the Module 7 workbook.
+checks:
+  - question: >-
+      A policy is written but never used or reviewed. Does that establish a
+      Living System?
+    choices:
+      - Yes, writing is sufficient.
+      - No, implementation and participant feedback are needed.
+    answer: 2
+    explanation: >-
+      Writing a policy is a proposal. It becomes part of a Living System when
+      people use it, give feedback on it, and revise it.
+  - question: Can a Leadership Tool be adapted for a household or community?
+    choices:
+      - Yes. Fit it to the purpose and people while retaining the protocol and principles.
+      - No, the tools only apply to workplaces.
+    answer: 1
+    explanation: >-
+      The tools are adaptations of the Communication Protocol. Change the format
+      to fit the people and purpose, and keep the protocol steps and principles
+      recognizable.

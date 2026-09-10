@@ -10,12 +10,14 @@ import { track } from '../../lib/analytics';
  */
 export default function CheckoutBanner() {
   const [show, setShow] = useState(false);
+  const [onCourse, setOnCourse] = useState(false);
 
   useEffect(() => {
     const url = new URL(window.location.href);
     if (url.searchParams.get('checkout') !== 'cancelled') return;
 
     track({ event: 'checkout_abandoned' });
+    setOnCourse(window.location.pathname.startsWith('/course'));
     setShow(true);
 
     // Strip the param so a refresh or a shared link doesn't re-show the banner.
@@ -29,11 +31,17 @@ export default function CheckoutBanner() {
     <div className="border-b border-amber-100 bg-amber-50">
       <div className="container-page flex flex-wrap items-center justify-between gap-3 py-3">
         <p className="text-sm text-amber-900">
-          No charge was made, and your conversation is right where you left it. Not sure yet?{' '}
-          <a href="/practice/demos" className="font-semibold underline hover:text-amber-950">
-            See what a full conversation produces
-          </a>
-          .
+          {onCourse ? (
+            'No charge was made. The course is here when you are ready.'
+          ) : (
+            <>
+              No charge was made, and your conversation is right where you left it. Not sure yet?{' '}
+              <a href="/practice/demos" className="font-semibold underline hover:text-amber-950">
+                See what a full conversation produces
+              </a>
+              .
+            </>
+          )}
         </p>
         <button
           type="button"

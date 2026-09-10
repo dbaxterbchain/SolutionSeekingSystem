@@ -1,0 +1,29 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import CourseDashboard from '../../../components/react/CourseDashboard.tsx';
+import { COURSE, COURSE_STATUS } from '../../../data/course';
+import { COURSE_PRICE } from '../../../data/pricing';
+import { courseCopy } from '../../../lib/course/copy';
+import { getCourseCatalog } from '../../../lib/course/catalog';
+import { publicCurriculum } from '../../../lib/course/curriculum';
+
+// Prerendered public shell, like /dashboard: it carries only public metadata
+// (module and lesson titles, the same ones the sales page lists) and gates
+// itself client-side. Built in every mode, so a learner granted access from
+// /admin can use it while the course is hidden.
+const curriculum = publicCurriculum(await getCourseCatalog());
+---
+
+<BaseLayout title="Your course" description="Your lessons, worksheets and progress in the Complete Solution Seeking course." noindex>
+  <div class="container-page py-10">
+    <CourseDashboard
+      client:load
+      curriculum={curriculum}
+      saleStatus={COURSE_STATUS}
+      courseId={COURSE.id}
+      courseTitle={COURSE.title}
+      supportContact={courseCopy('{{support_contact}}')}
+      priceAmount={Number(COURSE_PRICE?.priceAmount ?? 0)}
+    />
+  </div>
+</BaseLayout>
