@@ -31,6 +31,9 @@ const courseLessonPages = Object.fromEntries(
     { title: lesson.title, description: lesson.sections.outcome },
   ])
 );
+const courseWorksheetPages = Object.fromEntries(
+  courseCatalog.worksheets.map((w) => [`course/learn/worksheets/${w.id}`, { title: w.title, description: 'A printable worksheet from the Complete Solution Seeking course.' }])
+);
 
 const pages: Record<string, OgPage> = {
   index: {
@@ -170,6 +173,7 @@ const pages: Record<string, OgPage> = {
     ])
   ),
   ...courseLessonPages,
+  ...courseWorksheetPages,
   ...Object.fromEntries(
     MODES.map((m) => [
       `practice/modes/${m.id}`,

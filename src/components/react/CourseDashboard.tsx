@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSession } from '../../lib/useSession';
 import { accountLink } from '../../lib/accountLink';
 import { useCourseEntitlement } from '../../lib/useCourseEntitlement';
+import { fetchCourseState, type CourseStateView } from '../../lib/courseClient';
 import { track } from '../../lib/analytics';
 import CourseSalesCta from './CourseSalesCta';
 import type { PublicCurriculum } from '../../lib/course/curriculum';
@@ -107,6 +108,21 @@ export default function CourseDashboard(props: Props) {
 
   const enrolled = entitlement?.kind === 'enrolled';
 
+  const [courseState, setCourseState] = useState<CourseStateView | null>(null);
+  useEffect(() => {
+    if (!session || !enrolled) return;
+    let active = true;
+    fetchCourseState(session.access_token)
+      .then((s) => {
+        if (active) setCourseState(s);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enrolled, user?.id]);
+
   if (sessionLoading || (fromCheckout && !session && !graceOver)) {
     // The same text on the server and the client: fromCheckout reads the query
     // string, which the prerendered HTML cannot know.
@@ -202,9 +218,11 @@ export default function CourseDashboard(props: Props) {
     );
   }
 
-  const firstLesson = props.curriculum.modules
-    .flatMap((m) => m.lessons)
-    .find((l) => l.status === 'published');
+  const allLessons = props.curriculum.modules.flatMap((m) => m.lessons);
+  const resumeId = courseState ? courseState.resume_lesson_id : allLessons.find((l) => l.status === 'published')?.id ?? null;
+  const resume = resumeId ? allLessons.find((l) => l.id === resumeId) ?? null : null;
+  const anyPublished = allLessons.some((l) => l.status === 'published');
+  const everythingDone = courseState !== null && anyPublished && courseState.resume_lesson_id === null;
 
   return (
     <div>
@@ -222,13 +240,15 @@ export default function CourseDashboard(props: Props) {
             .
           </p>
         )}
-        {firstLesson ? (
+        {resume ? (
           <div className="mt-6">
-            <a href={`/course/learn/lessons/${firstLesson.id}`} className="btn-primary">
-              Open the first lesson
+            <a href={`/course/learn/lessons/${resume.id}`} className="btn-primary">
+              {courseState?.lessons[resume.id] ? 'Continue' : 'Start here'}
             </a>
-            <p className="mt-3 text-sm text-slate-500">{firstLesson.title}</p>
+            <p className="mt-3 text-sm text-slate-500">{resume.title}</p>
           </div>
+        ) : everythingDone ? (
+          <p className="mt-4 text-slate-600">You have finished every lesson available so far. More are on the way.</p>
         ) : (
           <p className="mt-4 text-slate-600">The first lessons are being prepared. Check back soon.</p>
         )}
@@ -247,13 +267,11 @@ export default function CourseDashboard(props: Props) {
                       {l.title}
                     </a>
                   ) : (
-                    <>
-                      <span className="text-slate-500">{l.title}</span>
-                      <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Coming soon
-                      </span>
-                    </>
+                    <span className="text-slate-500">{l.title}</span>
                   )}
+                  <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    {l.status !== 'published' ? 'Coming soon' : courseState?.lessons[l.id]?.completed ? 'Done' : courseState?.lessons[l.id] ? 'In progress' : ''}
+                  </span>
                 </li>
               ))}
             </ul>
