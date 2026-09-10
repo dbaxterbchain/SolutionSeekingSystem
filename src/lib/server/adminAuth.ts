@@ -24,6 +24,25 @@ function adminEmails(): string[] {
 }
 
 /**
+ * Whether an already-verified user is on the allowlist. Same rules as
+ * requireAdmin, for callers that hold the user and must not verify the token
+ * a second time (the course entitlement endpoint).
+ */
+export function isAdminUser(user: User): boolean {
+  // An anonymous trial user has a real auth.users row and no email at all.
+  if (user.is_anonymous === true) return false;
+  if (!user.email || !user.email_confirmed_at) return false;
+
+  const allow = adminEmails();
+  if (allow.length === 0) {
+    console.error('ADMIN_EMAILS is not set: refusing all admin access.');
+    return false;
+  }
+
+  return allow.includes(user.email.toLowerCase());
+}
+
+/**
  * The caller if they are an admin, otherwise null. Callers 403 on null.
  *
  * `email_confirmed_at` is not paranoia. If email confirmation is ever switched
@@ -34,18 +53,7 @@ function adminEmails(): string[] {
 export async function requireAdmin(request: Request): Promise<User | null> {
   const user = await getUserFromRequest(request);
   if (!user) return null;
-
-  // An anonymous trial user has a real auth.users row and no email at all.
-  if (user.is_anonymous === true) return null;
-  if (!user.email || !user.email_confirmed_at) return null;
-
-  const allow = adminEmails();
-  if (allow.length === 0) {
-    console.error('ADMIN_EMAILS is not set: refusing all admin access.');
-    return null;
-  }
-
-  return allow.includes(user.email.toLowerCase()) ? user : null;
+  return isAdminUser(user) ? user : null;
 }
 
 /** JSON response for admin routes. Never cached: this is somebody's private data. */
