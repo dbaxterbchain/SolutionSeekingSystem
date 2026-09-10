@@ -18,11 +18,15 @@ export default function Markdown({ text, headings = 'compact' }: { text: string;
   const flushList = (key: number) => {
     if (!list) return;
     const items = list.items.map((item, i) => <li key={i}>{inline(item)}</li>);
+    // Semantic mode renders inside a prose container that draws its own list
+    // markers (see .prose-sss in global.css); the chat lists carry their own.
+    const olClass = headings === 'semantic' ? 'space-y-1' : 'ml-5 list-decimal space-y-1';
+    const ulClass = headings === 'semantic' ? 'space-y-1' : 'ml-5 list-disc space-y-1';
     blocks.push(
       list.ordered ? (
-        <ol key={`l${key}`} className="ml-5 list-decimal space-y-1">{items}</ol>
+        <ol key={`l${key}`} className={olClass}>{items}</ol>
       ) : (
-        <ul key={`l${key}`} className="ml-5 list-disc space-y-1">{items}</ul>
+        <ul key={`l${key}`} className={ulClass}>{items}</ul>
       )
     );
     list = null;
