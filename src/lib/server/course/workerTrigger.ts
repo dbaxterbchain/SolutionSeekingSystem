@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { serverEnv } from '../env';
 import { supabaseAdmin } from '../supabaseAdmin';
-import { gradeAttempt } from './grader';
+import { GRADER_CALL_TIMEOUT_MS, gradeAttempt } from './grader';
 import { runGradingJob } from './gradingJob';
 import { supabaseJobStore } from './jobStore';
 
@@ -25,10 +25,26 @@ export function graderSettings(): { model: string; awardsEnabled: boolean } {
   return { model: serverEnv('COURSE_GRADER_MODEL') || 'claude-opus-5', awardsEnabled: awardsEnabled() };
 }
 
-let anthropic: Anthropic | null = null;
-const getAnthropic = () => (anthropic ??= new Anthropic({ apiKey: serverEnv('ANTHROPIC_API_KEY'), timeout: 300_000, maxRetries: 2 }));
+/**
+ * Where the worker lives. The trigger carries the shared secret, so the
+ * destination comes from configuration and never from the request: anyone who
+ * can set the Host header on a call to the SSR function would otherwise choose
+ * where that secret is sent. Netlify sets URL to the deploy's own address,
+ * PUBLIC_CANONICAL_ORIGIN covers a host that does not, and the request origin is
+ * trusted only under astro dev, where the port moves between runs.
+ */
+export function workerOrigin(requestOrigin: string): string {
+  return serverEnv('URL') || serverEnv('PUBLIC_CANONICAL_ORIGIN') || (import.meta.env.DEV ? requestOrigin : '');
+}
 
-/** Hand a queued job to the grader. Never throws. */
+// No SDK retries: the job runner owns retries through fail_course_grading_job,
+// which counts them against the job's budget and hands the next attempt a fresh
+// lease. An SDK retry would spend the grade's budget where nothing can see it.
+let anthropic: Anthropic | null = null;
+const getAnthropic = () =>
+  (anthropic ??= new Anthropic({ apiKey: serverEnv('ANTHROPIC_API_KEY'), timeout: GRADER_CALL_TIMEOUT_MS, maxRetries: 0 }));
+
+/** Hand a queued job to the grader. `origin` is the caller's request origin, used only as the dev fallback. Never throws. */
 export async function triggerGradingWorker(args: { origin: string; jobId: string }): Promise<void> {
   const mode = graderMode();
   if (mode === 'off') {
@@ -55,10 +71,15 @@ export async function triggerGradingWorker(args: { origin: string; jobId: string
     console.error(`grading job ${args.jobId}: COURSE_WORKER_SECRET is unset; the job stays queued for the sweeper`);
     return;
   }
+  const origin = workerOrigin(args.origin);
+  if (!origin) {
+    console.error(`grading job ${args.jobId}: no worker origin configured (URL or PUBLIC_CANONICAL_ORIGIN); the sweeper will retry`);
+    return;
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 5000);
   try {
-    const res = await fetch(`${args.origin}/.netlify/functions/course-grade`, {
+    const res = await fetch(`${origin}/.netlify/functions/course-grade`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-course-worker-secret': secret },
       body: JSON.stringify({ job_id: args.jobId }),

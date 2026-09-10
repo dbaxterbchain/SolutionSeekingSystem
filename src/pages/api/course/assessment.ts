@@ -57,8 +57,10 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         return await advance(auth.user, body);
       case 'submit':
         return await submit(auth.user, body, ip, origin);
-      default:
+      case 'status':
         return await status(auth.user, body);
+      default:
+        return bad('action');
     }
   } catch (err) {
     console.error('course assessment failed', err);
@@ -91,7 +93,10 @@ async function resultView(grade: attempts.GradeRow, row: attempts.AttemptRow): P
       weight: c.weight,
       score,
       effective_score: grade.decision.effective?.[c.id] ?? score,
-      status: flagged.has(c.id) ? 'misconception' : v?.evidence_status === 'none' ? 'unanswered' : 'answered',
+      // A criterion the grade never mentioned reads the same as one with no
+      // evidence: unanswered. Anything else would show a 0 as though it had been
+      // looked at and found wanting.
+      status: flagged.has(c.id) ? 'misconception' : !v || v.evidence_status === 'none' ? 'unanswered' : 'answered',
       reason: v?.reason ?? '',
       evidence: (v?.evidence ?? []).map((e) => ({ prompt_id: e.prompt_id, prompt_label: labels.get(e.prompt_id) ?? 'Your response', quote: e.exact_quote })),
       revision_lessons: (v?.revision_lesson_ids ?? []).map((id) => {
@@ -130,9 +135,11 @@ async function statusFor(user: User, row: attempts.AttemptRow | null): Promise<A
 }
 
 async function start(user: User, ip: string | null): Promise<Response> {
-  if (await isRateLimited('course_start', ip, 10, 3600)) return privateJson({ error: 'rate_limited' }, 429);
+  // Handing back the attempt the learner already has creates nothing, so it is
+  // answered before the limit is charged. Only a fresh attempt is charged.
   const open = await attempts.loadOpenAttempt(user.id);
   if (open) return privateJson(await statusFor(user, open));
+  if (await isRateLimited('course_start', ip, 10, 3600)) return privateJson({ error: 'rate_limited' }, 429);
   const elig = await eligibility(user, null);
   if (!elig.eligible) return privateJson({ error: 'not_eligible', reason: elig.reason }, 403);
 
@@ -203,6 +210,10 @@ async function advance(user: User, body: Record<string, unknown>): Promise<Respo
   const problems = stageProblems(snapshotStage, responses);
   if (problems.length) return privateJson({ error: 'incomplete', fields: problems }, 422);
 
+  // Locking before advancing is safe to repeat: lockStage only stamps rows that
+  // are still unlocked, and a retry re-runs the checks above against the same
+  // stage, so a client that lost the first response and sent it again either
+  // advances or gets stage_mismatch, never a half-locked stage.
   if (snapshotStage.lock_on_advance) await attempts.lockStage(attemptId, stage as number);
   const moved = await attempts.advanceAttempt(attemptId, stage as number);
   const after = await attempts.loadOwnedAttempt(attemptId, user.id);
@@ -211,7 +222,6 @@ async function advance(user: User, body: Record<string, unknown>): Promise<Respo
 }
 
 async function submit(user: User, body: Record<string, unknown>, ip: string | null, origin: string): Promise<Response> {
-  if (await isRateLimited('course_submit', ip, 10, 3600)) return privateJson({ error: 'rate_limited' }, 429);
   const attemptId = str(body.attempt_id);
   if (!UUID_RE.test(attemptId)) return bad('attempt_id');
   const requestKey = str(body.request_key);
@@ -219,14 +229,24 @@ async function submit(user: User, body: Record<string, unknown>, ip: string | nu
 
   const row = await attempts.loadOwnedAttempt(attemptId, user.id);
   if (!row) return privateJson({ error: 'not_found' }, 404);
+  // A replay of a submit that already landed reads the attempt as it stands and
+  // creates no work, so it is answered before the limit is charged. The path
+  // below, which submits the attempt and queues a grading job, is charged.
   if (row.state !== 'draft') {
     if (row.submit_request_key === requestKey) return privateJson(await statusFor(user, row));
     return privateJson({ error: 'already_submitted', state: row.state }, 409);
   }
+  if (await isRateLimited('course_submit', ip, 10, 3600)) return privateJson({ error: 'rate_limited' }, 429);
   if (row.current_stage !== row.stage_count - 1) return privateJson({ error: 'stage_mismatch', current_stage: row.current_stage }, 409);
 
   const responses = await attempts.loadResponses(attemptId);
-  const problems = row.snapshot_public.stages.flatMap((s) => stageProblems(s, responses));
+  // Every unlocked prompt of every stage is checked, and only those: the learner
+  // cannot act on a locked prompt, so a locked response must never block the
+  // submit. It is graded as it stands, short or empty.
+  const locked = new Set(responses.filter((r) => r.locked_at !== null).map((r) => r.prompt_id));
+  const problems = row.snapshot_public.stages.flatMap((s) =>
+    stageProblems({ ...s, prompts: s.prompts.filter((p) => !locked.has(p.prompt_id)) }, responses)
+  );
   if (problems.length) return privateJson({ error: 'incomplete', fields: problems }, 422);
 
   const hash = hashSubmission(responses.map((r) => ({ prompt_id: r.prompt_id, text: r.response_text })));
