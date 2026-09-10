@@ -1,0 +1,24 @@
+title: Solution Seeking
+summary: >-
+  Explore options and agree on fair actions you can test, implement, and
+  review.
+worksheet: w-m04
+checks:
+  - question: Is "We will communicate better" a complete solution?
+    choices:
+      - Yes, a shared intention is enough.
+      - No. Specify actions, owners, evidence, timing, fairness, and review.
+    answer: 2
+    explanation: >-
+      A solution you can test names who does what, by when, how you will know
+      it worked, whether it is fair to everyone, and when you will review it.
+      An intention has none of those.
+  - question: An agreed task was never done. What should the review examine first?
+    choices:
+      - What prevented implementation and how to repair the commitment.
+      - Why the proposed method is proven ineffective.
+    answer: 1
+    explanation: >-
+      A plan that was never tried has not been tested. The review starts with
+      what got in the way of doing it and how to repair the commitment, before
+      anyone judges the method.

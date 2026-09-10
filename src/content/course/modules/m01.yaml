@@ -1,0 +1,28 @@
+title: Start with the whole system
+summary: >-
+  See the whole system in a short example, choose a practice case, and record
+  your starting point.
+worksheet: w-m01
+# Explanations are interim wording from the course brief. David replaces each
+# one with the matching expected-answer text from the Module 1 workbook.
+checks:
+  - question: >-
+      Do possible motives listed during private Introspection establish the
+      other person's perspective?
+    choices:
+      - Yes, if they seem compassionate.
+      - No, they are possibilities to check with the person.
+    answer: 2
+    explanation: >-
+      Motives you imagine during Introspection are possibilities, not findings.
+      The only way to learn the other person's perspective is to ask them and
+      let them correct you.
+  - question: Which shows a Living System in practice?
+    choices:
+      - An implemented solution revised through participant feedback.
+      - A policy written once and left unchanged regardless of results.
+    answer: 1
+    explanation: >-
+      A Living System is one that people keep using and improving. Feedback
+      from the people inside it drives the next revision, so a solution that
+      changes with experience is the system at work.
