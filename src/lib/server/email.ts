@@ -68,8 +68,8 @@ export async function sendEmail(opts: SendOptions): Promise<boolean> {
 /* Templates                                                          */
 /* ------------------------------------------------------------------ */
 
-const BRAND = '#5271FF';
-const INK = '#16276B';
+export const BRAND = '#5271FF';
+export const INK = '#16276B';
 
 /**
  * Escape anything a stranger typed before it goes into an HTML email.
@@ -79,7 +79,7 @@ const INK = '#16276B';
  * trust, e.g. a plausible-looking link. Escape at the boundary and it cannot
  * happen at all.
  */
-const esc = (value: string) =>
+export const esc = (value: string) =>
   value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -95,7 +95,7 @@ const esc = (value: string) =>
 export const internalAlertTo = (): string =>
   serverEnv('ALERTS_TO') || serverEnv('TEAM_ENQUIRY_TO') || serverEnv('EMAIL_FROM');
 
-const layout = (bodyHtml: string, footerHtml: string) => `
+export const layout = (bodyHtml: string, footerHtml: string) => `
 <!doctype html>
 <html>
   <body style="margin:0;padding:24px;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#334155;line-height:1.6;">
@@ -112,7 +112,7 @@ const layout = (bodyHtml: string, footerHtml: string) => `
   </body>
 </html>`;
 
-const button = (href: string, label: string) => `
+export const button = (href: string, label: string) => `
   <a href="${href}" style="display:inline-block;background:${BRAND};color:#ffffff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:999px;">
     ${label}
   </a>`;

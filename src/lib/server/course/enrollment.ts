@@ -1,9 +1,16 @@
 import type { User } from '@supabase/supabase-js';
+import type Stripe from 'stripe';
 import { supabaseAdmin } from '../supabaseAdmin';
 import { getUserFromRequest } from '../auth';
-import { COURSE } from '../../../data/course';
+import { trackCourseEnrolled } from '../ga4';
+import { internalAlertTo, sendEmail } from '../email';
+import { coursePurchaseEmail, courseDuplicatePaymentAlertEmail } from '../courseEmail';
+import { COURSE, COURSE_TOKENS } from '../../../data/course';
 import {
   entitlementFromRow,
+  enrollFromSession,
+  paidSessionFacts,
+  recordPaymentSignal,
   type CourseEntitlement,
   type EnrollmentRow,
   type EnrollmentStore,
@@ -174,4 +181,83 @@ export async function recordCheckoutCreated(
   } catch (err) {
     console.error('course checkout_created event failed', err);
   }
+}
+
+/**
+ * The webhook's course branch. Called for checkout.session.completed and the
+ * two async payment events whenever metadata.purchase_intent is 'course'.
+ * Throws on a database failure so the route 500s and Stripe retries into the
+ * idempotency above; email and analytics failures are logged, never thrown.
+ */
+export async function handleCourseCheckoutEvent(
+  session: Stripe.Checkout.Session,
+  event: { id: string; type: string },
+  origin: string
+): Promise<void> {
+  const facts = paidSessionFacts(session, new Date());
+  if (!facts) {
+    console.warn('course checkout session missing user_id or course_id', session.id);
+    return;
+  }
+
+  if (session.payment_status !== 'paid') {
+    const kind = event.type === 'checkout.session.async_payment_failed' ? 'payment_failed' : 'payment_pending';
+    await recordPaymentSignal(enrollmentStore, facts, event.id, kind);
+    console.log(`course checkout ${session.id}: ${kind}`);
+    return;
+  }
+
+  const { outcome, enrollment } = await enrollFromSession(enrollmentStore, facts, event.id);
+  console.log(`course checkout ${session.id}: ${outcome}`);
+
+  if (outcome === 'enrolled' || outcome === 'reinstated') {
+    // The conversion of record, deduped by GA4 on the session id. Fired only
+    // when access actually changed hands, never on a retry or a duplicate.
+    await trackCourseEnrolled({
+      clientId: session.metadata?.ga_client_id || facts.userId,
+      sessionId: session.metadata?.ga_session_id || undefined,
+      courseId: facts.courseId,
+      value: (session.amount_total ?? 0) / 100,
+      currency: (session.currency ?? 'usd').toUpperCase(),
+      transactionId: session.id,
+    });
+    await sendPurchaseEmail(facts.userId, enrollment?.id ?? session.id, session, origin);
+    return;
+  }
+
+  if (outcome === 'duplicate_payment' || outcome === 'paid_while_revoked') {
+    const amount = `${((session.amount_total ?? 0) / 100).toFixed(2)} ${(session.currency ?? 'usd').toUpperCase()}`;
+    const mail = courseDuplicatePaymentAlertEmail({
+      userId: facts.userId,
+      sessionId: session.id,
+      amountLabel: amount,
+      note:
+        outcome === 'duplicate_payment'
+          ? 'They already had access and paid again, probably from a second tab.'
+          : 'Their access was revoked and they paid again. Access stays revoked.',
+      adminUrl: `${origin}/admin`,
+    });
+    await sendEmail({ to: internalAlertTo(), ...mail, idempotencyKey: `course-duplicate/${session.id}` });
+  }
+}
+
+async function sendPurchaseEmail(
+  userId: string,
+  enrollmentId: string,
+  session: Stripe.Checkout.Session,
+  origin: string
+): Promise<void> {
+  // The account's address, not what they typed at Stripe: the link needs a sign-in.
+  const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+  const to = data?.user?.email || session.customer_details?.email || null;
+  if (error || !to) {
+    console.error('course purchase email: no address for', userId, error?.message);
+    return;
+  }
+  const mail = coursePurchaseEmail({
+    courseTitle: COURSE.title,
+    courseUrl: `${origin}/course/learn/`,
+    supportEmail: COURSE_TOKENS.support_contact ?? 'hello@solutionseeking.com',
+  });
+  await sendEmail({ to, ...mail, idempotencyKey: `course-purchase/${enrollmentId}` });
 }
