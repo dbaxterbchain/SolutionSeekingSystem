@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validateCatalog } from '../validate';
-import { PUBLISHED_FIELDS, buildInput, withLesson, withModule } from './fixtures';
+import { PUBLISHED_FIELDS, buildInput, check, withLesson, withModule } from './fixtures';
 
 describe('validateCatalog', () => {
   it('accepts a valid draft catalog and derives sequence, order and minutes', () => {
@@ -44,6 +44,59 @@ describe('validateCatalog', () => {
     expect(() =>
       validateCatalog({ ...input, lessons: input.lessons.filter((l) => l.id !== 'v40') })
     ).toThrow(/Missing lesson file for v40/);
+  });
+
+  it('rejects an extra lesson id instead of crashing on the position check', () => {
+    const input = buildInput();
+    const v41 = {
+      ...input.lessons.find((l) => l.id === 'v40')!,
+      id: 'v41',
+      title: 'Lesson 41',
+      kind: 'standard' as const,
+    };
+    const withExtra = {
+      ...input,
+      lessons: [...input.lessons.map((l) => (l.id === 'v40' ? { ...l, next: 'v41' } : l)), v41],
+    };
+    expect(() => validateCatalog(withExtra)).toThrow(/Unexpected lesson id "v41"/);
+    let message = '';
+    try {
+      validateCatalog(withExtra);
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message).not.toMatch(/Not a lesson id|Not a module id/);
+  });
+
+  it('rejects an extra module id instead of crashing on the chain check', () => {
+    const input = buildInput();
+    const m10 = {
+      ...input.modules.find((m) => m.id === 'm09')!,
+      id: 'm10',
+      title: 'Module 10',
+      worksheet: 'w-m10',
+      checks: [check(), check()],
+    };
+    const w10 = {
+      ...input.worksheets.find((w) => w.id === 'w-m09')!,
+      id: 'w-m10',
+      title: 'Worksheet 10',
+      module: 'm10',
+    };
+    const withExtra = {
+      ...input,
+      modules: [...input.modules, m10],
+      worksheets: [...input.worksheets, w10],
+      lessons: input.lessons.map((l) => (l.id === 'v40' ? { ...l, module: 'm10' } : l)),
+    };
+    expect(() => validateCatalog(withExtra)).toThrow(/Unexpected module id "m10"/);
+    let message = '';
+    try {
+      validateCatalog(withExtra);
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message).not.toMatch(/Not a lesson id|Not a module id/);
   });
 
   it('rejects modules with the wrong number of checks', () => {

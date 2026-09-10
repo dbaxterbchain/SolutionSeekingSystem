@@ -147,7 +147,7 @@ export function validateCatalog(input: CatalogInput): Catalog {
     }
     orderedIds.forEach((id, i) => {
       if (id !== expectedLessonIds[i]) {
-        err(`Lesson ${id} is at position ${i + 1} in the chain but its id says ${lessonNumber(id)}`);
+        err(`Lesson ${id} is at position ${i + 1} in the chain but its id says ${id}`);
       }
     });
   }
@@ -158,7 +158,7 @@ export function validateCatalog(input: CatalogInput): Catalog {
   for (const id of orderedIds) {
     const lesson = byId.get(id);
     if (!lesson) continue;
-    if (!moduleById.has(lesson.module)) {
+    if (!expectedModuleIds.includes(lesson.module)) {
       err(`Lesson ${id}: unknown module ${lesson.module}`);
       continue;
     }
