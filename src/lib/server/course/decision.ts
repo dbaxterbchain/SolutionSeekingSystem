@@ -1,14 +1,5 @@
 import type { CapApplied, Decision, ValidatedGrade } from '../../course/assessmentTypes';
-import {
-  COVERAGE_CAP,
-  CRITERIA,
-  MISCONCEPTION_CAP,
-  PASS_MIN_CRITERION,
-  PASS_TOTAL,
-  RUBRIC_VERSION,
-  SCORE_MAX,
-  type CriterionId,
-} from './rubric';
+import { COVERAGE_CAP, CRITERIA, MISCONCEPTION_CAP, PASS_MIN_CRITERION, PASS_TOTAL, SCORE_MAX, type CriterionId } from './rubric';
 
 /**
  * The pass decision, computed by the server from a validated grade. The model
@@ -39,5 +30,7 @@ export function decide(grade: ValidatedGrade): Decision {
   let total = 0;
   for (const c of CRITERIA) total += (c.weight * effective[c.id]) / SCORE_MAX;
   const passed = total >= PASS_TOTAL && CRITERIA.every((c) => effective[c.id] >= PASS_MIN_CRITERION);
-  return { rubric_version: RUBRIC_VERSION, total, passed, raw, effective, caps_applied: caps };
+  // The grade's version, not this module's: it was validated against the version
+  // frozen into the attempt, and a rubric bump must not relabel an old decision.
+  return { rubric_version: grade.rubric_version, total, passed, raw, effective, caps_applied: caps };
 }

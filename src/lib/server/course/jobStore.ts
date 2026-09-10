@@ -40,7 +40,10 @@ export function supabaseJobStore(client: SupabaseClient): GradingJobStore {
         .eq('id', attempt.source_pack_id)
         .maybeSingle();
       if (packError) throw new Error(`source pack load failed: ${packError.message}`);
-      if (!pack) return null;
+      // null means "no such attempt", which the runner treats as a permanent
+      // failure. A missing pack row is a different thing entirely, so it throws
+      // and the runner records a retryable internal failure with this message.
+      if (!pack) throw new Error(`source pack missing for attempt ${attemptId}`);
 
       // Snapshot order: stage, then prompt order within the stage.
       const snapshotPublic = attempt.snapshot_public as SnapshotPublic;

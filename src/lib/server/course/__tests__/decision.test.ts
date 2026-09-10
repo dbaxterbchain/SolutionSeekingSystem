@@ -93,6 +93,10 @@ describe('decide', () => {
     expect(decide(g).caps_applied).toEqual([]);
   });
 
+  it('carries the grade its own rubric version', () => {
+    expect(decide(grade(all(4), { rubric_version: '7' })).rubric_version).toBe('7');
+  });
+
   it('keeps the total unrounded', () => {
     expect(decide(grade({ ...all(4), self_understanding: 3 })).total).toBe(96.25);
   });
