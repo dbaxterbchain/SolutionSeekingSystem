@@ -3,6 +3,8 @@ summary: >-
   Work through all seven Introspection steps. Examine assumptions, name
   feelings, and prepare useful questions.
 worksheet: w-m02
+# Explanations are interim wording from the course brief. David replaces each
+# one with the matching expected-answer text from the Module 2 workbook.
 checks:
   - question: >-
       In "Brian interrupted because he does not respect me," what needs

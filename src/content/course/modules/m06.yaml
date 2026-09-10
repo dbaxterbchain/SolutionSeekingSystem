@@ -3,6 +3,8 @@ summary: >-
   Choose and use One-on-Ones, Feedback, Targeted Conversations, and Solution
   Seeking Sessions.
 worksheet: w-m06
+# Explanations are interim wording from the course brief. David replaces each
+# one with the matching expected-answer text from the Module 6 workbook.
 checks:
   - question: Where should a known complex concern be raised?
     choices:

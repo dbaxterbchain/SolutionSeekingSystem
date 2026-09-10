@@ -3,6 +3,8 @@ summary: >-
   Repair a tense exchange, respond to a request for time, respect participation
   limits, and revisit recurring problems.
 worksheet: w-m05
+# Explanations are interim wording from the course brief. David replaces each
+# one with the matching expected-answer text from the Module 5 workbook.
 checks:
   - question: A person declines a voluntary conversation. What is appropriate?
     choices:

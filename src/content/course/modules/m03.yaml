@@ -3,6 +3,8 @@ summary: >-
   Share clearly, listen carefully, and check each person's perspective through
   questions and corrected summaries.
 worksheet: w-m03
+# Explanations are interim wording from the course brief. David replaces each
+# one with the matching expected-answer text from the Module 3 workbook.
 checks:
   - question: Someone corrects your summary. What should you do next?
     choices:

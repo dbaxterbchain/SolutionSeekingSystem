@@ -3,6 +3,8 @@ summary: >-
   Explore options and agree on fair actions you can test, implement, and
   review.
 worksheet: w-m04
+# Explanations are interim wording from the course brief. David replaces each
+# one with the matching expected-answer text from the Module 4 workbook.
 checks:
   - question: Is "We will communicate better" a complete solution?
     choices:

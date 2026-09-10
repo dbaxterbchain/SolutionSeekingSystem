@@ -3,6 +3,8 @@ summary: >-
   Build participant feedback and review into the routines, processes, and tools
   you use together.
 worksheet: w-m07
+# Explanations are interim wording from the course brief. David replaces each
+# one with the matching expected-answer text from the Module 7 workbook.
 checks:
   - question: >-
       A policy is written but never used or reviewed. Does that establish a

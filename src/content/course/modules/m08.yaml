@@ -3,6 +3,8 @@ summary: >-
   Follow complete fictional cases at work, at home, and in a community group,
   including what happens after the agreement.
 worksheet: w-m08
+# Explanations are interim wording from the course brief. David replaces each
+# one with the matching expected-answer text from the Module 8 workbook.
 checks:
   - question: Which is stronger evidence of Mutual Understanding?
     choices:
