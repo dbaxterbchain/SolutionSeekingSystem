@@ -151,3 +151,16 @@ grant select, insert                 on public.course_enrollment_events to servi
 grant select, insert, update, delete on public.course_progress          to service_role;
 grant select, insert                 on public.course_check_attempts    to service_role;
 grant select, insert, update, delete on public.course_stream_tokens     to service_role;
+
+-- Each `generated always as identity` column above (course_enrollment_events.id,
+-- course_check_attempts.id) creates a sequence in `public`. Migration 0010's
+-- revoke and default-privileges change covered tables only, and 0030 is the
+-- first migration in this repo to create a sequence at all. Supabase's hosted
+-- bootstrap grants ALL ON SEQUENCES in `public` to anon and authenticated, so
+-- without this, both sequences would stay reachable on the hosted project even
+-- though their tables are locked down.
+revoke all on sequence public.course_enrollment_events_id_seq,
+                       public.course_check_attempts_id_seq
+  from anon, authenticated;
+alter default privileges for role postgres in schema public
+  revoke all on sequences from anon, authenticated;
