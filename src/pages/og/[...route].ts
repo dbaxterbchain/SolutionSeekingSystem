@@ -3,6 +3,8 @@ import { OGImageRoute } from 'astro-og-canvas';
 import { protocolSteps, systemDefinition } from '../../data/concepts';
 import { MODES } from '../../data/modes';
 import { PLANS } from '../../data/pricing';
+import { getCourseCatalog } from '../../lib/course/catalog';
+import { hasShell } from '../../lib/course/visibility';
 
 /**
  * Generated 1200×630 social-share cards, one per page. Route keys mirror page
@@ -19,6 +21,15 @@ const principles = (await getCollection('principles')).sort(
 );
 const tools = (await getCollection('tools')).sort((a, b) => a.data.order - b.data.order);
 const demos = (await getCollection('demos')).sort((a, b) => a.data.order - b.data.order);
+
+// Learner lesson shells are noindex, but a shared link still shows a card.
+const courseCatalog = await getCourseCatalog();
+const courseLessonPages = Object.fromEntries(
+  courseCatalog.lessons.filter(hasShell).map((lesson) => [
+    `course/learn/lessons/${lesson.id}`,
+    { title: lesson.title, description: lesson.sections.outcome },
+  ])
+);
 
 const pages: Record<string, OgPage> = {
   index: {
@@ -144,6 +155,7 @@ const pages: Record<string, OgPage> = {
       { title: d.data.title, description: d.data.scenario },
     ])
   ),
+  ...courseLessonPages,
   ...Object.fromEntries(
     MODES.map((m) => [
       `practice/modes/${m.id}`,

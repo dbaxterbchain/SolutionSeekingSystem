@@ -24,6 +24,7 @@ export default defineConfig({
         !page.includes('/admin') &&
         !page.includes('/dashboard') &&
         !page.includes('/saved') &&
+        !page.includes('/course/learn') &&
         !page.includes('/404'),
     }),
   ],
