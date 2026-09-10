@@ -312,7 +312,8 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
                   onClick={() => {
                     setText(save.server.text);
                     revision.current = save.server.revision;
-                    setSave({ kind: 'saved', at: new Date() });
+                    lastSavedAt.current = new Date();
+                    setSave({ kind: 'saved', at: lastSavedAt.current });
                   }}
                 >
                   Use the other version
