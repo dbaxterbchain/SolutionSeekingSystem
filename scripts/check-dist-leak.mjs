@@ -2,10 +2,13 @@
 /**
  * After `astro build`, nothing private from an assessment form may exist in
  * dist/ (the static output; the SSR bundle is written under .netlify/ and is
- * server-only by construction). Needles: the private marker, every note,
- * every reveal, every reference response, every scoring anchor, and every
- * intro and prompt of a stage after the first, each cut to its first 60
- * characters. Files are compared raw, HTML-decoded and JS-unescaped so an
+ * server-only by construction). Needles: the private marker, every note, every
+ * reveal, every reference response, every scoring anchor, and every intro and
+ * prompt of a stage after the first, each with its whitespace collapsed and cut
+ * to its first 60 characters, and used only if 12 characters or more survive
+ * that. Every file in dist/ with a text extension is searched three ways: as it
+ * is, with the HTML entities for quotes and angle brackets decoded, and with
+ * backslash escapes for quotes, newlines and \uXXXX code units decoded, so an
  * escaped quote cannot hide a leak. Runs inside `npm run build`.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -54,7 +57,12 @@ const decodeHtml = (s) =>
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&amp;/g, '&');
-const decodeJs = (s) => s.replace(/\\"/g, '"').replace(/\\'/g, "'").replace(/\\n/g, ' ');
+const decodeJs = (s) =>
+  s
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/\\"/g, '"')
+    .replace(/\\'/g, "'")
+    .replace(/\\n/g, ' ');
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {

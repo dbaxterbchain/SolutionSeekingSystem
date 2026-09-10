@@ -282,10 +282,12 @@ end $$;
  * Claim: a worker takes the job for one lease. Queued jobs and running jobs
  * whose lease expired are claimable; a job another worker holds is skipped
  * (skip locked) rather than waited for. The retry cap is decided here, never
- * by a worker or the sweeper.
+ * by a worker or the sweeper. The default lease of 840 seconds mirrors
+ * DEFAULT_LEASE_SECONDS in gradingJob.ts: longer than the 720 seconds one
+ * grade is allowed, shorter than the 900 second Netlify background limit.
  */
 create or replace function public.claim_course_grading_job(
-  p_job uuid, p_worker text, p_lease_seconds integer default 600
+  p_job uuid, p_worker text, p_lease_seconds integer default 840
 ) returns jsonb
 language plpgsql security invoker set search_path = '' as $$
 declare
@@ -413,7 +415,11 @@ begin
   return jsonb_build_object('outcome', 'failed');
 end $$;
 
-/* Admin retry of a failed job: a fresh budget, the same generation. */
+/*
+ * Admin retry of a failed job: a fresh budget, the same generation. The output
+ * of the failed run is cleared with it, so the admin table shows a clean queued
+ * job rather than the last error beside a queued state.
+ */
 create or replace function public.retry_course_grading_job(p_job uuid, p_admin uuid)
 returns jsonb
 language plpgsql security invoker set search_path = '' as $$
@@ -426,7 +432,9 @@ begin
   end if;
   update public.course_grading_jobs
     set state = 'queued', attempts = 0, reason = 'retry', requested_by = p_admin,
-        locked_by = null, locked_at = null, lock_token = null
+        locked_by = null, locked_at = null, lock_token = null,
+        last_error = null, error_category = null, raw_output = null,
+        usage = null, validated = null, decision = null
     where id = p_job;
   update public.course_assessment_attempts set state = 'submitted' where id = v_job.attempt_id;
   return jsonb_build_object('outcome', 'queued');
