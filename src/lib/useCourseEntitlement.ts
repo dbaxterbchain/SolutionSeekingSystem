@@ -24,26 +24,35 @@ export function useCourseEntitlement(): CourseEntitlementState {
   const sessionRef = useRef(session);
   sessionRef.current = session;
 
+  // Every request takes a generation number. Only the newest request may
+  // commit its result; an older one that resolves late (a user switch, an
+  // unmount, an overlapping poll) is discarded.
+  const generation = useRef(0);
+
   const refetch = useCallback(async () => {
     const current = sessionRef.current;
+    const mine = ++generation.current;
     if (!current) {
       setState({ entitlement: null, loading: false, failed: false });
       return null;
     }
     const entitlement = await fetchCourseEntitlement(current.access_token);
+    if (mine !== generation.current) return entitlement;
     setState({ entitlement, loading: false, failed: entitlement === null });
     return entitlement;
   }, []);
 
   useEffect(() => {
     if (sessionLoading) return;
-    let active = true;
+    if (!session) {
+      setState({ entitlement: null, loading: false, failed: false });
+      return;
+    }
     setState((s) => ({ ...s, loading: true }));
-    void refetch().then(() => {
-      if (!active) return;
-    });
+    void refetch();
     return () => {
-      active = false;
+      // Anything still in flight belongs to the previous user or a gone component.
+      generation.current += 1;
     };
     // Keyed on the user, not the session object: a token refresh replaces the
     // session and would otherwise refetch on a timer for no reason.

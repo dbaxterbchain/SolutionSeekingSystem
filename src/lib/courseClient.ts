@@ -53,15 +53,21 @@ export async function startCourseCheckout(
   accessToken: string,
   input: { request_key: string; returnPath: string }
 ): Promise<string> {
-  const res = await fetch('/api/course/checkout', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({
-      ...input,
-      ga: getGaIds(),
-      attribution: getFirstTouch() ?? undefined,
-    }),
-  });
+  let res: Response;
+  try {
+    res = await fetch('/api/course/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({
+        ...input,
+        ga: getGaIds(),
+        attribution: getFirstTouch() ?? undefined,
+      }),
+    });
+  } catch {
+    // The request never reached the server: offline, DNS, or a blocking extension.
+    throw new CourseActionError('network_error', 0);
+  }
   const data = await res.json().catch(() => null);
   if (!res.ok || typeof data?.url !== 'string') {
     throw new CourseActionError(
@@ -92,6 +98,8 @@ export function courseErrorMessage(code: string): string {
     case 'entitlement_unavailable':
     case 'checkout_unavailable':
       return 'Checkout is not available right now. Please try again in a moment.';
+    case 'network_error':
+      return 'Could not reach the server. Check your connection and try again.';
     default:
       return 'Could not start checkout. Please try again.';
   }
