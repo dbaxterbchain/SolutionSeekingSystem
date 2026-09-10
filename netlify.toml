@@ -2,6 +2,12 @@
 [build.environment]
   NODE_VERSION = "22"
 
+# Pure-module tests run before every deploy build; a validator regression
+# cannot ship. Overrides the build command in the Netlify UI.
+[build]
+  command = "npm test && npm run build"
+  publish = "dist"
+
 # Astro fingerprints everything under /_astro/, so it can be cached forever.
 [[headers]]
   for = "/_astro/*"

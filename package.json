@@ -8,7 +8,9 @@
     "start": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "check": "astro check"
+    "check": "astro check",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
@@ -33,6 +35,7 @@
     "unpdf": "^1.6.2"
   },
   "devDependencies": {
-    "opentype.js": "^2.0.0"
+    "opentype.js": "^2.0.0",
+    "vitest": "^5.0.0"
   }
 }
