@@ -56,10 +56,10 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
   const [actionError, setActionError] = useState<string | null>(null);
   const [missing, setMissing] = useState<string[]>([]);
   const [completedNow, setCompletedNow] = useState(false);
-  const [nextId, setNextId] = useState<string | null>(null);
   const saveTimer = useRef<number | undefined>(undefined);
   const revision = useRef(0);
   const textRef = useRef('');
+  const lastSavedAt = useRef<Date | null>(null);
   textRef.current = text;
 
   const token = session?.access_token ?? null;
@@ -109,10 +109,11 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
       if (!token) return null;
       setBusy(body.action);
       setActionError(null);
+      setMissing([]);
       try {
         const res = await postProgress(token, { lesson_id: lessonId, ...body });
         setProgress(res.progress);
-        revision.current = res.progress.revision;
+        revision.current = Math.max(revision.current, res.progress.revision);
         return res;
       } catch (err) {
         if (err instanceof CourseActionError) {
@@ -144,17 +145,20 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
         });
         setProgress(res.progress);
         revision.current = res.progress.revision;
-        setSave({ kind: 'saved', at: new Date() });
-        try {
-          window.localStorage.removeItem(draftKey(user.id, lessonId));
-        } catch {
-          // Nothing to clean up.
+        lastSavedAt.current = new Date();
+        setSave({ kind: 'saved', at: lastSavedAt.current });
+        if (textRef.current === value) {
+          try {
+            window.localStorage.removeItem(draftKey(user.id, lessonId));
+          } catch {
+            // Nothing to clean up.
+          }
         }
       } catch (err) {
         if (err instanceof CourseActionError && err.code === 'revision_conflict') {
           setSave({ kind: 'conflict', server: err.extra.server as { text: string; revision: number } });
         } else {
-          setSave((s) => ({ kind: 'failed', keptFrom: s.kind === 'saved' ? s.at : null }));
+          setSave({ kind: 'failed', keptFrom: lastSavedAt.current });
         }
       }
     },
@@ -185,7 +189,6 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
     const res = await act({ action: 'complete' });
     if (!res) return;
     setMissing([]);
-    setNextId(res.next_lesson_id);
     if (res.lesson_completed && payload) {
       setCompletedNow(true);
       track({
@@ -203,7 +206,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
     return (
       <Note>
         Sign in to open this lesson.{' '}
-        <a href={accountLink({ next: window.location.pathname })} className="font-semibold text-brand-700 underline">
+        <a href={accountLink({ next: `/course/learn/lessons/${lessonId}` })} className="font-semibold text-brand-700 underline">
           Sign in
         </a>
       </Note>
@@ -278,7 +281,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
       <LessonSections sections={[{ id: 'key-points', title: 'Key points', markdown: lesson.sections.key_points }]} />
 
       {lesson.has_exercise && (
-        <section aria-labelledby="exercise-title" className="space-y-4">
+        <section aria-label="Exercise" className="space-y-4">
           <LessonSections sections={[{ id: 'exercise', title: 'Exercise', markdown: lesson.sections.exercise }]} />
           <label htmlFor="response" className="block text-sm font-semibold text-ink-800">
             Your response
@@ -299,7 +302,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
               (save.keptFrom ? `Could not save. Your last saved version from ${clock(save.keptFrom)} is kept.` : 'Could not save. Your draft is kept on this device.')}
           </p>
           {save.kind === 'conflict' && (
-            <div className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">
+            <div role="alert" className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">
               <p className="font-semibold">This response was changed somewhere else, probably in another tab.</p>
               <p className="mt-2 whitespace-pre-wrap rounded-lg bg-white/70 p-3 text-slate-700">{save.server.text}</p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -345,7 +348,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
           ) : (
             <div className="mt-4 space-y-8">
               <div className="prose-sss rounded-2xl border border-brand-100 bg-brand-50/40 p-5">
-                <LessonSections sections={[{ id: 'model-response', title: 'The model response', markdown: modelResponse }]} />
+                <LessonSections sections={[{ id: 'model-response', title: '', markdown: modelResponse }]} />
               </div>
               <LessonSections sections={[{ id: 'self-review', title: 'Self-review', markdown: lesson.sections.self_review }]} />
               <button type="button" onClick={() => void act({ action: 'acknowledge' })} disabled={busy !== null || Boolean(p?.acknowledged)} className={stepClass(Boolean(p?.acknowledged))}>
@@ -368,7 +371,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
         <details className="rounded-2xl border border-slate-100 bg-white p-5">
           <summary className="cursor-pointer font-heading text-lg font-bold text-ink-800">Transcript</summary>
           <div className="prose-sss mt-4">
-            <LessonSections sections={[{ id: 'transcript', title: 'Transcript', markdown: lesson.sections.transcript }]} />
+            <LessonSections sections={[{ id: 'transcript', title: '', markdown: lesson.sections.transcript }]} />
           </div>
         </details>
       )}
@@ -391,7 +394,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
             .
           </p>
         )}
-        {actionError && missing.length === 0 && <p className="mt-3 text-sm text-red-600">{actionError}</p>}
+        {actionError && <p className="mt-3 text-sm text-red-600">{actionError}</p>}
         {(done || completedNow) && (
           <div className="mt-4 flex flex-wrap gap-3">
             {lesson.next && lesson.next.available ? (
@@ -405,9 +408,6 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
               Back to your course
             </a>
           </div>
-        )}
-        {nextId === null && completedNow && !lesson.next && (
-          <p className="mt-3 text-sm text-slate-600">That is the last lesson available today.</p>
         )}
       </section>
 

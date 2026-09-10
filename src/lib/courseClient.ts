@@ -103,6 +103,8 @@ export function courseErrorMessage(code: string): string {
     case 'entitlement_unavailable':
     case 'checkout_unavailable':
       return 'Checkout is not available right now. Please try again in a moment.';
+    case 'checkout_failed':
+      return 'Could not start checkout. Please try again.';
     case 'network_error':
       return 'Could not reach the server. Check your connection and try again.';
     case 'enrollment_required':
@@ -115,8 +117,22 @@ export function courseErrorMessage(code: string): string {
       return 'A few steps are still open in this lesson.';
     case 'practice_required':
       return 'Try the exercise first, then compare with the model response.';
+    case 'request_failed':
+      return 'The server did not answer properly. Please try again.';
+    case 'reveal_required':
+      return 'Reveal the model response first, then compare.';
+    case 'studied_required':
+      return 'Mark the lesson as studied first.';
+    case 'too_long':
+      return 'Your response is too long. Keep it under 20,000 characters.';
+    case 'no_exercise':
+      return 'This lesson has no exercise to record.';
+    case 'no_model_response':
+      return 'This lesson has no model response.';
+    case 'revision_conflict':
+      return 'This response was changed somewhere else. Reload to see the latest version.';
     default:
-      return 'Could not start checkout. Please try again.';
+      return 'Something went wrong. Please try again.';
   }
 }
 
