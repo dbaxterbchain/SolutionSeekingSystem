@@ -275,6 +275,8 @@ export default function CourseDashboard(props: Props) {
         )}
       </header>
 
+      {courseState && <CertificationPanel state={courseState} />}
+
       <ol className="mt-10 grid gap-4 md:grid-cols-2">
         {props.curriculum.modules.map((m) => (
           <li key={m.id} className="rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
@@ -319,4 +321,38 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
       <div className="mt-3 space-y-3">{children}</div>
     </div>
   );
+}
+
+function CertificationPanel({ state }: { state: CourseStateView }) {
+  const { body, linkLabel } = certificationCopy(state);
+  return (
+    <div className="mt-10">
+      <Panel title="Certification">
+        <p>{body}</p>
+        <a href="/course/learn/assessment/" className="btn-primary mt-2">
+          {linkLabel}
+        </a>
+      </Panel>
+    </div>
+  );
+}
+
+/** The dashboard's one-line summary of where the learner stands with the final assessment. */
+function certificationCopy(state: CourseStateView): { body: string; linkLabel: string } {
+  switch (state.certification.status) {
+    case 'none':
+      return state.assessment_eligible
+        ? { body: 'You have finished the modules. The final assessment is ready when you are.', linkLabel: 'Start the final assessment' }
+        : { body: 'The final assessment opens when modules 1 to 8 and the orientation lesson are complete.', linkLabel: 'About the final assessment' };
+    case 'in_progress':
+      return { body: 'Your assessment is in progress.', linkLabel: 'Continue your assessment' };
+    case 'submitted':
+      return { body: 'Your assessment is being graded. Results usually take a few minutes.', linkLabel: 'Check the status' };
+    case 'passed':
+      return { body: 'You passed the final assessment.', linkLabel: 'See your result' };
+    case 'needs_revision':
+      return { body: 'Your result is ready, with lessons to revisit before a retake.', linkLabel: 'See your feedback' };
+    case 'grading_error':
+      return { body: 'We hit a technical problem while grading. This is not a failed attempt.', linkLabel: 'See the details' };
+  }
 }

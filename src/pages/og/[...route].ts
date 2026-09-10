@@ -135,6 +135,10 @@ const pages: Record<string, OgPage> = {
     title: 'Your course',
     description: 'Your lessons, worksheets and progress in the Complete Solution Seeking course.',
   },
+  'course/learn/assessment': {
+    title: 'Final assessment',
+    description: 'The staged final assessment for the Complete Solution Seeking course.',
+  },
   account: {
     title: 'Your Account',
     description: 'Save your practice work and pick it back up anytime.',

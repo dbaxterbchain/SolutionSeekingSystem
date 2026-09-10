@@ -104,6 +104,12 @@ export type AnalyticsEvent =
   | { event: 'lesson_completed'; lesson_id: string; module_id: string; content_version: number }
   /** The lesson that completed also completed its module. */
   | { event: 'module_completed'; module_id: string }
+  /** The learner submitted the final assessment (once per attempt). */
+  | { event: 'assessment_submitted'; attempt_id: string; form_id: string }
+  /** The grade arrived while the learner was on the page (once per attempt). */
+  | { event: 'grade_ready'; attempt_id: string; result: 'passed' | 'needs_revision' }
+  /** Grading failed after every retry and the learner saw the honest copy (once per attempt). */
+  | { event: 'grading_error'; attempt_id: string }
   /**
    * A visitor tapped a suggested opener in an empty chat. The blank composer is
    * the step the consumer funnel dies on, so this is the pair that tells us

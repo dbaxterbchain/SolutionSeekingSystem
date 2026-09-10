@@ -2,6 +2,9 @@ import { getGaIds } from './analytics';
 import { getFirstTouch } from './attribution';
 import type { ProgressAction } from './course/progressRules';
 import type { CourseStatus } from './course/status';
+import type { AssessmentStatus, CertificationStatus } from './course/assessmentTypes';
+
+export type { AssessmentStatus, AttemptView, CriterionFeedback, JobView, PromptView, ResultView, StageView } from './course/assessmentTypes';
 
 /**
  * The browser's view of the course, fetched from the server and never
@@ -94,7 +97,7 @@ export function courseErrorMessage(code: string): string {
     case 'enrollment_revoked':
       return 'Access to the course has ended for this account. Contact course support if that seems wrong.';
     case 'rate_limited':
-      return 'Too many attempts. Please wait a while and try again.';
+      return 'Too many requests. Please wait a minute and try again.';
     case 'course_not_configured':
       return 'Checkout is not available right now. Please try again later.';
     case 'request_key_reused':
@@ -132,6 +135,18 @@ export function courseErrorMessage(code: string): string {
       return 'This lesson has no model response.';
     case 'revision_conflict':
       return 'This response was changed somewhere else. Reload to see the latest version.';
+    case 'not_eligible':
+      return 'The final assessment opens when modules 1 to 8 and the orientation lesson are complete.';
+    case 'no_forms_available':
+      return 'Every assessment form has been used on a previous attempt. Write to course support for the next step.';
+    case 'already_submitted':
+      return 'This assessment has already been submitted.';
+    case 'stage_locked':
+      return 'This part is locked. Your later parts are still open.';
+    case 'stage_mismatch':
+      return 'This page is out of date. Reload to see where you are.';
+    case 'assessment_unavailable':
+      return 'The assessment is unavailable right now. Please try again in a minute.';
     default:
       return 'Something went wrong. Please try again.';
   }
@@ -198,7 +213,7 @@ export interface CourseStateView {
   assessment_eligible: boolean;
   plan_complete: boolean;
   course_complete: boolean;
-  certification: { version: string; status: 'none' };
+  certification: { version: string; status: CertificationStatus };
 }
 
 export interface WorksheetPayload {
@@ -263,3 +278,43 @@ export async function postProgress(accessToken: string, body: ProgressBody): Pro
   if (!res.ok) throwFor(res, data);
   return data as ProgressResponse;
 }
+
+export type AssessmentAction = 'start' | 'save' | 'advance' | 'submit' | 'status';
+
+/** POST to the assessment endpoint, keyed by `action`. Twin of postProgress. */
+async function postAssessment<T>(accessToken: string, body: Record<string, unknown> & { action: AssessmentAction }): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch('/api/course/assessment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new CourseActionError('network_error', 0);
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throwFor(res, data);
+  return data as T;
+}
+
+export const startAssessment = (accessToken: string): Promise<AssessmentStatus> => postAssessment(accessToken, { action: 'start' });
+export const fetchAssessmentStatus = (accessToken: string, attemptId?: string): Promise<AssessmentStatus> =>
+  postAssessment(accessToken, { action: 'status', ...(attemptId ? { attempt_id: attemptId } : {}) });
+export const saveAssessmentResponse = (accessToken: string, attemptId: string, promptId: string, text: string, expectedRevision: number) =>
+  postAssessment<{ prompt_id: string; revision: number; saved_at: string }>(accessToken, {
+    action: 'save',
+    attempt_id: attemptId,
+    prompt_id: promptId,
+    text,
+    expected_revision: expectedRevision,
+  });
+export const advanceAssessment = (
+  accessToken: string,
+  attemptId: string,
+  stage: number,
+  expectedRevisions: Record<string, number>
+): Promise<AssessmentStatus> =>
+  postAssessment(accessToken, { action: 'advance', attempt_id: attemptId, stage, expected_revisions: expectedRevisions });
+export const submitAssessment = (accessToken: string, attemptId: string, requestKey: string): Promise<AssessmentStatus> =>
+  postAssessment(accessToken, { action: 'submit', attempt_id: attemptId, request_key: requestKey });
