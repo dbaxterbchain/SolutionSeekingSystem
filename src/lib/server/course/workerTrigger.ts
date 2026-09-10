@@ -1,0 +1,73 @@
+import Anthropic from '@anthropic-ai/sdk';
+import { serverEnv } from '../env';
+import { supabaseAdmin } from '../supabaseAdmin';
+import { gradeAttempt } from './grader';
+import { runGradingJob } from './gradingJob';
+import { supabaseJobStore } from './jobStore';
+
+/**
+ * How a submitted attempt reaches the grader. COURSE_GRADER_MODE:
+ *   worker  POST the Netlify background function with the shared secret
+ *           (production; a failed hand-off is logged and the sweeper retries)
+ *   inline  run the job inside the dev server (astro dev only)
+ *   off     leave the job queued (the recovery test drives it by hand)
+ * Unset means inline under astro dev and worker everywhere else.
+ */
+export type GraderMode = 'worker' | 'inline' | 'off';
+
+export function graderMode(): GraderMode {
+  const value = serverEnv('COURSE_GRADER_MODE');
+  if (value === 'worker' || value === 'inline' || value === 'off') return value;
+  return import.meta.env.DEV ? 'inline' : 'worker';
+}
+export const awardsEnabled = (): boolean => serverEnv('COURSE_AWARDS_ENABLED') === 'true';
+export function graderSettings(): { model: string; awardsEnabled: boolean } {
+  return { model: serverEnv('COURSE_GRADER_MODEL') || 'claude-opus-5', awardsEnabled: awardsEnabled() };
+}
+
+let anthropic: Anthropic | null = null;
+const getAnthropic = () => (anthropic ??= new Anthropic({ apiKey: serverEnv('ANTHROPIC_API_KEY'), timeout: 300_000, maxRetries: 2 }));
+
+/** Hand a queued job to the grader. Never throws. */
+export async function triggerGradingWorker(args: { origin: string; jobId: string }): Promise<void> {
+  const mode = graderMode();
+  if (mode === 'off') {
+    console.log(`grading job ${args.jobId}: left queued (COURSE_GRADER_MODE=off)`);
+    return;
+  }
+  if (mode === 'inline') {
+    if (!import.meta.env.DEV) {
+      console.error(`grading job ${args.jobId}: COURSE_GRADER_MODE=inline is honoured only under astro dev; the job stays queued`);
+      return;
+    }
+    const settings = graderSettings();
+    void runGradingJob({
+      jobId: args.jobId,
+      worker: 'inline-dev',
+      store: supabaseJobStore(supabaseAdmin),
+      grade: (input, ctx) => gradeAttempt({ anthropic: getAnthropic(), input, ctx, settings: { model: settings.model } }),
+      settings,
+    }).catch((err) => console.error(`grading job ${args.jobId}: inline run failed`, err));
+    return;
+  }
+  const secret = serverEnv('COURSE_WORKER_SECRET');
+  if (!secret) {
+    console.error(`grading job ${args.jobId}: COURSE_WORKER_SECRET is unset; the job stays queued for the sweeper`);
+    return;
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(`${args.origin}/.netlify/functions/course-grade`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-course-worker-secret': secret },
+      body: JSON.stringify({ job_id: args.jobId }),
+      signal: controller.signal,
+    });
+    if (!res.ok) console.error(`grading job ${args.jobId}: worker answered ${res.status}; the sweeper will retry`);
+  } catch (err) {
+    console.error(`grading job ${args.jobId}: worker trigger failed; the sweeper will retry`, err);
+  } finally {
+    clearTimeout(timer);
+  }
+}
