@@ -12,6 +12,9 @@ interface ImportMetaEnv {
   readonly STRIPE_PRICE_ID: string;
   /** The course's one-time price; see src/lib/server/course/offer.ts. */
   readonly STRIPE_PRICE_ID_COURSE?: string;
+  /** Cloudflare Stream, for the course videos; see src/lib/server/course/stream.ts. */
+  readonly CLOUDFLARE_STREAM_API_TOKEN?: string;
+  readonly CLOUDFLARE_STREAM_CUSTOMER_CODE?: string;
   readonly SUPABASE_SERVICE_ROLE_KEY: string;
 }
 
