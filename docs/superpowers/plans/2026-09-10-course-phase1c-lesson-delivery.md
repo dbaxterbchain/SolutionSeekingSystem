@@ -2918,6 +2918,31 @@ With the local stack, the dev server and the admin enrolled by hand (REST insert
 
 ---
 
+## Execution record (2026-09-10)
+
+Executed with subagent-driven development: twelve commits from `cf4f302` to the marker fix that follows `c89d637`, each task reviewed, a whole-branch review, one fix wave and two controller follow-ups. Amendments the reviews forced on this plan, now in the code:
+
+- Write safety. The plan's whole-row upsert let a step click that landed during an in-flight autosave erase the typed response. Three layers now guard it: the `course_progress_monotone` trigger keeps `response_text` and `previous_response_text` unless the revision advances (migration `0030` edited in place while unpushed); the progress route answers 409 `revision_conflict` when the stored text differs from what the save wrote; the island serialises every write through one queue, never lets an action move the revision, flushes a pending save before reveal and complete, and stops those actions when the flush conflicts.
+- Completion means the learner's explicit `completed_at` everywhere; the readiness rule only guards the complete action.
+- The validator exempts placeholder lessons from the `streamUid` requirement; the stand-in clip's UID is one setting, `COURSE.placeholderStreamUid`.
+- The shared 12 hour playback token per video stands for launch; the upgrade path (per-viewer tokens from a Stream signing key) is documented in `streamUrls.ts`.
+- `courseErrorMessage` has a neutral default and the lesson codes; a failed action's message renders once beside its control; the restored device draft is saved; the model response re-appears on revisit; a previous link joins the next one; semantic markdown leaves list markers to the prose container.
+- The dashboard holds a neutral state until the course state loads.
+
+Browser verification (Task 8) passed on 2026-09-10: the full practice flow with autosave, the reload, the two-tab conflict in both directions, the drawer's focus handling, the finished-state dashboard, the printable worksheet, the draft-lesson 404 and the non-enrolled refusals. Screenshots for `docs/features/course/` are with sub-plan 1e.
+
+Carried forward:
+
+1. When David uploads the stand-in clip: set `COURSE.placeholderStreamUid`, set `CLOUDFLARE_STREAM_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_STREAM_CUSTOMER_CODE`, and verify playback plus the token-substituted poster URL against the real video (1e).
+2. Per-viewer short-lived Stream tokens via a signing key, if a shared token is ever found beyond a learner (Phase 2 or later).
+3. Product decision for David: every enrolled learner can fetch all nine worksheets from day one; gate on a published lesson in the module if that matters.
+4. `/api/course/progress` has no rate limit (each autosave is one auth call, one enrollment read, one load and one upsert); a note for the 1e runbook.
+5. No `pagehide` flush; the restored device draft now saves on the next visit, which covers the loss.
+6. `lessonComplete` is used only by its tests now; it can go.
+7. The analytics four-place rule for `lesson_completed` and `module_completed` (1e).
+8. Widen `certification.status` from the literal `'none'` when awards arrive (1d); wire `assessmentSubmitted` to the attempts table (1d).
+9. An `open` build has two blockers by design until the videos exist: V04's placeholder and the unpublished free lesson.
+
 ## Handoff
 
 Sub-plan 1d (assessment data path) consumes `computeCourseState().assessment_eligible`, `requireEnrolled`, and the `assessmentSubmitted` input of `deriveCourseState` (wire it to the attempts table). Sub-plan 1e wires `/course/learn/` into the nav and AuthMenu, documents the Stream runbook and the placeholder UID setting in `docs/course-production.md` and `deployment.md`, and verifies playback against the real clip once `COURSE.placeholderStreamUid` and the two Stream env vars exist. Phase 2 adds `/api/course/check` (the `checkId` convention from Task 3), the preview page that renders `LessonSections` at build time, and the drawer's module check status.
