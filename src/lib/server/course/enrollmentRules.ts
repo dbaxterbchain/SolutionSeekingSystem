@@ -123,6 +123,18 @@ export function paidSessionFacts(session: CheckoutSessionLike, now: Date): PaidS
   };
 }
 
+/**
+ * Whether a Checkout Session's payment_status means access is owed. In
+ * payment mode `no_payment_required` can only be a zero total (a full
+ * promotion code), which is still a purchase.
+ */
+export const isPaidStatus = (status: string | null | undefined): boolean =>
+  status === 'paid' || status === 'no_payment_required';
+
+/** The ledger kind for a session that completed without settling. */
+export const paymentSignalKind = (eventType: string): 'payment_pending' | 'payment_failed' =>
+  eventType === 'checkout.session.async_payment_failed' ? 'payment_failed' : 'payment_pending';
+
 export type PaidOutcome =
   | 'enrolled'
   | 'reinstated'
@@ -130,11 +142,18 @@ export type PaidOutcome =
   | 'duplicate_payment'
   | 'paid_while_revoked';
 
-/** What a PAID session should do to the learner's existing enrollment, if any. */
-export function classifyPaidSession(existing: EnrollmentRow | null, sessionId: string): PaidOutcome {
+/** What a PAID session should do to the learner's existing enrollment, if any, as of `now`. */
+export function classifyPaidSession(
+  existing: EnrollmentRow | null,
+  sessionId: string,
+  now: Date
+): PaidOutcome {
   if (!existing) return 'enrolled';
   if (existing.stripe_checkout_session_id === sessionId) return 'already_processed';
-  if (existing.status === 'enrolled') return 'duplicate_payment';
+  if (existing.status === 'enrolled') {
+    // Access that has ended may be bought again; the purchase re-opens the row.
+    return entitlementFromRow(existing, now).kind === 'expired' ? 'reinstated' : 'duplicate_payment';
+  }
   if (existing.status === 'refunded') return 'reinstated';
   return 'paid_while_revoked';
 }
@@ -157,6 +176,7 @@ export interface NewEvent {
   course_id: string;
   kind: EventKind;
   actor: 'stripe' | 'admin' | 'system';
+  actor_user_id?: string | null;
   stripe_checkout_session_id: string | null;
   stripe_event_id: string | null;
   note: string | null;
@@ -167,6 +187,8 @@ export interface EnrollmentStore {
   findByUser(userId: string, courseId: string): Promise<EnrollmentRow | null>;
   /** True when a ledger row already carries this Stripe event id. */
   hasEvent(stripeEventId: string): Promise<boolean>;
+  /** True when an `enrolled` or `reinstated` ledger row already records this session. */
+  hasGrantEvent(sessionId: string): Promise<boolean>;
   /** Insert a fresh enrollment; 'conflict' when a row for this learner (or session) appeared meanwhile. */
   insert(session: PaidSession): Promise<EnrollmentRow | 'conflict'>;
   /** Re-activate a refunded enrollment with the new purchase. */
@@ -205,7 +227,9 @@ function noteFor(outcome: PaidOutcome, existing: EnrollmentRow | null): string |
  *  - the enrollment's unique stripe_checkout_session_id makes the same
  *    purchase a no-op even under a fresh event id;
  *  - the unique (user_id, course_id) turns two racing first purchases into one
- *    enrollment and one duplicate_payment record for a human to refund.
+ *    enrollment and one duplicate_payment record for a human to refund;
+ *  - a delivery that died after the mutation is completed by the retry rather
+ *    than skipped.
  */
 export async function enrollFromSession(
   store: EnrollmentStore,
@@ -219,8 +243,9 @@ export async function enrollFromSession(
     };
   }
 
+  const now = new Date(session.paidAt);
   let existing = await store.findByUser(session.userId, session.courseId);
-  let outcome = classifyPaidSession(existing, session.sessionId);
+  let outcome = classifyPaidSession(existing, session.sessionId, now);
   let enrollment = existing;
 
   if (outcome === 'enrolled') {
@@ -229,7 +254,7 @@ export async function enrollFromSession(
       // A parallel delivery (a second tab, or a retry) won the insert race.
       existing = await store.findByUser(session.userId, session.courseId);
       if (!existing) throw new Error(`course enrollment insert conflicted but no row exists for ${session.userId}`);
-      outcome = classifyPaidSession(existing, session.sessionId);
+      outcome = classifyPaidSession(existing, session.sessionId, now);
       enrollment = existing;
     } else {
       enrollment = inserted;
@@ -238,7 +263,16 @@ export async function enrollFromSession(
   if (outcome === 'reinstated' && existing) {
     enrollment = await store.reinstate(existing.id, session);
   }
-  if (outcome === 'already_processed') return { outcome, enrollment };
+  if (outcome === 'already_processed') {
+    // The row carries this session, so an earlier delivery got as far as the
+    // mutation. If it died before its ledger row, finish the job now: the
+    // ledger row under this event id, and the side effects the caller runs.
+    if (existing && !(await store.hasGrantEvent(session.sessionId))) {
+      outcome = 'enrolled';
+    } else {
+      return { outcome, enrollment };
+    }
+  }
 
   await store.addEvent({
     enrollment_id: enrollment?.id ?? null,

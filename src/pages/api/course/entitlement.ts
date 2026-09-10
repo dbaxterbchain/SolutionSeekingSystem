@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { getUserFromRequest, privateJson } from '../../../lib/server/auth';
 import { isAdminUser } from '../../../lib/server/adminAuth';
 import { getCourseEntitlement } from '../../../lib/server/course/enrollment';
-import { canPurchase } from '../../../lib/server/course/enrollmentRules';
+import { canPurchase, type CourseEntitlement } from '../../../lib/server/course/enrollmentRules';
 import { COURSE_STATUS } from '../../../data/course';
 
 export const prerender = false;
@@ -17,7 +17,13 @@ export const GET: APIRoute = async ({ request }) => {
   const user = await getUserFromRequest(request);
   if (!user) return privateJson({ error: 'unauthorized' }, 401);
 
-  const entitlement = await getCourseEntitlement(user);
+  let entitlement: CourseEntitlement;
+  try {
+    entitlement = await getCourseEntitlement(user);
+  } catch (err) {
+    console.error('course entitlement lookup failed', err);
+    return privateJson({ error: 'entitlement_unavailable' }, 503);
+  }
   // Admins may buy before launch (that is how the pilot tests checkout), so the
   // answer depends on who is asking. Only consulted while the course is not open.
   const isAdmin = COURSE_STATUS !== 'open' && isAdminUser(user);

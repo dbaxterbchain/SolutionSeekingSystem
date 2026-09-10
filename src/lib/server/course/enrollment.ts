@@ -11,7 +11,9 @@ import { COURSE } from '../../../data/course';
 import {
   entitlementFromRow,
   enrollFromSession,
+  isPaidStatus,
   paidSessionFacts,
+  paymentSignalKind,
   recordPaymentSignal,
   type CourseEntitlement,
   type EnrollmentRow,
@@ -92,6 +94,18 @@ export const enrollmentStore: EnrollmentStore = {
     return data !== null;
   },
 
+  async hasGrantEvent(sessionId) {
+    const { data, error } = await supabaseAdmin
+      .from('course_enrollment_events')
+      .select('id')
+      .eq('stripe_checkout_session_id', sessionId)
+      .in('kind', ['enrolled', 'reinstated'])
+      .limit(1)
+      .maybeSingle();
+    if (error) throw new Error(`course grant event lookup failed: ${error.message}`);
+    return data !== null;
+  },
+
   async insert(s) {
     const { data, error } = await supabaseAdmin
       .from('course_enrollments')
@@ -122,6 +136,7 @@ export const enrollmentStore: EnrollmentStore = {
       .from('course_enrollments')
       .update({
         status: 'enrolled',
+        source: 'stripe',
         stripe_checkout_session_id: s.sessionId,
         stripe_payment_intent_id: s.paymentIntentId,
         stripe_customer_id: s.customerId,
@@ -192,22 +207,25 @@ export async function recordCheckoutCreated(
  * idempotency above; email and analytics failures are logged, never thrown.
  * Email links use CANONICAL_ORIGIN, not the webhook request's origin, which
  * is Stripe's and has nothing to do with the buyer's site.
+ *
+ * Once the enrollment is written, nothing here may throw: a retry would find
+ * the row already applied and never reach the side effects, so a failed email
+ * or event is logged and the delivery is acknowledged.
  */
 export async function handleCourseCheckoutEvent(
   session: Stripe.Checkout.Session,
-  event: { id: string; type: string }
+  event: { id: string; type: string; created: number }
 ): Promise<void> {
-  const facts = paidSessionFacts(session, new Date());
+  // Stripe's own timestamp for the event, so a delayed retry records the day
+  // the payment settled, not the day it was retried.
+  const facts = paidSessionFacts(session, new Date(event.created * 1000));
   if (!facts) {
     console.warn('course checkout session missing user_id or course_id', session.id);
     return;
   }
 
-  // no_payment_required covers a 100% promotion code or a hand-made session:
-  // no money moves, but the sale is final, so it enrolls like any other paid session.
-  const paid = session.payment_status === 'paid' || session.payment_status === 'no_payment_required';
-  if (!paid) {
-    const kind = event.type === 'checkout.session.async_payment_failed' ? 'payment_failed' : 'payment_pending';
+  if (!isPaidStatus(session.payment_status)) {
+    const kind = paymentSignalKind(event.type);
     await recordPaymentSignal(enrollmentStore, facts, event.id, kind);
     console.log(`course checkout ${session.id}: ${kind}`);
     return;
@@ -216,34 +234,38 @@ export async function handleCourseCheckoutEvent(
   const { outcome, enrollment } = await enrollFromSession(enrollmentStore, facts, event.id);
   console.log(`course checkout ${session.id}: ${outcome}`);
 
-  if (outcome === 'enrolled' || outcome === 'reinstated') {
-    // The conversion of record, deduped by GA4 on the session id. Fired only
-    // when access actually changed hands, never on a retry or a duplicate.
-    await trackCourseEnrolled({
-      clientId: session.metadata?.ga_client_id || facts.userId,
-      sessionId: session.metadata?.ga_session_id || undefined,
-      courseId: facts.courseId,
-      value: (session.amount_total ?? 0) / 100,
-      currency: (session.currency ?? 'usd').toUpperCase(),
-      transactionId: session.id,
-    });
-    await sendPurchaseEmail(facts.userId, enrollment?.id ?? session.id, session);
-    return;
-  }
+  try {
+    if (outcome === 'enrolled' || outcome === 'reinstated') {
+      // The conversion of record, deduped by GA4 on the session id. Fired only
+      // when access actually changed hands, never on a retry or a duplicate.
+      await trackCourseEnrolled({
+        clientId: session.metadata?.ga_client_id || facts.userId,
+        sessionId: session.metadata?.ga_session_id || undefined,
+        courseId: facts.courseId,
+        value: (session.amount_total ?? 0) / 100,
+        currency: (session.currency ?? 'usd').toUpperCase(),
+        transactionId: session.id,
+      });
+      await sendPurchaseEmail(facts.userId, enrollment?.id ?? session.id, session);
+      return;
+    }
 
-  if (outcome === 'duplicate_payment' || outcome === 'paid_while_revoked') {
-    const amount = `${((session.amount_total ?? 0) / 100).toFixed(2)} ${(session.currency ?? 'usd').toUpperCase()}`;
-    const mail = courseDuplicatePaymentAlertEmail({
-      userId: facts.userId,
-      sessionId: session.id,
-      amountLabel: amount,
-      note:
-        outcome === 'duplicate_payment'
-          ? 'They already had access and paid again, probably from a second tab.'
-          : 'Their access was revoked and they paid again. Access stays revoked.',
-      adminUrl: `${CANONICAL_ORIGIN}/admin`,
-    });
-    await sendEmail({ to: internalAlertTo(), ...mail, idempotencyKey: `course-duplicate/${session.id}` });
+    if (outcome === 'duplicate_payment' || outcome === 'paid_while_revoked') {
+      const amount = `${((session.amount_total ?? 0) / 100).toFixed(2)} ${(session.currency ?? 'usd').toUpperCase()}`;
+      const mail = courseDuplicatePaymentAlertEmail({
+        userId: facts.userId,
+        sessionId: session.id,
+        amountLabel: amount,
+        note:
+          outcome === 'duplicate_payment'
+            ? 'They already had access and paid again, probably from a second tab.'
+            : 'Their access was revoked and they paid again. Access stays revoked.',
+        adminUrl: `${CANONICAL_ORIGIN}/admin`,
+      });
+      await sendEmail({ to: internalAlertTo(), ...mail, idempotencyKey: `course-duplicate/${session.id}` });
+    }
+  } catch (err) {
+    console.error(`course checkout ${session.id}: side effect failed after ${outcome}`, err);
   }
 }
 

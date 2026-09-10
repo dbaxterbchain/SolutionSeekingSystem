@@ -158,6 +158,11 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
       // A retry with the same key gets the same session back from Stripe.
       { idempotencyKey: `course:${user.id}:${body.request_key}` }
     );
+    // A replayed key can hand back a session that already finished (a second
+    // click after paying, before the webhook landed) or one that expired.
+    // Neither has a page to send the learner to.
+    if (session.status === 'complete') return privateJson({ error: 'already_enrolled' }, 409);
+    if (!session.url) return privateJson({ error: 'request_key_reused' }, 409);
     await recordCheckoutCreated(
       user.id,
       session.id,

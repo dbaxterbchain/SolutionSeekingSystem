@@ -45,7 +45,9 @@ export default function CourseDashboard(props: Props) {
   const [activation, setActivation] = useState<Activation>(fromCheckout ? 'pending' : 'none');
   const [graceOver, setGraceOver] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [checkNote, setCheckNote] = useState<string | null>(null);
   const readyTracked = useRef(false);
+  const viewedTracked = useRef(false);
 
   // The session rehydrates from localStorage after the Stripe redirect. Hold a
   // neutral screen instead of flashing "sign in", with a grace window.
@@ -59,8 +61,12 @@ export default function CourseDashboard(props: Props) {
     if (!fromCheckout || sessionLoading || !session) return;
     let cancelled = false;
     let tries = 0;
+    let timer: number | undefined;
     // A funnel step, not the conversion: course_enrolled is sent by the webhook.
-    track({ event: 'checkout_success_viewed' });
+    if (!viewedTracked.current) {
+      viewedTracked.current = true;
+      track({ event: 'checkout_success_viewed' });
+    }
     const poll = async () => {
       const current = await refetch();
       if (cancelled) return;
@@ -69,7 +75,7 @@ export default function CourseDashboard(props: Props) {
         clearCheckoutParam();
       } else if (tries < POLL_TRIES) {
         tries += 1;
-        window.setTimeout(poll, POLL_INTERVAL_MS);
+        timer = window.setTimeout(poll, POLL_INTERVAL_MS);
       } else {
         setActivation('slow');
         clearCheckoutParam();
@@ -77,6 +83,7 @@ export default function CourseDashboard(props: Props) {
     };
     void poll();
     return () => {
+      window.clearTimeout(timer);
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -94,12 +101,15 @@ export default function CourseDashboard(props: Props) {
     const current = await refetch();
     setChecking(false);
     if (current?.kind === 'enrolled') setActivation('ready');
+    else setCheckNote('Not showing yet. Give it a minute, then try again.');
   };
 
   const enrolled = entitlement?.kind === 'enrolled';
 
   if (sessionLoading || (fromCheckout && !session && !graceOver)) {
-    return <Neutral text={fromCheckout ? 'Finishing your purchase…' : 'Loading your course…'} />;
+    // The same text on the server and the client: fromCheckout reads the query
+    // string, which the prerendered HTML cannot know.
+    return <Neutral text="Loading your course…" />;
   }
 
   if (!session || user?.is_anonymous) {
@@ -127,6 +137,9 @@ export default function CourseDashboard(props: Props) {
         <button type="button" onClick={checkAccess} disabled={checking} className="btn-primary mt-5 disabled:opacity-60">
           {checking ? 'Checking…' : 'Check access'}
         </button>
+        <p aria-live="polite" className="mt-3 text-sm text-slate-600">
+          {checkNote}
+        </p>
         <p className="mt-4 text-sm text-slate-500">
           Still nothing after a few minutes? Write to{' '}
           <a href={`mailto:${props.supportContact}`} className="font-semibold text-brand-700 underline">
@@ -199,6 +212,15 @@ export default function CourseDashboard(props: Props) {
         <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-ink-800 sm:text-4xl">
           {activation === 'ready' ? 'Your course is ready' : props.courseTitle}
         </h1>
+        {failed && (
+          <p className="mt-4 max-w-prose rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            We could not check your access just now. If a lesson will not open, sign in again or write to{' '}
+            <a href={`mailto:${props.supportContact}`} className="font-semibold underline">
+              {props.supportContact}
+            </a>
+            .
+          </p>
+        )}
         {firstLesson ? (
           <div className="mt-6">
             <a href={`/course/learn/lessons/${firstLesson.id}`} className="btn-primary">

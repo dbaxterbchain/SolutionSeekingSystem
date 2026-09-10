@@ -4,7 +4,9 @@ import {
   classifyPaidSession,
   enrollFromSession,
   entitlementFromRow,
+  isPaidStatus,
   paidSessionFacts,
+  paymentSignalKind,
   recordPaymentSignal,
   type EnrollmentRow,
   type EnrollmentStore,
@@ -60,6 +62,11 @@ function fakeStore(seed: EnrollmentRow[] = []) {
     },
     async hasEvent(id) {
       return events.some((e) => e.stripe_event_id === id);
+    },
+    async hasGrantEvent(sessionId) {
+      return events.some(
+        (e) => e.stripe_checkout_session_id === sessionId && (e.kind === 'enrolled' || e.kind === 'reinstated')
+      );
     },
     async insert(s) {
       if (rows.some((r) => r.user_id === s.userId && r.course_id === s.courseId)) return 'conflict';
@@ -159,11 +166,12 @@ describe('canPurchase', () => {
 
 describe('classifyPaidSession', () => {
   it('follows the decision table', () => {
-    expect(classifyPaidSession(null, 'cs_new')).toBe('enrolled');
-    expect(classifyPaidSession(row(), 'cs_first')).toBe('already_processed');
-    expect(classifyPaidSession(row(), 'cs_new')).toBe('duplicate_payment');
-    expect(classifyPaidSession(row({ status: 'refunded' }), 'cs_new')).toBe('reinstated');
-    expect(classifyPaidSession(row({ status: 'revoked' }), 'cs_new')).toBe('paid_while_revoked');
+    expect(classifyPaidSession(null, 'cs_new', NOW)).toBe('enrolled');
+    expect(classifyPaidSession(row(), 'cs_first', NOW)).toBe('already_processed');
+    expect(classifyPaidSession(row(), 'cs_new', NOW)).toBe('duplicate_payment');
+    expect(classifyPaidSession(row({ status: 'refunded' }), 'cs_new', NOW)).toBe('reinstated');
+    expect(classifyPaidSession(row({ status: 'revoked' }), 'cs_new', NOW)).toBe('paid_while_revoked');
+    expect(classifyPaidSession(row({ access_ends_at: '2026-01-01T00:00:00Z' }), 'cs_new', NOW)).toBe('reinstated');
   });
 });
 
@@ -269,6 +277,43 @@ describe('enrollFromSession', () => {
     expect(rows).toHaveLength(1);
     expect(events.map((e) => e.kind).sort()).toEqual(['duplicate_payment', 'enrolled']);
   });
+
+  it('re-opens an enrollment whose access ended when the learner buys again', async () => {
+    const { store, rows, events } = fakeStore([row({ access_ends_at: '2026-01-01T00:00:00Z' })]);
+    const result = await enrollFromSession(store, session({ sessionId: 'cs_renew' }), 'evt_r');
+    expect(result.outcome).toBe('reinstated');
+    expect(rows[0]).toMatchObject({ status: 'enrolled', access_ends_at: null, stripe_checkout_session_id: 'cs_renew' });
+    expect(events[0]).toMatchObject({ kind: 'reinstated', stripe_event_id: 'evt_r' });
+  });
+
+  it('finishes a delivery that died between the enrollment write and its ledger row', async () => {
+    const { store, rows, events } = fakeStore();
+    let failNext = true;
+    const flaky: EnrollmentStore = {
+      ...store,
+      async addEvent(e) {
+        if (failNext) {
+          failNext = false;
+          throw new Error('ledger unavailable');
+        }
+        return store.addEvent(e);
+      },
+    };
+    await expect(enrollFromSession(flaky, session(), 'evt_1')).rejects.toThrow('ledger unavailable');
+    expect(rows).toHaveLength(1);
+    expect(events).toHaveLength(0);
+    const retry = await enrollFromSession(flaky, session(), 'evt_1');
+    expect(retry.outcome).toBe('enrolled');
+    expect(events).toEqual([
+      expect.objectContaining({ kind: 'enrolled', stripe_event_id: 'evt_1', enrollment_id: rows[0].id }),
+    ]);
+  });
+
+  it('throws when an insert conflicts but no row can be found', async () => {
+    const { store } = fakeStore();
+    const broken: EnrollmentStore = { ...store, async insert() { return 'conflict'; } };
+    await expect(enrollFromSession(broken, session(), 'evt_x')).rejects.toThrow(/conflicted but no row/);
+  });
 });
 
 describe('recordPaymentSignal', () => {
@@ -279,5 +324,18 @@ describe('recordPaymentSignal', () => {
     await recordPaymentSignal(store, session({ sessionId: 'cs_bank' }), 'evt_f', 'payment_failed');
     expect(events.map((e) => e.kind)).toEqual(['payment_pending', 'payment_failed']);
     expect(events[0]).toMatchObject({ enrollment_id: 'enr_1', actor: 'stripe', stripe_checkout_session_id: 'cs_bank' });
+  });
+});
+
+describe('payment helpers', () => {
+  it('treats paid and no_payment_required as paid', () => {
+    expect(isPaidStatus('paid')).toBe(true);
+    expect(isPaidStatus('no_payment_required')).toBe(true);
+    expect(isPaidStatus('unpaid')).toBe(false);
+    expect(isPaidStatus(null)).toBe(false);
+  });
+  it('maps the failed async event to payment_failed and everything else to payment_pending', () => {
+    expect(paymentSignalKind('checkout.session.async_payment_failed')).toBe('payment_failed');
+    expect(paymentSignalKind('checkout.session.completed')).toBe('payment_pending');
   });
 });

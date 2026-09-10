@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { useSession } from '../../lib/useSession';
 import { accountLink } from '../../lib/accountLink';
 import { useCourseEntitlement } from '../../lib/useCourseEntitlement';
@@ -20,6 +20,16 @@ interface Props {
   trackView?: boolean;
 }
 
+/** A uuid for the checkout request key. crypto.randomUUID needs a secure context; plain http gets the manual form. */
+function newRequestKey(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 /**
  * The buy control. An island because checkout needs the session, because the
  * enrolled state must come from the server, and because checkout_started has
@@ -36,7 +46,7 @@ export default function CourseSalesCta(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [justEnrolled, setJustEnrolled] = useState(false);
   // One key per mount: a double click or a retry replays the same Stripe session.
-  const [requestKey, setRequestKey] = useState(() => crypto.randomUUID());
+  const [requestKey, setRequestKey] = useState(newRequestKey);
 
   useEffect(() => {
     if (props.trackView) {
@@ -50,6 +60,9 @@ export default function CourseSalesCta(props: Props) {
   const revoked = entitlement?.kind === 'inactive' && entitlement.reason === 'revoked';
   // Signed out, the server has not been asked: the launch flag decides.
   const purchasable = entitlement ? entitlement.sale.can_purchase : props.saleStatus === 'open';
+  // Signed in with the answer still in flight: hold the verdict rather than
+  // telling a buyer the course opens soon and then swapping in a button.
+  const settling = Boolean(session) && loading && !entitlement;
   const label = props.priceLabel ? `Get the course for ${props.priceLabel}` : 'Get the course';
 
   const buy = async () => {
@@ -70,8 +83,7 @@ export default function CourseSalesCta(props: Props) {
 
     const ok = await confirm({
       title: 'Continue to checkout?',
-      message:
-        'Stripe takes the payment on a secure page and sends you straight back here to start the course.',
+      message: 'Stripe takes the payment on a secure page, then brings you to your course.',
       confirmLabel: 'Continue to checkout',
       cancelLabel: 'Not now',
     });
@@ -91,7 +103,7 @@ export default function CourseSalesCta(props: Props) {
         // The server refused a replayed key with different parameters (a GA
         // session rolled over between clicks): mint a fresh key and try once more.
         if (err instanceof CourseActionError && err.code === 'request_key_reused' && attempt === 0) {
-          key = crypto.randomUUID();
+          key = newRequestKey();
           setRequestKey(key);
           continue;
         }
@@ -107,8 +119,9 @@ export default function CourseSalesCta(props: Props) {
     }
   };
 
+  let body: ReactElement;
   if (enrolled) {
-    return (
+    body = (
       <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-5">
         <p className="font-semibold text-emerald-800">You already have access to the course.</p>
         <a href="/course/learn/" className="btn-primary mt-4" data-track-cta={props.location} data-track-label="Continue your course">
@@ -116,10 +129,8 @@ export default function CourseSalesCta(props: Props) {
         </a>
       </div>
     );
-  }
-
-  if (revoked) {
-    return (
+  } else if (revoked) {
+    body = (
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-slate-700">
         <p className="font-semibold text-ink-800">Access to the course has ended for this account.</p>
         <p className="mt-2 text-sm">
@@ -131,32 +142,36 @@ export default function CourseSalesCta(props: Props) {
         </p>
       </div>
     );
-  }
-
-  if (!purchasable) {
-    return (
+  } else if (!purchasable && !settling) {
+    body = (
       <div className="rounded-2xl border border-brand-100 bg-brand-50/60 p-5 text-slate-700">
         <p className="font-semibold text-ink-800">The course opens soon.</p>
         <p className="mt-2 text-sm">The lessons are being filmed now. Everything else on the site is free to use today.</p>
       </div>
     );
+  } else {
+    body = (
+      <div>
+        <button
+          type="button"
+          onClick={buy}
+          disabled={busy || sessionLoading || (Boolean(session) && loading && !entitlement)}
+          className="btn-primary disabled:opacity-60"
+        >
+          {busy ? 'Opening checkout…' : label}
+        </button>
+        {!sessionLoading && !signedIn && (
+          <p className="mt-3 text-sm text-slate-500">Create a free account first. The course is added to it after payment.</p>
+        )}
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      </div>
+    );
   }
 
   return (
-    <div>
-      <button
-        type="button"
-        onClick={buy}
-        disabled={busy || sessionLoading || (Boolean(session) && loading && !entitlement)}
-        className="btn-primary disabled:opacity-60"
-      >
-        {busy ? 'Opening checkout…' : label}
-      </button>
-      {!sessionLoading && !signedIn && (
-        <p className="mt-3 text-sm text-slate-500">Create a free account first. The course is added to it after payment.</p>
-      )}
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+    <>
+      {body}
       {dialog}
-    </div>
+    </>
   );
 }
