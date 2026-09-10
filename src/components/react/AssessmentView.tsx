@@ -156,21 +156,25 @@ export default function AssessmentView(props: Props) {
       try {
         const r = await saveAssessmentResponse(token, attempt.id, promptId, text, expectedRevision);
         revisions.current[promptId] = r.revision;
-        setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], text, revision: r.revision, state: 'saved', savedAt: r.saved_at, error: null, conflict: null } }));
+        // Never write the captured text back here: the rendered draft may
+        // already hold newer typing than what this request just saved.
+        setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], revision: r.revision, state: 'saved', savedAt: r.saved_at, error: null, conflict: null } }));
         return true;
       } catch (err) {
         if (err instanceof CourseActionError && err.code === 'revision_conflict') {
-          dirtyText.current[promptId] = text;
+          // Restore the captured text only if nothing newer arrived while this
+          // request was in flight; a newer edit is what the learner wants saved next.
+          if (dirtyText.current[promptId] === undefined) dirtyText.current[promptId] = text;
           const extra = err.extra as { text?: string; revision?: number };
-          setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], text, state: 'error', error: null, conflict: { text: extra.text ?? '', revision: extra.revision ?? expectedRevision } } }));
+          setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], state: 'error', error: null, conflict: { text: extra.text ?? '', revision: extra.revision ?? expectedRevision } } }));
           return false;
         }
         if (err instanceof CourseActionError && (err.code === 'stage_locked' || err.code === 'already_submitted')) {
           void load();
           return false;
         }
-        dirtyText.current[promptId] = text;
-        setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], text, state: 'error', error: courseErrorMessage(err instanceof CourseActionError ? err.code : 'request_failed') } }));
+        if (dirtyText.current[promptId] === undefined) dirtyText.current[promptId] = text;
+        setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], state: 'error', error: courseErrorMessage(err instanceof CourseActionError ? err.code : 'request_failed') } }));
         return false;
       }
     },
@@ -197,17 +201,26 @@ export default function AssessmentView(props: Props) {
     }, SAVE_DEBOUNCE_MS);
   };
 
-  /** Flush every scheduled save and wait for every save in flight to land. */
+  /**
+   * Flush every scheduled save and wait for every save in flight to land.
+   * Looped: a round can leave new dirty text behind (a conflict or error
+   * restores it, or a caller's own retry logic re-marks it), so re-save and
+   * re-await up to three rounds before giving up.
+   */
   const flush = async (): Promise<boolean> => {
     for (const promptId of Object.keys(timers.current)) {
       clearTimeout(timers.current[promptId]);
       delete timers.current[promptId];
     }
-    for (const promptId of Object.keys(dirtyText.current)) {
-      void saveNow(promptId);
+    let results: boolean[] = [];
+    for (let round = 0; round < 3; round += 1) {
+      for (const promptId of Object.keys(dirtyText.current)) {
+        void saveNow(promptId);
+      }
+      results = await Promise.all(Object.values(pending.current));
+      if (Object.keys(dirtyText.current).length === 0) break;
     }
-    const results = await Promise.all(Object.values(pending.current));
-    return results.every((ok) => ok);
+    return results.every((ok) => ok) && Object.keys(dirtyText.current).length === 0;
   };
 
   const resolveConflict = (promptId: string, keepMine: boolean) => {
@@ -215,7 +228,9 @@ export default function AssessmentView(props: Props) {
     if (!conflict) return;
     revisions.current[promptId] = conflict.revision;
     if (keepMine) {
-      dirtyText.current[promptId] = drafts[promptId]?.text ?? '';
+      // Saves whatever is already dirty (the newest typing); only falls back
+      // to the rendered draft text when nothing newer has been typed since.
+      if (dirtyText.current[promptId] === undefined) dirtyText.current[promptId] = drafts[promptId]?.text ?? '';
       setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], state: 'idle', error: null, conflict: null } }));
       void saveNow(promptId);
     } else {
@@ -243,19 +258,21 @@ export default function AssessmentView(props: Props) {
   const advance = async (stage: StageView) => {
     if (!token || !attempt) return;
     setActionError(null);
-    if (!(await flush())) {
-      setActionError('Some responses could not be saved. Fix the ones marked below, then try again.');
-      return;
-    }
-    const ok = await confirm({
-      title: 'Continue and lock this part?',
-      message: 'The next part reveals new information. Once you continue, this part cannot be edited.',
-      confirmLabel: 'Continue and lock',
-      cancelLabel: 'Keep editing',
-    });
-    if (!ok) return;
+    // busy goes up before flush and stays up through the confirm dialog too,
+    // so nothing can type into a disabled textarea while either is pending.
     setBusy(true);
     try {
+      if (!(await flush())) {
+        setActionError('Some responses could not be saved. Fix the ones marked below, then try again.');
+        return;
+      }
+      const ok = await confirm({
+        title: 'Continue and lock this part?',
+        message: 'The next part reveals new information. Once you continue, this part cannot be edited.',
+        confirmLabel: 'Continue and lock',
+        cancelLabel: 'Keep editing',
+      });
+      if (!ok) return;
       const expectedRevisions = Object.fromEntries(stage.prompts.map((p) => [p.prompt_id, revisions.current[p.prompt_id] ?? 0]));
       setStatus(await advanceAssessment(token, attempt.id, stage.index, expectedRevisions));
       setProblems({});
@@ -278,19 +295,21 @@ export default function AssessmentView(props: Props) {
   const submit = async () => {
     if (!token || !attempt) return;
     setActionError(null);
-    if (!(await flush())) {
-      setActionError('Some responses could not be saved. Fix the ones marked below, then try again.');
-      return;
-    }
-    const ok = await confirm({
-      title: 'Submit your assessment?',
-      message: 'Every response locks and grading begins. You will not be able to edit after this.',
-      confirmLabel: 'Submit for grading',
-      cancelLabel: 'Keep editing',
-    });
-    if (!ok) return;
+    // busy goes up before flush and stays up through the confirm dialog too,
+    // so nothing can type into a disabled textarea while either is pending.
     setBusy(true);
     try {
+      if (!(await flush())) {
+        setActionError('Some responses could not be saved. Fix the ones marked below, then try again.');
+        return;
+      }
+      const ok = await confirm({
+        title: 'Submit your assessment?',
+        message: 'Every response locks and grading begins. You will not be able to edit after this.',
+        confirmLabel: 'Submit for grading',
+        cancelLabel: 'Keep editing',
+      });
+      if (!ok) return;
       const next = await submitAssessment(token, attempt.id, submitKeyFor(attempt.id));
       setStatus(next);
       setProblems({});
@@ -439,6 +458,7 @@ function Stages(props: {
                   draft={props.drafts[p.prompt_id]}
                   problem={props.problems[p.prompt_id]}
                   editable={current && !p.response.locked}
+                  busy={props.busy}
                   onChange={props.onChange}
                   onResolve={props.onResolve}
                 />
@@ -472,6 +492,7 @@ function Prompt(props: {
   draft: Draft | undefined;
   problem: string | undefined;
   editable: boolean;
+  busy: boolean;
   onChange: (promptId: string, text: string) => void;
   onResolve: (promptId: string, keepMine: boolean) => void;
 }) {
@@ -493,6 +514,7 @@ function Prompt(props: {
             rows={8}
             value={text}
             maxLength={prompt.max_chars}
+            disabled={props.busy}
             onChange={(e) => props.onChange(prompt.prompt_id, e.target.value)}
           />
           <div className="mt-1 flex flex-wrap justify-between gap-2 text-sm text-slate-600">
