@@ -1,6 +1,8 @@
 import { defineCollection, z } from 'astro:content';
 import { glob } from 'astro/loaders';
-import { APPROVAL_RE, MODULE_ID_RE, STREAM_UID_RE, WORKSHEET_ID_RE, hasBannedCopy } from '../lib/course/ids';
+import { CRITERION_IDS, PRINCIPLE_IDS, TOOL_IDS, type CriterionId } from '../data/certification';
+import { FORM_PRIVATE_MARKER, FORM_STATUSES, RESPONSE_MAX_CHARS, STAGE_PARTS, checkForm } from '../lib/course/assessmentForm';
+import { APPROVAL_RE, LESSON_ID_RE, MODULE_ID_RE, STREAM_UID_RE, WORKSHEET_ID_RE, hasBannedCopy } from '../lib/course/ids';
 import { LESSON_KINDS, LESSON_STATUSES } from '../lib/course/types';
 
 /**
@@ -203,6 +205,64 @@ const courseWorksheets = defineCollection({
   }),
 });
 
+/**
+ * Assessment forms are PRIVATE content. The collection is read by exactly one
+ * module, src/lib/server/course/forms.ts; scripts/check-private-content.mjs
+ * fails `npm run check` on any other reference, and scripts/check-dist-leak.mjs
+ * fails `npm run build` if a reveal, a reference response or a later-stage
+ * prompt appears in dist/. Keys are snake_case because the same shape is
+ * frozen into the database as an attempt's snapshot.
+ */
+const assessmentForms = defineCollection({
+  loader: glob({ pattern: '**/*.json', base: './src/content/course/assessment-forms' }),
+  schema: z
+    .object({
+      form_id: z.string().regex(/^[a-z0-9-]+$/),
+      version: z.number().int().min(1),
+      certification_version: z.string().min(1),
+      status: z.enum(FORM_STATUSES),
+      order: z.number().int().min(0),
+      private_marker: z.literal(FORM_PRIVATE_MARKER),
+      stages: z
+        .array(
+          z.object({
+            id: z.string().min(1),
+            part: z.enum(STAGE_PARTS),
+            title: cleanCopy('stage title'),
+            intro: cleanCopy('stage intro').optional(),
+            reveal: cleanCopy('stage reveal').optional(),
+            lock_on_advance: z.boolean(),
+            prompts: z
+              .array(
+                z.object({
+                  prompt_id: z.string().regex(/^[a-z][a-z0-9]*$/),
+                  text: cleanCopy('prompt'),
+                  required: z.boolean(),
+                  min_chars: z.number().int().min(0),
+                  max_chars: z.number().int().min(1).max(RESPONSE_MAX_CHARS),
+                  principle_ids: z.array(z.enum(PRINCIPLE_IDS)),
+                  tool_ids: z.array(z.enum(TOOL_IDS)),
+                })
+              )
+              .min(1),
+          })
+        )
+        .min(1),
+      reference_responses: z.array(z.object({ prompt_id: z.string(), text: cleanCopy('reference response') })),
+      scoring_anchors: z.array(
+        z.object({
+          criterion_id: z.enum(CRITERION_IDS as unknown as [CriterionId, ...CriterionId[]]),
+          note: cleanCopy('scoring anchor'),
+        })
+      ),
+      lesson_ids: z.array(z.string().regex(LESSON_ID_RE)).min(1),
+      notes: cleanCopy('notes').optional(),
+    })
+    .superRefine((form, ctx) => {
+      for (const message of checkForm(form)) ctx.addIssue({ code: z.ZodIssueCode.custom, message });
+    }),
+});
+
 export const collections = {
   principles,
   protocol,
@@ -211,4 +271,5 @@ export const collections = {
   courseModules,
   courseLessons,
   courseWorksheets,
+  assessmentForms,
 };
