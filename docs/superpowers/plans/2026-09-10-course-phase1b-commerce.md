@@ -2845,3 +2845,20 @@ Not a subagent task: the controller runs it after the final code review, with th
 Lesson delivery consumes `requireEnrolled` (Task 2) for `/api/course/lesson`, `/progress`, `/state` and `/worksheet`, `privateJson` for every response, `useCourseEntitlement` in `LessonView`, and the dashboard's "Coming soon" list, which `LessonNav` replaces. The lesson shell's placeholder card is replaced by the island. Publishing V04 with the placeholder clip (`videoPlaceholder: true`, `status: published`, the Stream UID of `scripts/placeholder-video/out/coming-soon.mp4` once David uploads it) makes "Open the first lesson" live.
 
 Deferred to sub-plan 1e: `docs/status.md`, `deployment.md` (the two async webhook events, `STRIPE_PRICE_ID_COURSE`, the refund runbook), `architecture.md`, the JSON-LD `course()` helper, nav and footer wiring, `AuthMenu`, home, practice, pricing and FAQ touchpoints, `llms.txt`, the hosted migration push, Netlify env vars, the `course-beta` branch context, and the curated screenshots.
+
+## Execution record (2026-09-10)
+
+Executed with subagent-driven development: twelve commits from `e4e5cb7` to `d5c300c`, each task reviewed, a whole-branch review, one fix wave and one follow-up. Amendments the reviews forced on this plan, now in the code: the checkout endpoint answers 503 `entitlement_unavailable` and `checkout_unavailable` on database failures, 409 `request_key_reused` on a Stripe idempotency conflict (the CTA mints a fresh key once) and 409 `payment_pending` when a replayed key returns a completed session whose bank debit is still settling; `checkout_created` audit rows are deduped per session; `classifyPaidSession` takes `now` and re-opens an expired enrollment as `reinstated`; a delivery that died before its ledger row is finished by the retry, but only for a row still `enrolled`; every side effect after the enrollment write is caught and logged; the purchase email links to `CANONICAL_ORIGIN`, is keyed per purchase, and `no_payment_required` counts as paid; the entitlement hook uses a generation counter; the sales copy lost its "not just X" heading and its uniform bullet openers; `vite` is a declared devDependency because `astro.config.mjs` imports `loadEnv`.
+
+Browser verification (Task 8) passed on 2026-09-10: purchase, delayed-webhook recovery through "Check access", cancel banner, non-admin refusal, hidden 404 and the preview build. Screenshots for `docs/features/course/` are with sub-plan 1e.
+
+Carried to sub-plan 1e, in priority order:
+
+1. Register `checkout.session.async_payment_succeeded` and `checkout.session.async_payment_failed` on the hosted Stripe webhook endpoint, and set `STRIPE_PRICE_ID_COURSE` in Netlify. Without the events a bank-debit purchase never enrolls.
+2. The four-place analytics rule for `course_viewed`, `enrollment_ready` and the server-side `course_enrolled` (GTM trigger regex, GA4 custom dimensions `course_id` and `sale_status`, key event, Ads import).
+3. The resume path in `enrollFromSession` records `enrolled` even when the mutation it finishes was a reinstatement; a unique index on `(stripe_checkout_session_id, kind)` would turn `hasGrantEvent` into a guarantee.
+4. `/api/checkout` and `/api/team-checkout` build `cancel_url` with the pre-fix fragment bug that `cancelUrl` in the course endpoint solves; three pre-existing em dashes in `stripe-webhook.ts` comments and one in `CheckoutBanner.tsx`.
+5. The refund runbook should say that a course buyer who later subscribes (or a refunded re-buyer) may hold two Stripe customers, because `/api/checkout` reuses only the subscription's customer.
+6. `NewEvent.actor_user_id` is ready for the admin grant, revoke, refund and reinstate actions.
+7. A React "Invalid hook call" warning appears only under `astro dev` on `/dashboard` and `/course/learn`; the production build is clean. Investigate if it persists.
+8. Six stale `astro dev` processes from another repo hold ports 4321 to 4326 on the development machine; local instructions that say 4321 should say "the port the dev server prints".
