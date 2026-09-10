@@ -128,6 +128,10 @@ const pages: Record<string, OgPage> = {
         },
       }
     : {}),
+  'course/learn': {
+    title: 'Your course',
+    description: 'Your lessons, worksheets and progress in the Complete Solution Seeking course.',
+  },
   account: {
     title: 'Your Account',
     description: 'Save your practice work and pick it back up anytime.',
