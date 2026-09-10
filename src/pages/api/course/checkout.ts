@@ -160,8 +160,14 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     );
     // A replayed key can hand back a session that already finished (a second
     // click after paying, before the webhook landed) or one that expired.
-    // Neither has a page to send the learner to.
-    if (session.status === 'complete') return privateJson({ error: 'already_enrolled' }, 409);
+    // Neither has a page to send the learner to. A finished session whose
+    // bank debit is still settling is a purchase in progress, not a new one.
+    if (session.status === 'complete') {
+      return privateJson(
+        { error: session.payment_status === 'unpaid' ? 'payment_pending' : 'already_enrolled' },
+        409
+      );
+    }
     if (!session.url) return privateJson({ error: 'request_key_reused' }, 409);
     await recordCheckoutCreated(
       user.id,

@@ -314,6 +314,14 @@ describe('enrollFromSession', () => {
     const broken: EnrollmentStore = { ...store, async insert() { return 'conflict'; } };
     await expect(enrollFromSession(broken, session(), 'evt_x')).rejects.toThrow(/conflicted but no row/);
   });
+
+  it('does not finish a dead delivery for a row an operator has since revoked', async () => {
+    const { store, rows, events } = fakeStore([row({ status: 'revoked', stripe_checkout_session_id: 'cs_new' })]);
+    const result = await enrollFromSession(store, session(), 'evt_late');
+    expect(result.outcome).toBe('already_processed');
+    expect(rows[0].status).toBe('revoked');
+    expect(events).toHaveLength(0);
+  });
 });
 
 describe('recordPaymentSignal', () => {

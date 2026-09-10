@@ -95,6 +95,8 @@ export function courseErrorMessage(code: string): string {
       return 'Checkout is not available right now. Please try again later.';
     case 'request_key_reused':
       return 'That checkout attempt expired. Please try again.';
+    case 'payment_pending':
+      return 'Your payment is still being processed. Your course opens as soon as it settles.';
     case 'entitlement_unavailable':
     case 'checkout_unavailable':
       return 'Checkout is not available right now. Please try again in a moment.';

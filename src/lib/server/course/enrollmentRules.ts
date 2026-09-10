@@ -222,7 +222,7 @@ function noteFor(outcome: PaidOutcome, existing: EnrollmentRow | null): string |
 /**
  * Apply one PAID Checkout Session to the learner's enrollment, exactly once.
  *
- * Idempotent three ways, because Stripe retries and people double-pay:
+ * Idempotent four ways, because Stripe retries and people double-pay:
  *  - the ledger's unique stripe_event_id makes a re-delivered event a no-op;
  *  - the enrollment's unique stripe_checkout_session_id makes the same
  *    purchase a no-op even under a fresh event id;
@@ -267,7 +267,9 @@ export async function enrollFromSession(
     // The row carries this session, so an earlier delivery got as far as the
     // mutation. If it died before its ledger row, finish the job now: the
     // ledger row under this event id, and the side effects the caller runs.
-    if (existing && !(await store.hasGrantEvent(session.sessionId))) {
+    // Only for a row that is still enrolled: an operator may have revoked or
+    // refunded it in the meantime, and that decision stands.
+    if (existing?.status === 'enrolled' && !(await store.hasGrantEvent(session.sessionId))) {
       outcome = 'enrolled';
     } else {
       return { outcome, enrollment };

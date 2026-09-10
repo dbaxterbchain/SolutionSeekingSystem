@@ -98,6 +98,7 @@ export default function CourseDashboard(props: Props) {
 
   const checkAccess = async () => {
     setChecking(true);
+    setCheckNote(null);
     const current = await refetch();
     setChecking(false);
     if (current?.kind === 'enrolled') setActivation('ready');

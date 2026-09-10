@@ -62,7 +62,7 @@ export default function CourseSalesCta(props: Props) {
   const purchasable = entitlement ? entitlement.sale.can_purchase : props.saleStatus === 'open';
   // Signed in with the answer still in flight: hold the verdict rather than
   // telling a buyer the course opens soon and then swapping in a button.
-  const settling = Boolean(session) && loading && !entitlement;
+  const settling = signedIn && loading && !entitlement;
   const label = props.priceLabel ? `Get the course for ${props.priceLabel}` : 'Get the course';
 
   const buy = async () => {
