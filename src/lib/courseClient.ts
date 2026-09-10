@@ -4,7 +4,7 @@ import type { ProgressAction } from './course/progressRules';
 import type { CourseStatus } from './course/status';
 import type { AssessmentStatus, CertificationStatus } from './course/assessmentTypes';
 
-export type { AssessmentStatus, AttemptView, CriterionFeedback, JobView, PromptView, ResultView, StageView } from './course/assessmentTypes';
+export type { AssessmentStatus, AttemptView, CapApplied, CriterionFeedback, JobView, PromptView, ResultView, StageView } from './course/assessmentTypes';
 
 /**
  * The browser's view of the course, fetched from the server and never
@@ -150,6 +150,17 @@ export function courseErrorMessage(code: string): string {
     default:
       return 'Something went wrong. Please try again.';
   }
+}
+
+/**
+ * The copy for a refused start. courseErrorMessage only sees the code, and
+ * `not_eligible` covers three different situations, so callers pass the
+ * server's `reason` here instead.
+ */
+export function notEligibleMessage(reason: unknown): string {
+  if (reason === 'already_passed') return 'You have passed this version of the assessment.';
+  if (reason === 'open_attempt') return 'Your assessment is already open.';
+  return courseErrorMessage('not_eligible');
 }
 
 export interface ProgressView {

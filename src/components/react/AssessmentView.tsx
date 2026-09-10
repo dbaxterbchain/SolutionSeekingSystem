@@ -7,10 +7,12 @@ import {
   advanceAssessment,
   courseErrorMessage,
   fetchAssessmentStatus,
+  notEligibleMessage,
   saveAssessmentResponse,
   startAssessment,
   submitAssessment,
   type AssessmentStatus,
+  type CapApplied,
   type CriterionFeedback,
   type PromptView,
   type StageView,
@@ -68,6 +70,7 @@ export default function AssessmentView(props: Props) {
   /** Text typed since the last successful save, per prompt: read at save time, never from render-derived state. */
   const dirtyText = useRef<Record<string, string>>({});
   const pending = useRef<Record<string, Promise<boolean>>>({});
+  /** The one-time event already fired, as `${attempt id}:${event}`: after a grading_error, an admin retry must still fire grade_ready once. */
   const firedFor = useRef<string | null>(null);
   /** Set by the polling effect: which attempt this page itself watched through submitted/grading. */
   const sawOpenFor = useRef<string | null>(null);
@@ -129,14 +132,14 @@ export default function AssessmentView(props: Props) {
   useEffect(() => {
     if (!attempt) return;
     if (sawOpenFor.current !== attempt.id) return;
-    if (firedFor.current === attempt.id) return;
-    if (attempt.state === 'passed' || attempt.state === 'needs_revision') {
-      firedFor.current = attempt.id;
-      track({ event: 'grade_ready', attempt_id: attempt.id, result: attempt.state });
-    } else if (attempt.state === 'grading_error') {
-      firedFor.current = attempt.id;
-      track({ event: 'grading_error', attempt_id: attempt.id });
-    }
+    const state = attempt.state;
+    const kind = state === 'passed' || state === 'needs_revision' ? 'grade_ready' : state === 'grading_error' ? 'grading_error' : null;
+    if (!kind) return;
+    const key = `${attempt.id}:${kind}`;
+    if (firedFor.current === key) return;
+    firedFor.current = key;
+    if (state === 'grading_error') track({ event: 'grading_error', attempt_id: attempt.id });
+    else track({ event: 'grade_ready', attempt_id: attempt.id, result: state === 'passed' ? 'passed' : 'needs_revision' });
   }, [attempt?.id, attempt?.state]);
 
   /**
@@ -249,7 +252,8 @@ export default function AssessmentView(props: Props) {
     try {
       setStatus(await startAssessment(token));
     } catch (err) {
-      setActionError(courseErrorMessage(err instanceof CourseActionError ? err.code : 'request_failed'));
+      if (err instanceof CourseActionError && err.code === 'not_eligible') setActionError(notEligibleMessage(err.extra.reason));
+      else setActionError(courseErrorMessage(err instanceof CourseActionError ? err.code : 'request_failed'));
     } finally {
       setBusy(false);
     }
@@ -370,9 +374,10 @@ export default function AssessmentView(props: Props) {
         <section className="mt-8 rounded-2xl border border-amber-100 bg-amber-50 p-6" role="alert">
           <h2 className="font-heading text-xl font-bold text-ink-800">We could not finish grading</h2>
           <p className="mt-2 text-amber-900">{GRADING_ERROR_COPY}</p>
+          <p className="mt-2 text-amber-900">Course support can re-run the grading for you.</p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <button type="button" className="btn-primary" onClick={() => void load()}>Check again</button>
-            <a className="btn-secondary" href={`mailto:${props.supportContact}`}>Contact course support</a>
+            <a className="btn-primary" href={`mailto:${props.supportContact}`}>Contact course support</a>
+            <button type="button" className="btn-secondary" onClick={() => void load()}>Check again</button>
           </div>
         </section>
       )}
@@ -536,10 +541,14 @@ function Prompt(props: {
           {props.problem && <ErrorLine text={props.problem} />}
         </>
       ) : (
-        <div className="mt-3 whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-slate-800">
-          {text || <span className="text-slate-500">No response.</span>}
-          {prompt.response.locked && <p className="mt-2 text-xs uppercase tracking-wide text-slate-500">Locked</p>}
-        </div>
+        <>
+          <div className="mt-3 whitespace-pre-wrap rounded-xl border border-slate-200 bg-slate-50 p-3 text-slate-800">
+            {text || <span className="text-slate-500">No response.</span>}
+            {prompt.response.locked && <p className="mt-2 text-xs uppercase tracking-wide text-slate-500">Locked</p>}
+          </div>
+          {/* A problem on a prompt this learner cannot edit still has to show, or the submit fails with nothing on screen to explain it. */}
+          {props.problem && <ErrorLine text={props.problem} />}
+        </>
       )}
     </div>
   );
@@ -567,7 +576,7 @@ function Result({ result, awardsEnabled }: { result: NonNullable<AssessmentStatu
         )}
       </div>
       {result.criteria.map((c) => (
-        <Criterion key={c.criterion_id} feedback={c} />
+        <Criterion key={c.criterion_id} feedback={c} caps={result.caps_applied.filter((cap) => cap.criterion_id === c.criterion_id)} />
       ))}
     </section>
   );
@@ -583,8 +592,20 @@ function joinWithAnd(nodes: ReactNode[]): ReactNode {
   ));
 }
 
-function Criterion({ feedback: c }: { feedback: CriterionFeedback }) {
+/**
+ * Why a criterion reads lower than it scored, one sentence per cause. Several
+ * missing principles are one cap sentence, because the sentence already says "at
+ * least one"; each misconception names itself, so each gets its own.
+ */
+function capSentence(cap: CapApplied): string {
+  if (cap.cause === 'principle') return `Capped at ${cap.to} because at least one Wisdom Principle was missing or misapplied.`;
+  if (cap.cause === 'tool') return `Capped at ${cap.to} because at least one Leadership Tool was missing or misapplied.`;
+  return `Capped at ${cap.to} because of a material misconception: ${cap.detail}`;
+}
+
+function Criterion({ feedback: c, caps }: { feedback: CriterionFeedback; caps: CapApplied[] }) {
   const capped = c.effective_score < c.score;
+  const reasons = capped ? [...new Set(caps.map(capSentence))] : [];
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -596,6 +617,11 @@ function Criterion({ feedback: c }: { feedback: CriterionFeedback }) {
       </div>
       {c.status === 'unanswered' && <p className="mt-1 text-sm text-slate-600">Nothing in your responses could be quoted for this criterion.</p>}
       {c.status === 'misconception' && <p className="mt-1 text-sm text-amber-900">A material misconception was found here.</p>}
+      {reasons.map((sentence) => (
+        <p key={sentence} className="mt-1 text-sm text-slate-600">
+          {sentence}
+        </p>
+      ))}
       <p className="mt-3 text-slate-800">{c.reason}</p>
       {c.evidence.length > 0 && (
         <ul className="mt-3 space-y-2">
