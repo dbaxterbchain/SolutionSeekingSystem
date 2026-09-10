@@ -244,7 +244,10 @@ export function validateCatalog(input: CatalogInput): Catalog {
       need(Boolean(l.approvals.copy), 'approvals.copy is required');
     }
     if (r >= rank('edited')) {
-      need(l.streamUid !== null, 'streamUid is required');
+      // A placeholder-video lesson has no video of its own yet: it plays
+      // COURSE.placeholderStreamUid instead (src/lib/course/lessonView.ts),
+      // so it is exempt here the same way it is from approvals.edit below.
+      if (!l.videoPlaceholder) need(l.streamUid !== null, 'streamUid is required');
       need(l.durationMin >= 1, 'durationMin must be at least 1');
       if (!l.videoPlaceholder) need(Boolean(l.approvals.edit), 'approvals.edit is required');
     }
