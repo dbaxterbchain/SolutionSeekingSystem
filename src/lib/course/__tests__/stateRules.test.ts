@@ -33,7 +33,7 @@ function done(id: string, kind: 'standard' | 'orientation' | 'plan', openedMinut
 }
 
 function input(rows: ProgressRow[], attempts: StateInput['attempts'] = []): StateInput {
-  return { lessons, modules, rows, attempts, orientationLessonId: 'v39', planLessonId: 'v40', assessmentModuleId: 'm09', assessmentSubmitted: false, certificationVersion: '1' };
+  return { lessons, modules, rows, attempts, orientationLessonId: 'v39', planLessonId: 'v40', assessmentModuleId: 'm09', assessment: { latestState: null, anySubmitted: false }, certificationVersion: '1' };
 }
 
 describe('resume pointer', () => {
@@ -99,13 +99,18 @@ describe('eligibility and completion', () => {
     const notYet = deriveCourseState({ ...input(rows, allChecks), lessons: lessons.filter((l) => l.status === 'published') });
     expect(notYet.plan_complete).toBe(true);
     expect(notYet.course_complete).toBe(false);
-    const complete = deriveCourseState({ ...input(rows, allChecks), lessons: lessons.filter((l) => l.status === 'published'), assessmentSubmitted: true });
+    const complete = deriveCourseState({ ...input(rows, allChecks), lessons: lessons.filter((l) => l.status === 'published'), assessment: { latestState: 'passed', anySubmitted: true } });
     expect(complete.course_complete).toBe(true);
   });
   it('a lesson that is not published never counts, even with a complete row', () => {
     const state = deriveCourseState(input([done('v04', 'standard', 1)]));
     expect(state.lessons.v04).toBeUndefined();
     expect(state.certification).toEqual({ version: '1', status: 'none' });
+  });
+  it('reports the certification status from the latest attempt', () => {
+    const rows: ProgressRow[] = [];
+    expect(deriveCourseState({ ...input(rows, []), assessment: { latestState: 'grading', anySubmitted: true } }).certification.status).toBe('submitted');
+    expect(deriveCourseState({ ...input(rows, []), assessment: { latestState: 'draft', anySubmitted: false } }).certification.status).toBe('in_progress');
   });
   it('reports a lesson row with its flags', () => {
     const row = newProgressRow('v01', 1, new Date(T(1)));

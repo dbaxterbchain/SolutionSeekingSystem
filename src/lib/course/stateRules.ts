@@ -1,5 +1,7 @@
 import type { PracticeState, ProgressRow } from './progressRules';
 import type { LessonKind, LessonStatus } from './types';
+import type { AttemptState, CertificationStatus } from './assessmentTypes';
+import { certificationStatus } from './assessmentRules';
 
 /**
  * The learner's place in the course, derived at read time from at most 40
@@ -37,7 +39,8 @@ export interface StateInput {
   planLessonId: string;
   /** The module that holds the assessment and the plan, so it is not counted as a study module. */
   assessmentModuleId: string;
-  assessmentSubmitted: boolean;
+  /** The latest attempt's state, and whether any attempt has ever been submitted. */
+  assessment: { latestState: AttemptState | null; anySubmitted: boolean };
   certificationVersion: string;
 }
 
@@ -64,7 +67,7 @@ export interface CourseStateView {
   assessment_eligible: boolean;
   plan_complete: boolean;
   course_complete: boolean;
-  certification: { version: string; status: 'none' };
+  certification: { version: string; status: CertificationStatus };
 }
 
 export function deriveCourseState(input: StateInput): CourseStateView {
@@ -131,7 +134,7 @@ export function deriveCourseState(input: StateInput): CourseStateView {
   const courseComplete =
     published.length === input.lessons.length &&
     published.every((l) => isComplete(l.id)) &&
-    input.assessmentSubmitted &&
+    input.assessment.anySubmitted &&
     planComplete;
 
   return {
@@ -141,6 +144,6 @@ export function deriveCourseState(input: StateInput): CourseStateView {
     assessment_eligible: assessmentEligible,
     plan_complete: planComplete,
     course_complete: courseComplete,
-    certification: { version: input.certificationVersion, status: 'none' },
+    certification: { version: input.certificationVersion, status: certificationStatus(input.assessment.latestState) },
   };
 }

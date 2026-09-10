@@ -15,8 +15,8 @@ export async function computeCourseState(userId: string): Promise<CourseStateVie
     orientationLessonId: COURSE.orientationLessonId,
     planLessonId: COURSE.planLessonId,
     assessmentModuleId: catalog.byId[COURSE.orientationLessonId].module,
-    // Sub-plan 1d records submissions; until then nothing has been submitted.
-    assessmentSubmitted: false,
+    // Sub-plan 1d Task 7 reads the attempts table here; until then no attempt exists.
+    assessment: { latestState: null, anySubmitted: false },
     certificationVersion: COURSE.certificationVersion,
   });
 }
