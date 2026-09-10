@@ -13,7 +13,7 @@ import { useDialog } from './Dialog';
  * false sense of where the boundary is. The boundary is the API.
  */
 
-type Tab = 'feedback' | 'orgs' | 'subscribers' | 'enquiries';
+type Tab = 'feedback' | 'orgs' | 'subscribers' | 'enquiries' | 'grading';
 
 interface FeedbackRow {
   id: string;
@@ -70,8 +70,31 @@ interface EnquiryRow {
   created_at: string;
 }
 
+interface GradingRow {
+  id: string;
+  attempt_id: string;
+  generation: number;
+  state: 'queued' | 'running' | 'succeeded' | 'failed';
+  reason: 'submission' | 'retry' | 'regrade';
+  attempts: number;
+  max_attempts: number;
+  error_category: string | null;
+  last_error: string | null;
+  model: string | null;
+  locked_by: string | null;
+  locked_at: string | null;
+  created_at: string;
+  updated_at: string;
+  attempt_state: string | null;
+  user_id: string | null;
+  form_id: string | null;
+  submitted_at: string | null;
+}
+
 const date = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+const time = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
 
 export default function AdminView() {
   const { session, user, loading } = useSession();
@@ -86,6 +109,7 @@ export default function AdminView() {
   const [subscribers, setSubscribers] = useState<SubscriberRow[] | null>(null);
   const [bySource, setBySource] = useState<Record<string, { total: number; confirmed: number }>>({});
   const [enquiries, setEnquiries] = useState<EnquiryRow[] | null>(null);
+  const [grading, setGrading] = useState<GradingRow[] | null>(null);
   const { confirm, dialog } = useDialog();
 
   const call = async (path: string, body?: unknown) => {
@@ -124,6 +148,9 @@ export default function AdminView() {
         setSubscribers(d.rows);
         setBySource(d.bySource ?? {});
       }
+    } else if (which === 'grading') {
+      const d = await call('course?view=grading');
+      if (d) setGrading(d.rows);
     } else {
       const d = await call('enquiries');
       if (d) setEnquiries(d.rows);
@@ -179,6 +206,7 @@ export default function AdminView() {
     { id: 'orgs', label: 'Organizations', count: orgs?.length },
     { id: 'subscribers', label: 'Email list', count: subscribers?.length },
     { id: 'enquiries', label: 'Enquiries', count: enquiries?.filter((e) => !e.handled).length },
+    { id: 'grading', label: 'Grading' },
   ];
 
   return (
@@ -235,6 +263,18 @@ export default function AdminView() {
           onHandled={async (id, handled) => {
             const d = await call('enquiries', { id, handled });
             if (d?.ok) void loadTab('enquiries');
+          }}
+        />
+      )}
+      {tab === 'grading' && (
+        <GradingTab
+          rows={grading}
+          onAction={async (action, jobId) => {
+            const d = await call('course', { action, job_id: jobId });
+            if (d) {
+              setNotice(action === 'retry_job' ? 'Job queued for another try.' : 'Worker triggered.');
+              await loadTab('grading');
+            }
           }}
         />
       )}
@@ -720,6 +760,99 @@ function EnquiriesTab({
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- Grading */
+
+function GradingTab({
+  rows,
+  onAction,
+}: {
+  rows: GradingRow[] | null;
+  onAction: (action: 'retry_job' | 'kick_job', jobId: string) => void;
+}) {
+  if (!rows) return <p className="text-sm text-slate-400">Loading…</p>;
+  if (rows.length === 0) {
+    return <Empty>No grading jobs yet.</Empty>;
+  }
+
+  const stateBadge: Record<GradingRow['state'], string> = {
+    queued: 'bg-slate-100 text-slate-600',
+    running: 'bg-amber-100 text-amber-800',
+    succeeded: 'bg-emerald-100 text-emerald-700',
+    failed: 'bg-red-50 text-red-700',
+  };
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-card">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">
+          <tr>
+            <th className="px-5 py-3">Job</th>
+            <th className="px-5 py-3">Attempt state</th>
+            <th className="px-5 py-3">Learner</th>
+            <th className="px-5 py-3">Form</th>
+            <th className="px-5 py-3">Job state</th>
+            <th className="px-5 py-3">Attempts</th>
+            <th className="px-5 py-3">Error</th>
+            <th className="px-5 py-3">Updated</th>
+            <th className="px-5 py-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id} className="border-b border-slate-50 last:border-0">
+              <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{r.id.slice(0, 8)}</td>
+              <td className="px-5 py-2.5 text-slate-500">{r.attempt_state ?? ''}</td>
+              <td className="px-5 py-2.5 font-mono text-xs text-slate-500">
+                {r.user_id ? r.user_id.slice(0, 8) : ''}
+              </td>
+              <td className="px-5 py-2.5 text-slate-500">{r.form_id ?? ''}</td>
+              <td className="px-5 py-2.5">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${stateBadge[r.state]}`}>
+                  {r.state}
+                </span>
+              </td>
+              <td className="px-5 py-2.5 text-slate-500">
+                {r.attempts}/{r.max_attempts}
+              </td>
+              <td className="max-w-xs px-5 py-2.5 align-top text-slate-500">
+                {r.error_category && (
+                  <p className="text-xs font-semibold text-red-700">{r.error_category}</p>
+                )}
+                {r.last_error && (
+                  <p className="mt-0.5 break-words text-xs text-slate-400">{r.last_error}</p>
+                )}
+              </td>
+              <td className="px-5 py-2.5 text-slate-400">
+                {date(r.updated_at)} {time(r.updated_at)}
+              </td>
+              <td className="px-5 py-2.5">
+                {r.state === 'failed' && (
+                  <button
+                    type="button"
+                    onClick={() => onAction('retry_job', r.id)}
+                    className="rounded-full bg-brand-500 px-3.5 py-1 text-xs font-semibold text-white hover:bg-brand-600"
+                  >
+                    Retry
+                  </button>
+                )}
+                {(r.state === 'queued' || r.state === 'running') && (
+                  <button
+                    type="button"
+                    onClick={() => onAction('kick_job', r.id)}
+                    className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
+                  >
+                    Kick
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
