@@ -100,6 +100,10 @@ export type AnalyticsEvent =
   | { event: 'course_viewed'; course_id: string; sale_status: 'hidden' | 'preview' | 'open' }
   /** Back from Stripe and the enrollment is confirmed by the server. Fired once. */
   | { event: 'enrollment_ready'; course_id: string }
+  /** A lesson reached complete (fired once, by the action that completed it). */
+  | { event: 'lesson_completed'; lesson_id: string; module_id: string; content_version: number }
+  /** The lesson that completed also completed its module. */
+  | { event: 'module_completed'; module_id: string }
   /**
    * A visitor tapped a suggested opener in an empty chat. The blank composer is
    * the step the consumer funnel dies on, so this is the pair that tells us
