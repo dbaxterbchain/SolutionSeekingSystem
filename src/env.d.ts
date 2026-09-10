@@ -3,6 +3,8 @@
 interface ImportMetaEnv {
   readonly PUBLIC_SUPABASE_URL: string;
   readonly PUBLIC_SUPABASE_ANON_KEY: string;
+  /** Course launch flag: hidden (default) | preview | open. See src/lib/course/status.ts. */
+  readonly PUBLIC_COURSE_STATUS?: string;
   // Phase 3 — server-side only (never exposed to the browser).
   readonly ANTHROPIC_API_KEY: string;
   readonly STRIPE_SECRET_KEY: string;
