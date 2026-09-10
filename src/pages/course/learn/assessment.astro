@@ -1,7 +1,6 @@
 ---
 import BaseLayout from '../../../layouts/BaseLayout.astro';
 import AssessmentView from '../../../components/react/AssessmentView.tsx';
-import { COURSE } from '../../../data/course';
 import { CERTIFICATION_TITLE } from '../../../data/certification';
 import { courseCopy } from '../../../lib/course/copy';
 
@@ -11,6 +10,6 @@ import { courseCopy } from '../../../lib/course/copy';
 
 <BaseLayout title="Final assessment" description="The staged final assessment for the Complete Solution Seeking course." noindex>
   <div class="container-page py-10">
-    <AssessmentView client:load courseId={COURSE.id} certificationTitle={CERTIFICATION_TITLE} supportContact={courseCopy('{{support_contact}}')} />
+    <AssessmentView client:load certificationTitle={CERTIFICATION_TITLE} supportContact={courseCopy('{{support_contact}}')} />
   </div>
 </BaseLayout>

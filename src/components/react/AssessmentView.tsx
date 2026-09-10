@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSession } from '../../lib/useSession';
 import { accountLink } from '../../lib/accountLink';
 import { track } from '../../lib/analytics';
@@ -18,7 +18,6 @@ import {
 import { useDialog } from './Dialog';
 
 interface Props {
-  courseId: string;
   certificationTitle: string;
   supportContact: string;
 }
@@ -64,14 +63,27 @@ export default function AssessmentView(props: Props) {
   const [problems, setProblems] = useState<Record<string, string>>({});
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const pending = useRef<Record<string, Promise<void>>>({});
+  /** The latest revision the server has told us about, per prompt: the source of truth for `expected_revision`. */
+  const revisions = useRef<Record<string, number>>({});
+  /** Text typed since the last successful save, per prompt: read at save time, never from render-derived state. */
+  const dirtyText = useRef<Record<string, string>>({});
+  const pending = useRef<Record<string, Promise<boolean>>>({});
   const firedFor = useRef<string | null>(null);
+  /** Set by the polling effect: which attempt this page itself watched through submitted/grading. */
+  const sawOpenFor = useRef<string | null>(null);
 
   const attempt = status?.attempt ?? null;
 
   // Seed the drafts from the server view whenever the attempt changes shape.
   useEffect(() => {
     if (!attempt) return;
+    for (const stage of attempt.stages) {
+      for (const p of stage.prompts) {
+        if ((revisions.current[p.prompt_id] ?? -1) < p.response.revision) {
+          revisions.current[p.prompt_id] = p.response.revision;
+        }
+      }
+    }
     setDrafts((prev) => {
       const next = { ...prev };
       for (const stage of attempt.stages) {
@@ -99,13 +111,24 @@ export default function AssessmentView(props: Props) {
     if (!loading && token) void load();
   }, [loading, token, load]);
 
-  // Poll while grading; fire the one-time events when the outcome lands.
+  // Poll while grading. An interval, not a timeout re-armed by this effect's
+  // own deps: a `grading` reading twice in a row would otherwise not re-run
+  // the effect at all, and the poll would silently stop. Once started, the
+  // interval keeps firing on its own until the cleanup below runs.
   useEffect(() => {
     if (!attempt) return;
-    if (attempt.state === 'submitted' || attempt.state === 'grading') {
-      const id = setTimeout(() => void load(), POLL_MS);
-      return () => clearTimeout(id);
-    }
+    if (attempt.state !== 'submitted' && attempt.state !== 'grading') return;
+    sawOpenFor.current = attempt.id;
+    const id = setInterval(() => void load(), POLL_MS);
+    return () => clearInterval(id);
+  }, [attempt?.id, attempt?.state, load]);
+
+  // Fire the one-time events when the outcome lands, but only for an attempt
+  // this page itself watched through submitted/grading: never on a plain
+  // visit to a result that was already finished before this page loaded.
+  useEffect(() => {
+    if (!attempt) return;
+    if (sawOpenFor.current !== attempt.id) return;
     if (firedFor.current === attempt.id) return;
     if (attempt.state === 'passed' || attempt.state === 'needs_revision') {
       firedFor.current = attempt.id;
@@ -114,63 +137,93 @@ export default function AssessmentView(props: Props) {
       firedFor.current = attempt.id;
       track({ event: 'grading_error', attempt_id: attempt.id });
     }
-  }, [attempt?.id, attempt?.state, load]);
+  }, [attempt?.id, attempt?.state]);
 
-  const saveNow = useCallback(
-    async (promptId: string, text: string, expectedRevision: number) => {
-      if (!token || !attempt) return;
-      setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], state: 'saving', error: null } }));
+  /**
+   * Perform one save for promptId, reading the text and expected revision
+   * from refs, never from render-derived state (which can still be showing a
+   * pre-save snapshot by the time an awaited continuation runs). Resolves to
+   * whether this prompt's saved state is now clean.
+   */
+  const doSave = useCallback(
+    async (promptId: string): Promise<boolean> => {
+      const text = dirtyText.current[promptId];
+      if (text === undefined) return true;
+      if (!token || !attempt) return true;
+      delete dirtyText.current[promptId];
+      const expectedRevision = revisions.current[promptId] ?? 0;
+      setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], text, state: 'saving', error: null, conflict: null } }));
       try {
         const r = await saveAssessmentResponse(token, attempt.id, promptId, text, expectedRevision);
-        setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], revision: r.revision, state: 'saved', savedAt: r.saved_at, error: null, conflict: null } }));
+        revisions.current[promptId] = r.revision;
+        setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], text, revision: r.revision, state: 'saved', savedAt: r.saved_at, error: null, conflict: null } }));
+        return true;
       } catch (err) {
         if (err instanceof CourseActionError && err.code === 'revision_conflict') {
+          dirtyText.current[promptId] = text;
           const extra = err.extra as { text?: string; revision?: number };
-          setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], state: 'error', error: null, conflict: { text: extra.text ?? '', revision: extra.revision ?? expectedRevision } } }));
-          return;
+          setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], text, state: 'error', error: null, conflict: { text: extra.text ?? '', revision: extra.revision ?? expectedRevision } } }));
+          return false;
         }
         if (err instanceof CourseActionError && (err.code === 'stage_locked' || err.code === 'already_submitted')) {
           void load();
-          return;
+          return false;
         }
-        setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], state: 'error', error: courseErrorMessage(err instanceof CourseActionError ? err.code : 'request_failed') } }));
+        dirtyText.current[promptId] = text;
+        setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], text, state: 'error', error: courseErrorMessage(err instanceof CourseActionError ? err.code : 'request_failed') } }));
+        return false;
       }
     },
     [token, attempt, load]
   );
 
-  const draftsRef = useRef(drafts);
-  draftsRef.current = drafts;
+  /** Queue a save for promptId behind any save already in flight for it. */
+  const saveNow = useCallback(
+    (promptId: string): Promise<boolean> => {
+      const run = (pending.current[promptId] ?? Promise.resolve(true)).then(() => doSave(promptId));
+      pending.current[promptId] = run;
+      return run;
+    },
+    [doSave]
+  );
 
   const onChange = (promptId: string, text: string) => {
+    dirtyText.current[promptId] = text;
     setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], text, state: 'idle' } }));
     setProblems((p) => ({ ...p, [promptId]: '' }));
     clearTimeout(timers.current[promptId]);
     timers.current[promptId] = setTimeout(() => {
-      const draft = draftsRef.current[promptId];
-      pending.current[promptId] = saveNow(promptId, text, draft.revision);
+      void saveNow(promptId);
     }, SAVE_DEBOUNCE_MS);
   };
 
-  /** Flush every scheduled save and wait for the ones in flight. */
-  const flush = async () => {
+  /** Flush every scheduled save and wait for every save in flight to land. */
+  const flush = async (): Promise<boolean> => {
     for (const promptId of Object.keys(timers.current)) {
       clearTimeout(timers.current[promptId]);
       delete timers.current[promptId];
-      const draft = draftsRef.current[promptId];
-      if (draft && draft.state === 'idle') pending.current[promptId] = saveNow(promptId, draft.text, draft.revision);
     }
-    await Promise.all(Object.values(pending.current));
-    return Object.values(draftsRef.current).every((d) => d.state !== 'error');
+    for (const promptId of Object.keys(dirtyText.current)) {
+      void saveNow(promptId);
+    }
+    const results = await Promise.all(Object.values(pending.current));
+    return results.every((ok) => ok);
   };
 
   const resolveConflict = (promptId: string, keepMine: boolean) => {
-    const draft = draftsRef.current[promptId];
-    if (!draft?.conflict) return;
+    const conflict = drafts[promptId]?.conflict;
+    if (!conflict) return;
+    revisions.current[promptId] = conflict.revision;
     if (keepMine) {
-      pending.current[promptId] = saveNow(promptId, draft.text, draft.conflict.revision);
+      dirtyText.current[promptId] = drafts[promptId]?.text ?? '';
+      setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], state: 'idle', error: null, conflict: null } }));
+      void saveNow(promptId);
     } else {
-      setDrafts((d) => ({ ...d, [promptId]: { ...d[promptId], text: draft.conflict!.text, revision: draft.conflict!.revision, state: 'saved', conflict: null, error: null } }));
+      delete dirtyText.current[promptId];
+      setDrafts((d) => ({
+        ...d,
+        [promptId]: { ...d[promptId], text: conflict.text, revision: conflict.revision, state: 'saved', savedAt: new Date().toISOString(), conflict: null, error: null },
+      }));
     }
   };
 
@@ -190,7 +243,10 @@ export default function AssessmentView(props: Props) {
   const advance = async (stage: StageView) => {
     if (!token || !attempt) return;
     setActionError(null);
-    if (!(await flush())) return;
+    if (!(await flush())) {
+      setActionError('Some responses could not be saved. Fix the ones marked below, then try again.');
+      return;
+    }
     const ok = await confirm({
       title: 'Continue and lock this part?',
       message: 'The next part reveals new information. Once you continue, this part cannot be edited.',
@@ -200,8 +256,8 @@ export default function AssessmentView(props: Props) {
     if (!ok) return;
     setBusy(true);
     try {
-      const revisions = Object.fromEntries(stage.prompts.map((p) => [p.prompt_id, draftsRef.current[p.prompt_id]?.revision ?? 0]));
-      setStatus(await advanceAssessment(token, attempt.id, stage.index, revisions));
+      const expectedRevisions = Object.fromEntries(stage.prompts.map((p) => [p.prompt_id, revisions.current[p.prompt_id] ?? 0]));
+      setStatus(await advanceAssessment(token, attempt.id, stage.index, expectedRevisions));
       setProblems({});
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
     } catch (err) {
@@ -222,7 +278,10 @@ export default function AssessmentView(props: Props) {
   const submit = async () => {
     if (!token || !attempt) return;
     setActionError(null);
-    if (!(await flush())) return;
+    if (!(await flush())) {
+      setActionError('Some responses could not be saved. Fix the ones marked below, then try again.');
+      return;
+    }
     const ok = await confirm({
       title: 'Submit your assessment?',
       message: 'Every response locks and grading begins. You will not be able to edit after this.',
@@ -258,11 +317,12 @@ export default function AssessmentView(props: Props) {
       </p>
     );
   }
-  if (loadError) return <ErrorLine text={loadError} />;
+  if (loadError && !status) return <ErrorLine text={loadError} />;
   if (!status) return <p className="text-slate-600">Loading your assessment…</p>;
 
   return (
     <div className="max-w-3xl">
+      {loadError && <ErrorLine text={loadError} />}
       <header>
         <p className="eyebrow">{props.certificationTitle}</p>
         <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-ink-800 sm:text-4xl">Final assessment</h1>
@@ -395,7 +455,7 @@ function Stages(props: {
                     Submit for grading
                   </button>
                 )}
-                {stage.index < last && <span className="text-sm text-slate-600">Part {String.fromCharCode(66 + stage.index)} opens after this one locks.</span>}
+                {stage.index < last && <span className="text-sm text-slate-600">Part {String.fromCharCode(stage.part.charCodeAt(0) + 1)} opens after this one locks.</span>}
               </div>
             )}
             {current && props.error && <ErrorLine text={props.error} />}
@@ -491,6 +551,16 @@ function Result({ result, awardsEnabled }: { result: NonNullable<AssessmentStatu
   );
 }
 
+/** Join nodes into a plain-sentence list: "A", "A and B", "A, B and C". */
+function joinWithAnd(nodes: ReactNode[]): ReactNode {
+  return nodes.map((node, i) => (
+    <span key={i}>
+      {i > 0 && (i === nodes.length - 1 ? ' and ' : ', ')}
+      {node}
+    </span>
+  ));
+}
+
 function Criterion({ feedback: c }: { feedback: CriterionFeedback }) {
   const capped = c.effective_score < c.score;
   return (
@@ -517,13 +587,19 @@ function Criterion({ feedback: c }: { feedback: CriterionFeedback }) {
       )}
       {c.revision_lessons.length > 0 && (
         <p className="mt-3 text-sm text-slate-700">
-          Revisit:{' '}
-          {c.revision_lessons.map((l, i) => (
-            <span key={l.id}>
-              {i > 0 && ', '}
-              {l.href ? <a href={l.href} className="font-semibold text-brand-700 underline">{l.title}</a> : l.title}
-            </span>
-          ))}
+          Revisit{' '}
+          {joinWithAnd(
+            c.revision_lessons.map((l) =>
+              l.href ? (
+                <a href={l.href} className="font-semibold text-brand-700 underline">
+                  {l.title}
+                </a>
+              ) : (
+                l.title
+              )
+            )
+          )}{' '}
+          before a retake.
         </p>
       )}
     </article>

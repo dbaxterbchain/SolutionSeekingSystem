@@ -97,7 +97,7 @@ export function courseErrorMessage(code: string): string {
     case 'enrollment_revoked':
       return 'Access to the course has ended for this account. Contact course support if that seems wrong.';
     case 'rate_limited':
-      return 'Too many requests. Please wait a minute and try again.';
+      return 'Too many requests. Please wait a while and try again.';
     case 'course_not_configured':
       return 'Checkout is not available right now. Please try again later.';
     case 'request_key_reused':

@@ -326,14 +326,13 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
 function CertificationPanel({ state }: { state: CourseStateView }) {
   const { body, linkLabel } = certificationCopy(state);
   return (
-    <div className="mt-10">
-      <Panel title="Certification">
-        <p>{body}</p>
-        <a href="/course/learn/assessment/" className="btn-primary mt-2">
-          {linkLabel}
-        </a>
-      </Panel>
-    </div>
+    <section className="mt-10 max-w-xl rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
+      <h2 className="font-heading text-lg font-bold text-ink-800">Certification</h2>
+      <p className="mt-3 text-slate-700">{body}</p>
+      <a href="/course/learn/assessment/" className="btn-primary mt-4">
+        {linkLabel}
+      </a>
+    </section>
   );
 }
 
