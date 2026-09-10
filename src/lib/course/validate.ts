@@ -255,11 +255,13 @@ export function validateCatalog(input: CatalogInput): Catalog {
     if (l.videoPlaceholder && input.courseStatus === 'open' && r >= rank('staged')) {
       err(`${where}: a placeholder video cannot ship while the course is open for sale`);
     }
-    if (l.preview && input.courseStatus !== 'hidden') {
-      need(l.status === 'published', 'the preview lesson must be published once the course is public');
+    // The free lesson has to exist before anything is sold. A preview build
+    // only shows the course as coming soon, so it may run before V05 is filmed.
+    if (l.preview && input.courseStatus === 'open') {
+      need(l.status === 'published', 'the preview lesson must be published once the course is open');
       need(
         !l.videoPlaceholder,
-        'the preview lesson cannot use a placeholder video once the course is public'
+        'the preview lesson cannot use a placeholder video once the course is open'
       );
     }
   }

@@ -1,0 +1,178 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHero from '../../components/PageHero.astro';
+import CourseSyllabus from '../../components/CourseSyllabus.astro';
+import CourseSalesCta from '../../components/react/CourseSalesCta.tsx';
+import { breadcrumbs } from '../../lib/schema';
+import { COURSE, COURSE_STATUS, COURSE_TOKENS, type CourseToken } from '../../data/course';
+import { COURSE_PRICE } from '../../data/pricing';
+import { assertLaunchSettings, courseCopy } from '../../lib/course/copy';
+import { getCourseCatalog } from '../../lib/course/catalog';
+import { publicCurriculum } from '../../lib/course/curriculum';
+
+/**
+ * The public sales page. Prerendered from the catalog and the offer config.
+ * While the course is hidden there is no page at all: the 404 below writes
+ * nothing to dist, and the sitemap filter in astro.config.mjs keeps the URL
+ * out as well. Lesson prose never appears here; titles are public.
+ */
+if (COURSE_STATUS === 'hidden') return new Response(null, { status: 404 });
+
+// Throws in an `open` build when a launch token, the price or David's
+// confirmation is missing. A no-op in preview.
+assertLaunchSettings();
+
+const curriculum = publicCurriculum(await getCourseCatalog());
+
+/** A launch token once it is set, else the honest interim sentence. The price only once the course is open. */
+const tokenOr = (key: CourseToken, fallback: string): string => {
+  if (key === 'course_price' && COURSE_STATUS !== 'open') return fallback;
+  return COURSE_TOKENS[key] ? courseCopy(`{{${key}}}`) : fallback;
+};
+
+const priceLabel = COURSE_STATUS === 'open' ? courseCopy('{{course_price}}') : null;
+const priceAmount = Number(COURSE_PRICE?.priceAmount ?? 0);
+const supportContact = courseCopy('{{support_contact}}');
+
+const facts = [
+  `${curriculum.modules.length} modules`,
+  `${curriculum.totalLessons} short video lessons`,
+  `About ${COURSE.learnerHours} hours including practice`,
+  'Self-paced',
+  'AI-assessed certification included',
+];
+
+const practice = [
+  'Separating what you observed from what you concluded, before a conversation starts.',
+  'Asking questions that help the other person feel understood, then checking your summary with them.',
+  'Turning a shared understanding into actions that are fair, testable and reviewed.',
+  'Repairing a tense exchange, and respecting someone who asks for time.',
+  'Running one-on-ones, feedback, targeted conversations and solution seeking sessions.',
+  'Building review and participant feedback into the routines your team already has.',
+];
+
+const included = [
+  `${curriculum.totalLessons} short video lessons, each with an exercise and a model response to compare against`,
+  'A printable worksheet for every module',
+  'Module checks that confirm you can apply each idea before you move on',
+  `The final assessment and the Solution Seeking System Certification. ${tokenOr('retakes_summary', 'Retakes are included.')}`,
+  'Everything on the site that is already free: the guide, the worksheets and the assistants trial',
+];
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Video course', path: '/course' },
+  ]),
+];
+
+const cta = {
+  saleStatus: COURSE_STATUS,
+  courseId: COURSE.id,
+  priceLabel,
+  priceAmount,
+  supportContact,
+};
+---
+
+<BaseLayout
+  title="Solution Seeking Course"
+  description={`Learn the Solution Seeking System with ${COURSE.presenter} through ${curriculum.totalLessons} video lessons, practical exercises, and AI-assessed certification.`}
+  schemas={schemas}
+>
+  <PageHero
+    eyebrow="Video course"
+    title="Learn to turn difficult conversations into shared understanding and workable solutions"
+    intro={`${curriculum.totalLessons} short video lessons with ${COURSE.presenter}, each with an exercise and a model response, a worksheet for every module, and an AI-assessed certification at the end.`}
+  >
+    <div class="mt-8">
+      <CourseSalesCta client:load location="course_hero" trackView {...cta} />
+    </div>
+    <p class="mt-6 text-sm text-slate-500">{facts.join(' · ')}</p>
+  </PageHero>
+
+  <div class="container-page py-16">
+    <section class="max-w-2xl">
+      <p class="eyebrow mb-3">Who it is for</p>
+      <h2 class="text-3xl font-bold text-ink-800">For people who keep having the same hard conversation</h2>
+      <p class="mt-4 text-slate-600">
+        Managers, parents, teachers, organizers and partners who already know the free material and want
+        to practice it properly: one lesson at a time, on a real situation of their own, with a model
+        response to check their thinking against.
+      </p>
+    </section>
+
+    <section class="mt-16">
+      <p class="eyebrow mb-3">What you will practice</p>
+      <h2 class="text-3xl font-bold text-ink-800">The skills, not just the ideas</h2>
+      <ul class="mt-6 grid gap-3 text-slate-700 sm:grid-cols-2">
+        {
+          practice.map((item) => (
+            <li class="relative pl-5">
+              <span class="absolute left-0 top-2 h-1.5 w-1.5 rounded-full bg-brand-400" />
+              {item}
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section class="mt-16">
+      <p class="eyebrow mb-3">How the course works</p>
+      <h2 class="text-3xl font-bold text-ink-800">Module by module</h2>
+      <p class="mt-4 max-w-2xl text-slate-600">
+        Watch a short lesson, work the exercise on a situation of your own, then compare your answer with
+        the model response. Each module ends with two quick checks. A pace of {COURSE.suggestedWeeks} weeks
+        works well, and the course waits for you if life gets in the way.
+      </p>
+      <div class="mt-8">
+        <CourseSyllabus curriculum={curriculum} />
+      </div>
+    </section>
+
+    <section class="mt-16">
+      <p class="eyebrow mb-3">What is included</p>
+      <h2 class="text-3xl font-bold text-ink-800">Everything you need to finish</h2>
+      <ul class="mt-6 grid gap-3 text-slate-700 sm:grid-cols-2">
+        {
+          included.map((item) => (
+            <li class="relative pl-5">
+              <span class="absolute left-0 top-2 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              {item}
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section class="mt-16 max-w-2xl">
+      <p class="eyebrow mb-3">Your presenter</p>
+      <h2 class="text-3xl font-bold text-ink-800">{COURSE.presenter}</h2>
+      <p class="mt-4 text-slate-600">
+        {COURSE.presenter} developed the Solution Seeking System and presents every lesson. The examples
+        come from the same places the system came from: workplaces, families and community groups.
+        <a href="/about" class="font-medium text-brand-600 underline decoration-brand-200 underline-offset-2">Read the story behind the system</a>.
+      </p>
+    </section>
+
+    <section class="mt-16 max-w-2xl">
+      <p class="eyebrow mb-3">Time and access</p>
+      <h2 class="text-3xl font-bold text-ink-800">Self-paced, and yours to keep coming back to</h2>
+      <p class="mt-4 text-slate-600">
+        Plan on about {COURSE.learnerHours} hours in total, practice included. {tokenOr('access_summary', 'Access details are confirmed when the course opens.')}
+      </p>
+    </section>
+
+    <section class="mt-16 rounded-3xl border border-brand-100 bg-brand-50/50 p-7 sm:p-10">
+      <h2 class="text-3xl font-bold text-ink-800">Start when you are ready</h2>
+      <p class="mt-3 max-w-2xl text-slate-600">
+        {tokenOr('refund_summary', 'Refund terms are confirmed when the course opens.')} Questions first? Write to
+        <a href={`mailto:${supportContact}`} class="font-medium text-brand-600 underline decoration-brand-200 underline-offset-2">{supportContact}</a>.
+      </p>
+      <div class="mt-6">
+        <CourseSalesCta client:load location="course_close" {...cta} />
+      </div>
+    </section>
+  </div>
+</BaseLayout>

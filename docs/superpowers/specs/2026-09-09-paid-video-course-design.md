@@ -123,7 +123,7 @@ Build-time validation (`src/lib/course/validate.ts`, pure, called by `getCourseC
 
 - exactly 40 lessons `v01`..`v40` and 9 modules `m01`..`m09`; `next` forms one chain from v01 that visits all 40, v40 has none; modules ascend along the chain and each module's lessons are contiguous
 - `kind` is `orientation` only for v39, `plan` only for v40; `standard`/`plan` require Exercise; `standard` requires Model response and Self-review
-- exactly one `preview: true` lesson, and it is published whenever the status is not hidden
+- exactly one `preview: true` lesson, and it is published (no placeholder video) once the status is `open`; a `preview` build may run before the free lesson exists (amended 2026-09-10, sub-plan 1b)
 - every `module`/`worksheet` reference resolves; a lesson's worksheet equals its module's; m01..m08 have two checks, m09 none; `answer` in range
 - the six `##` headings, in order, nothing else at `##`; section non-emptiness per status; `streamUid` is 32 hex chars; approvals match `^\d{4}-\d{2}-\d{2} [A-Z]{2,3}$`
 - no em dash, en dash or `{{` in any string or body (transcripts included)

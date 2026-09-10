@@ -5,6 +5,7 @@ import { MODES } from '../../data/modes';
 import { PLANS } from '../../data/pricing';
 import { getCourseCatalog } from '../../lib/course/catalog';
 import { hasShell } from '../../lib/course/visibility';
+import { COURSE, COURSE_STATUS } from '../../data/course';
 
 /**
  * Generated 1200×630 social-share cards, one per page. Route keys mirror page
@@ -118,6 +119,15 @@ const pages: Record<string, OgPage> = {
     title: 'About',
     description: 'Why Beanchain Coffee built the Solution Seeking System, and how to use it.',
   },
+  // The sales page exists only when the course is public; its card follows.
+  ...(COURSE_STATUS !== 'hidden'
+    ? {
+        course: {
+          title: COURSE.title,
+          description: `Learn the Solution Seeking System with ${COURSE.presenter}: video lessons, practical exercises, and AI-assessed certification.`,
+        },
+      }
+    : {}),
   account: {
     title: 'Your Account',
     description: 'Save your practice work and pick it back up anytime.',

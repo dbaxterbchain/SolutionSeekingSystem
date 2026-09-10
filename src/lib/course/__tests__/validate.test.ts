@@ -173,8 +173,9 @@ describe('validateCatalog', () => {
     );
   });
 
-  it('requires the preview lesson to be published once the course is public', () => {
-    expect(() => validateCatalog({ ...buildInput(), courseStatus: 'preview' })).toThrow(
+  it('requires the preview lesson to be published once the course is open, not for a preview build', () => {
+    expect(() => validateCatalog({ ...buildInput(), courseStatus: 'preview' })).not.toThrow();
+    expect(() => validateCatalog({ ...buildInput(), courseStatus: 'open' })).toThrow(
       /preview lesson must be published/
     );
   });
@@ -294,13 +295,13 @@ describe('validateCatalog', () => {
     expect(() => validateCatalog(input)).not.toThrow();
   });
 
-  it('rejects a placeholder video on the preview lesson once the course is public', () => {
-    const input = withLesson({ ...buildInput(), courseStatus: 'preview' }, 'v05', {
+  it('rejects a placeholder video on the preview lesson once the course is open', () => {
+    const input = withLesson({ ...buildInput(), courseStatus: 'open' }, 'v05', {
       ...PUBLISHED_FIELDS,
       videoPlaceholder: true,
     });
     expect(() => validateCatalog(input)).toThrow(
-      /the preview lesson cannot use a placeholder video once the course is public/
+      /the preview lesson cannot use a placeholder video once the course is open/
     );
   });
 
