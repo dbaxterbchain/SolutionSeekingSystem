@@ -1,5 +1,7 @@
 import { defineCollection, z } from 'astro:content';
 import { glob } from 'astro/loaders';
+import { APPROVAL_RE, MODULE_ID_RE, STREAM_UID_RE, WORKSHEET_ID_RE, hasBannedCopy } from '../lib/course/ids';
+import { LESSON_KINDS, LESSON_STATUSES } from '../lib/course/types';
 
 /**
  * Wisdom Principles — the "source code" of the system. Every principle shares
@@ -126,4 +128,87 @@ const demos = defineCollection({
     }),
 });
 
-export const collections = { principles, protocol, tools, demos };
+/* ---------------------------------------------------------------------------
+ * The paid video course. Three collections under src/content/course/, read
+ * ONLY through getCourseCatalog() (src/lib/course/catalog.ts), which checks
+ * every cross-file rule (the lesson chain, module contiguity, check counts,
+ * status gates) and fails the build on a violation. Per-entry rules live here.
+ *
+ * Authoring format: docs/content-guide.md, "Course content".
+ * ------------------------------------------------------------------------- */
+
+/** The house copy rule, enforced on every string a learner might read. */
+const cleanCopy = (label: string) =>
+  z.string().refine((s) => !hasBannedCopy(s), {
+    message: `${label}: no em dashes, en dashes, or {{tokens}} (see CLAUDE.md)`,
+  });
+
+const courseModules = defineCollection({
+  loader: glob({ pattern: '**/*.yaml', base: './src/content/course/modules' }),
+  schema: z.object({
+    title: cleanCopy('title'),
+    summary: cleanCopy('summary'),
+    worksheet: z.string().regex(WORKSHEET_ID_RE),
+    // Two authored checks for modules 1 to 8, none for module 9 (the catalog
+    // validator counts them). `answer` is a developer field: the check API
+    // sends question and choices only, and grades the learner's pick.
+    checks: z
+      .array(
+        z.object({
+          question: cleanCopy('question'),
+          choices: z.tuple([cleanCopy('choice'), cleanCopy('choice')]),
+          answer: z.union([z.literal(1), z.literal(2)]),
+          explanation: cleanCopy('explanation'),
+        })
+      )
+      .default([]),
+  }),
+});
+
+const courseLessons = defineCollection({
+  // [^_] keeps _template.md (the copy-me starter) out of the collection.
+  loader: glob({ pattern: '**/[^_]*.md', base: './src/content/course/lessons' }),
+  schema: z.object({
+    title: cleanCopy('title'),
+    module: z.string().regex(MODULE_ID_RE),
+    kind: z.enum(LESSON_KINDS).default('standard'),
+    // The next lesson in the suggested order; omitted only on v40. The
+    // validator proves the chain visits all 40 lessons in id order.
+    next: z.string().optional(),
+    worksheet: z.string().regex(WORKSHEET_ID_RE),
+    // Cloudflare Stream video uid; captions live on the video in Stream.
+    streamUid: z.string().regex(STREAM_UID_RE).nullable().default(null),
+    // Planned minutes until the edited master exists, then the real length.
+    durationMin: z.number().int().min(0).default(0),
+    status: z.enum(LESSON_STATUSES).default('draft'),
+    // Bump when copy or the master changes after publish. Never resets progress.
+    contentVersion: z.number().int().min(1).default(1),
+    preview: z.boolean().default(false),
+    videoPlaceholder: z.boolean().default(false),
+    approvals: z
+      .object({
+        copy: z.string().regex(APPROVAL_RE).optional(),
+        edit: z.string().regex(APPROVAL_RE).optional(),
+        captions: z.string().regex(APPROVAL_RE).optional(),
+      })
+      .default({}),
+  }),
+});
+
+const courseWorksheets = defineCollection({
+  loader: glob({ pattern: '**/*.md', base: './src/content/course/worksheets' }),
+  schema: z.object({
+    title: cleanCopy('title'),
+    module: z.string().regex(MODULE_ID_RE),
+  }),
+});
+
+export const collections = {
+  principles,
+  protocol,
+  tools,
+  demos,
+  courseModules,
+  courseLessons,
+  courseWorksheets,
+};
