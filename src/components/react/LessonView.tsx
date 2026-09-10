@@ -59,10 +59,19 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
   const saveTimer = useRef<number | undefined>(undefined);
   const revision = useRef(0);
   const textRef = useRef('');
+  const lastSavedText = useRef('');
   const lastSavedAt = useRef<Date | null>(null);
+  const queue = useRef<Promise<unknown>>(Promise.resolve());
   textRef.current = text;
 
   const token = session?.access_token ?? null;
+
+  /** Every progress write goes through here, one at a time, so a tab never overlaps its own requests. */
+  const enqueue = useCallback(<T,>(work: () => Promise<T>): Promise<T> => {
+    const run = queue.current.then(work, work);
+    queue.current = run.catch(() => undefined);
+    return run;
+  }, []);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -74,17 +83,27 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
         setProgress(data.progress);
         revision.current = data.progress.revision;
       }
+      // Coming back to a lesson already revealed: the text is never in the
+      // lesson payload, so ask for it again. reveal_model is idempotent.
+      if (data.progress?.model_revealed && modelResponse === null) {
+        try {
+          const again = await enqueue(() => postProgress(token, { lesson_id: lessonId, action: 'reveal_model' }));
+          if (again.model_response !== undefined) setModelResponse(again.model_response);
+        } catch {
+          // The button under the model response is the fallback.
+        }
+      }
     } catch (err) {
       setLoadError(err instanceof CourseActionError ? err : new CourseActionError('request_failed', 0));
     }
-  }, [token, lessonId]);
+  }, [token, lessonId, modelResponse, enqueue]);
 
   // First load, the open action, the drawer's state, and the local draft.
   useEffect(() => {
     if (sessionLoading || !token || !user) return;
     void load();
     void fetchCourseState(token).then(setState).catch(() => setState(null));
-    void postProgress(token, { lesson_id: lessonId, action: 'open' }).catch(() => {});
+    void enqueue(() => postProgress(token, { lesson_id: lessonId, action: 'open' })).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionLoading, user?.id, lessonId]);
 
@@ -100,7 +119,12 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
       draft = null;
     }
     const serverRevision = payload.progress?.revision ?? 0;
-    setText(draft && draft.revision === serverRevision && draft.text !== server ? draft.text : server);
+    const useDraft = Boolean(draft && draft.revision === serverRevision && draft.text !== server);
+    setText(useDraft && draft ? draft.text : server);
+    // Either way the server copy is the last thing saved, so a draft counts as
+    // unsaved typing: send it now rather than wait for the next keystroke.
+    lastSavedText.current = server;
+    if (useDraft) saveTimer.current = window.setTimeout(() => void saveNow(), SAVE_DEBOUNCE_MS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payload?.lesson.id]);
 
@@ -111,9 +135,10 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
       setActionError(null);
       setMissing([]);
       try {
-        const res = await postProgress(token, { lesson_id: lessonId, ...body });
+        const res = await enqueue(() => postProgress(token, { lesson_id: lessonId, ...body }));
         setProgress(res.progress);
-        revision.current = Math.max(revision.current, res.progress.revision);
+        // Only a save moves the revision: adopting another tab's number without
+        // its text would let the next autosave overwrite it silently.
         return res;
       } catch (err) {
         if (err instanceof CourseActionError) {
@@ -127,7 +152,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
         setBusy(null);
       }
     },
-    [token, lessonId]
+    [token, lessonId, enqueue]
   );
 
   const saveNow = useCallback(
@@ -136,15 +161,18 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
       const value = textRef.current;
       setSave({ kind: 'saving' });
       try {
-        const res = await postProgress(token, {
-          lesson_id: lessonId,
-          action: 'save_response',
-          text: value,
-          expected_revision: opts.expected ?? revision.current,
-          ...(opts.keepPrevious ? { keep_previous: true } : {}),
-        });
+        const res = await enqueue(() =>
+          postProgress(token, {
+            lesson_id: lessonId,
+            action: 'save_response',
+            text: value,
+            expected_revision: opts.expected ?? revision.current,
+            ...(opts.keepPrevious ? { keep_previous: true } : {}),
+          })
+        );
         setProgress(res.progress);
         revision.current = res.progress.revision;
+        lastSavedText.current = value;
         lastSavedAt.current = new Date();
         setSave({ kind: 'saved', at: lastSavedAt.current });
         if (textRef.current === value) {
@@ -162,8 +190,14 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
         }
       }
     },
-    [token, user, lessonId]
+    [token, user, lessonId, enqueue]
   );
+
+  /** Send any unsaved typing before an action that depends on it. */
+  const flushSave = useCallback(async () => {
+    window.clearTimeout(saveTimer.current);
+    if (textRef.current !== lastSavedText.current) await saveNow();
+  }, [saveNow]);
 
   const onType = (value: string) => {
     setText(value);
@@ -181,11 +215,13 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
   useEffect(() => () => window.clearTimeout(saveTimer.current), []);
 
   const reveal = async () => {
+    await flushSave();
     const res = await act({ action: 'reveal_model' });
     if (res?.model_response !== undefined) setModelResponse(res.model_response);
   };
 
   const complete = async () => {
+    await flushSave();
     const res = await act({ action: 'complete' });
     if (!res) return;
     setMissing([]);
@@ -199,6 +235,8 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
       });
       if (res.module_completed) track({ event: 'module_completed', module_id: payload.lesson.module_id });
     }
+    // The drawer's marks are a lesson behind until the state is fetched again.
+    if (token) void fetchCourseState(token).then(setState).catch(() => {});
   };
 
   if (sessionLoading) return <Note>Loading the lesson…</Note>;
@@ -257,7 +295,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
 
       {p && p.content_version < lesson.content_version && (
         <p className="rounded-xl border border-brand-100 bg-brand-50/60 px-4 py-3 text-sm text-slate-700">
-          This lesson was updated since you last worked on it. Your progress and your response are kept.
+          This lesson was updated since you first opened it. Your progress and your response are kept.
         </p>
       )}
 
@@ -274,7 +312,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
         <h2 id="studied-title" className="sr-only">Study</h2>
         <button type="button" onClick={() => void act({ action: 'studied' })} disabled={busy !== null || Boolean(p?.studied)} className={stepClass(Boolean(p?.studied))}>
           {mark(Boolean(p?.studied))}
-          I watched the video or studied the transcript
+          I watched the video or studied this lesson
         </button>
       </section>
 
@@ -312,6 +350,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
                   onClick={() => {
                     setText(save.server.text);
                     revision.current = save.server.revision;
+                    lastSavedText.current = save.server.text;
                     lastSavedAt.current = new Date();
                     setSave({ kind: 'saved', at: lastSavedAt.current });
                   }}
@@ -343,8 +382,9 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
             <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <p className="text-sm text-slate-600">Try the exercise first. The model response is here when you are ready to compare.</p>
               <button type="button" onClick={() => void reveal()} disabled={busy !== null || !hasPractice} className="btn-primary mt-4 disabled:opacity-60">
-                Reveal the model response
+                {p?.model_revealed ? 'Show the model response again' : 'Reveal the model response'}
               </button>
+              {actionError && <p role="alert" className="mt-3 text-sm text-red-600">{actionError}</p>}
             </div>
           ) : (
             <div className="mt-4 space-y-8">
@@ -398,6 +438,11 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
         {actionError && <p className="mt-3 text-sm text-red-600">{actionError}</p>}
         {(done || completedNow) && (
           <div className="mt-4 flex flex-wrap gap-3">
+            {lesson.prev && lesson.prev.available && (
+              <a href={`/course/learn/lessons/${lesson.prev.id}`} className="btn-secondary">
+                Previous: {lesson.prev.title}
+              </a>
+            )}
             {lesson.next && lesson.next.available ? (
               <a href={`/course/learn/lessons/${lesson.next.id}`} className="btn-primary">
                 Next: {lesson.next.title}

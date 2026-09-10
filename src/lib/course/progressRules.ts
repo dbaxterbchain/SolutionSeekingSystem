@@ -3,8 +3,8 @@ import type { LessonKind } from './types';
 /**
  * The rules of lesson progress, with no I/O. POST /api/course/progress loads a
  * row, applies one action here, and persists the result; the database trigger
- * refuses any regression the rules might miss. Every decision that decides
- * whether a lesson is complete lives in this file.
+ * silently corrects any regression the rules might miss. Every decision that
+ * decides whether a lesson is complete lives in this file.
  */
 
 export type PracticeState = 'none' | 'in_site' | 'offline';
@@ -143,7 +143,7 @@ export function applyAction(
       if (expected !== row.revision) {
         return fail(409, 'revision_conflict', { server: { text: row.response_text, revision: row.revision } });
       }
-      if (input.keep_previous === true) next.previous_response_text = row.response_text;
+      if (input.keep_previous === true && row.response_text !== '') next.previous_response_text = row.response_text;
       next.response_text = text;
       next.revision = row.revision + 1;
       if (text.trim() !== '') next.practice_state = 'in_site';

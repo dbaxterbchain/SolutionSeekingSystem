@@ -46,7 +46,8 @@ export async function loadCheckAttempts(userId: string): Promise<CheckAttemptLit
     .from('course_check_attempts')
     .select('module_id, check_id, correct')
     .eq('user_id', userId)
-    .eq('course_id', COURSE.id);
+    .eq('course_id', COURSE.id)
+    .eq('correct', true);
   if (error) throw new Error(`course_check_attempts list failed: ${error.message}`);
   return (data as CheckAttemptLite[]) ?? [];
 }

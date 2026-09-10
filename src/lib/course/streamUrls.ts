@@ -2,7 +2,10 @@
  * Cloudflare Stream signed playback, the pure part. Tokens are not bound to a
  * viewer, so one token per video is shared by every learner and refreshed
  * long before it expires; the mint rate stays at a handful a day regardless
- * of how many people watch.
+ * of how many people watch. Sharing one token per video was chosen for launch
+ * because the mint endpoint is rate-limited; per-viewer short-lived tokens
+ * signed locally with a Stream signing key are the upgrade path if a token is
+ * ever shared beyond a learner.
  */
 
 /** A minted token lives twelve hours. */

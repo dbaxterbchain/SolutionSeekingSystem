@@ -61,7 +61,7 @@ export const GET: APIRoute = async ({ request }) => {
       content_version: lesson.contentVersion,
       duration_min: lesson.durationMin,
       status: lesson.status,
-      video_placeholder: lesson.videoPlaceholder,
+      video_placeholder: !lesson.streamUid && lesson.videoPlaceholder,
       worksheet_id: lesson.worksheet,
       has_exercise: lesson.sections.exercise.trim() !== '',
       has_model_response: lesson.kind === 'standard' && lesson.sections.modelResponse.trim() !== '',

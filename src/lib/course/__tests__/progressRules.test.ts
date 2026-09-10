@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PROGRESS_ACTIONS,
   RESPONSE_MAX,
   applyAction,
   hasPractice,
@@ -49,7 +50,8 @@ describe('open and studied', () => {
     expect(once.studied_at).toBe(T1.toISOString());
     const again = applyAction(once, 'standard', true, 'studied', {}, T2);
     expect(again.ok && again.row.studied_at).toBe(T1.toISOString());
-    expect(again.ok && again.changed).toBe(false);
+    expect(again.ok).toBe(true);
+    expect(again.ok && again.changed === false).toBe(true);
   });
 });
 
@@ -81,6 +83,10 @@ describe('save_response', () => {
   it('refuses a response on a lesson without an exercise', () => {
     expect(applyAction(fresh(), 'orientation', false, 'save_response', { text: 'x', expected_revision: 0 }, T1)).toMatchObject({ ok: false, status: 400, error: 'no_exercise' });
   });
+  it('keep_previous does not store an empty previous version', () => {
+    const r = applyAction(fresh(), 'standard', true, 'save_response', { text: 'first', expected_revision: 0, keep_previous: true }, T1);
+    expect(r.ok && r.row.previous_response_text).toBeNull();
+  });
 });
 
 describe('practiced_offline', () => {
@@ -107,6 +113,13 @@ describe('reveal_model and acknowledge', () => {
   it('orientation and plan lessons have no model response', () => {
     expect(applyAction(fresh(), 'orientation', false, 'reveal_model', {}, T1)).toMatchObject({ ok: false, status: 400, error: 'no_model_response' });
     expect(applyAction(fresh(), 'plan', true, 'reveal_model', {}, T1)).toMatchObject({ ok: false, status: 400, error: 'no_model_response' });
+  });
+  it('reveal is idempotent and keeps returning the reveal flag', () => {
+    const revealed = run('standard', [['practiced_offline'], ['reveal_model']]);
+    const again = applyAction(revealed, 'standard', true, 'reveal_model', {}, T2);
+    expect(again.ok).toBe(true);
+    expect(again.ok && again.reveal).toBe(true);
+    expect(again.ok && again.changed).toBe(false);
   });
   it('acknowledge needs the reveal on standard lessons and studied elsewhere', () => {
     expect(applyAction(fresh(), 'standard', true, 'acknowledge', {}, T1)).toMatchObject({ ok: false, status: 409, error: 'reveal_required' });
@@ -139,13 +152,20 @@ describe('complete', () => {
     const row = run('orientation', [['studied'], ['acknowledge'], ['complete']], false);
     const again = applyAction(row, 'orientation', false, 'complete', {}, T2);
     expect(again.ok && again.row.completed_at).toBe(T1.toISOString());
-    expect(again.ok && again.changed).toBe(false);
+    expect(again.ok).toBe(true);
+    expect(again.ok && again.changed === false).toBe(true);
   });
 });
 
 describe('unknown actions and the view', () => {
   it('rejects an unknown action', () => {
     expect(applyAction(fresh(), 'standard', true, 'delete', {}, T1)).toMatchObject({ ok: false, status: 400, error: 'bad_request', extra: { field: 'action' } });
+  });
+  it('every listed action has a branch', () => {
+    for (const action of PROGRESS_ACTIONS) {
+      const r = applyAction(fresh(), 'standard', true, action, { text: 'x', expected_revision: 0 }, T1);
+      expect(r.ok || r.error !== 'bad_request' || r.extra?.field !== 'action').toBe(true);
+    }
   });
   it('the view flattens timestamps to booleans and keeps the text', () => {
     expect(progressView(run('standard', [['studied'], ['save_response', { text: 'a', expected_revision: 0 }]]))).toEqual({

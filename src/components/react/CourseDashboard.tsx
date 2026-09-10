@@ -109,14 +109,26 @@ export default function CourseDashboard(props: Props) {
   const enrolled = entitlement?.kind === 'enrolled';
 
   const [courseState, setCourseState] = useState<CourseStateView | null>(null);
+  // Settled means the lookup finished, either way. Until then the page says it
+  // is looking rather than guessing at a lesson the learner has already done.
+  const [courseStateSettled, setCourseStateSettled] = useState(false);
+  // The token is read when the effect runs, not depended on: a silent refresh
+  // swaps the session object and would otherwise refetch on every rotation.
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
   useEffect(() => {
-    if (!session || !enrolled) return;
+    const current = sessionRef.current;
+    if (!current || !enrolled) return;
     let active = true;
-    fetchCourseState(session.access_token)
+    fetchCourseState(current.access_token)
       .then((s) => {
-        if (active) setCourseState(s);
+        if (!active) return;
+        setCourseState(s);
+        setCourseStateSettled(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (active) setCourseStateSettled(true);
+      });
     return () => {
       active = false;
     };
@@ -219,7 +231,14 @@ export default function CourseDashboard(props: Props) {
   }
 
   const allLessons = props.curriculum.modules.flatMap((m) => m.lessons);
-  const resumeId = courseState ? courseState.resume_lesson_id : allLessons.find((l) => l.status === 'published')?.id ?? null;
+  // An enrolled learner waits for their real place; anyone else (a failed
+  // entitlement lookup, say) gets the first published lesson as before.
+  const findingPlace = enrolled && !courseStateSettled;
+  const resumeId = courseState
+    ? courseState.resume_lesson_id
+    : findingPlace
+      ? null
+      : allLessons.find((l) => l.status === 'published')?.id ?? null;
   const resume = resumeId ? allLessons.find((l) => l.id === resumeId) ?? null : null;
   const anyPublished = allLessons.some((l) => l.status === 'published');
   const everythingDone = courseState !== null && anyPublished && courseState.resume_lesson_id === null;
@@ -240,7 +259,9 @@ export default function CourseDashboard(props: Props) {
             .
           </p>
         )}
-        {resume ? (
+        {findingPlace ? (
+          <p className="mt-4 text-sm text-slate-500">Finding your place…</p>
+        ) : resume ? (
           <div className="mt-6">
             <a href={`/course/learn/lessons/${resume.id}`} className="btn-primary">
               {courseState?.lessons[resume.id] ? 'Continue' : 'Start here'}

@@ -30,9 +30,16 @@ export default function WorksheetView({ worksheetId, title }: { worksheetId: str
     );
   }
   if (error) {
+    // The shared messages name a lesson; this page is a worksheet.
+    const message =
+      error.code === 'enrollment_required'
+        ? 'This worksheet is for enrolled learners.'
+        : error.code === 'not_found'
+          ? 'This worksheet is not available.'
+          : courseErrorMessage(error.code);
     return (
       <p className="text-slate-700">
-        {courseErrorMessage(error.code)}{' '}
+        {message}{' '}
         <a href="/course/learn/" className="font-semibold text-brand-700 underline">
           Go to your course
         </a>

@@ -1,5 +1,6 @@
 import { getGaIds } from './analytics';
 import { getFirstTouch } from './attribution';
+import type { ProgressAction } from './course/progressRules';
 import type { CourseStatus } from './course/status';
 
 /**
@@ -241,7 +242,7 @@ export const fetchWorksheet = (accessToken: string, id: string): Promise<Workshe
 
 export interface ProgressBody {
   lesson_id: string;
-  action: 'open' | 'studied' | 'save_response' | 'practiced_offline' | 'reveal_model' | 'acknowledge' | 'complete';
+  action: ProgressAction;
   text?: string;
   expected_revision?: number;
   keep_previous?: boolean;

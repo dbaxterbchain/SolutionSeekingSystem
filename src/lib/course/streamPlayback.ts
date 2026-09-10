@@ -68,10 +68,14 @@ export async function resolvePlayback(deps: PlaybackDeps, uid: string): Promise<
         body: JSON.stringify({ exp, downloadable: false }),
       }
     );
+    if (!res.ok) {
+      console.error('stream token mint failed', `http ${res.status}`);
+      return null;
+    }
     const body = (await res.json()) as { success?: boolean; result?: { token?: string }; errors?: unknown };
     const token = body.success ? body.result?.token : undefined;
     if (!token) {
-      console.error('stream token mint failed', res.ok ? JSON.stringify(body.errors ?? body) : `http ${res.status}`);
+      console.error('stream token mint failed', JSON.stringify(body.errors ?? 'no token in the response'));
       return null;
     }
     const expiresAt = new Date(exp * 1000);

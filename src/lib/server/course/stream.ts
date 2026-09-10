@@ -18,7 +18,6 @@ const store: TokenStore = {
       stream_uid: uid,
       token,
       expires_at: expiresAt.toISOString(),
-      updated_at: new Date().toISOString(),
     });
     if (error) throw new Error(`course_stream_tokens write failed: ${error.message}`);
   },

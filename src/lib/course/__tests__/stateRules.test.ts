@@ -33,7 +33,7 @@ function done(id: string, kind: 'standard' | 'orientation' | 'plan', openedMinut
 }
 
 function input(rows: ProgressRow[], attempts: StateInput['attempts'] = []): StateInput {
-  return { lessons, modules, rows, attempts, orientationLessonId: 'v39', planLessonId: 'v40', assessmentSubmitted: false, certificationVersion: '1' };
+  return { lessons, modules, rows, attempts, orientationLessonId: 'v39', planLessonId: 'v40', assessmentModuleId: 'm09', assessmentSubmitted: false, certificationVersion: '1' };
 }
 
 describe('resume pointer', () => {
@@ -106,5 +106,12 @@ describe('eligibility and completion', () => {
     const state = deriveCourseState(input([done('v04', 'standard', 1)]));
     expect(state.lessons.v04).toBeUndefined();
     expect(state.certification).toEqual({ version: '1', status: 'none' });
+  });
+  it('reports a lesson row with its flags', () => {
+    const row = newProgressRow('v01', 1, new Date(T(1)));
+    const state = deriveCourseState(input([{ ...row, studied_at: row.first_opened_at, practice_state: 'in_site', response_text: 'x' }]));
+    expect(state.lessons.v01).toEqual({
+      completed: false, studied: true, practice_state: 'in_site', model_revealed: false, acknowledged: false, last_opened_at: row.last_opened_at,
+    });
   });
 });

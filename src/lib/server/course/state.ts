@@ -14,6 +14,7 @@ export async function computeCourseState(userId: string): Promise<CourseStateVie
     attempts,
     orientationLessonId: COURSE.orientationLessonId,
     planLessonId: COURSE.planLessonId,
+    assessmentModuleId: catalog.byId[COURSE.orientationLessonId].module,
     // Sub-plan 1d records submissions; until then nothing has been submitted.
     assessmentSubmitted: false,
     certificationVersion: COURSE.certificationVersion,

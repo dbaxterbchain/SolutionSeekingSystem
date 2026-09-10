@@ -122,6 +122,13 @@ begin
   end if;
   -- The optimistic-concurrency token never moves backwards.
   if new.revision < old.revision then new.revision := old.revision; end if;
+  -- The response is written only by a save whose revision moves forward. A
+  -- stale whole-row write (an action that loaded the row before a concurrent
+  -- save landed) therefore cannot erase what the learner typed.
+  if new.revision <= old.revision then
+    new.response_text := old.response_text;
+    new.previous_response_text := old.previous_response_text;
+  end if;
   new.first_opened_at := old.first_opened_at;
   return new;
 end $$;

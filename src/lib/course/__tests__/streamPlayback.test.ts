@@ -19,7 +19,7 @@ function fakeStore(seed: Record<string, { token: string; expires_at: string }> =
 }
 
 function fakeFetch(body: unknown, ok = true) {
-  return vi.fn(async () => ({ ok, json: async () => body })) as unknown as typeof fetch;
+  return vi.fn(async () => ({ ok, status: ok ? 200 : 502, json: async () => body })) as unknown as typeof fetch;
 }
 
 function deps(overrides: Partial<PlaybackDeps> = {}): PlaybackDeps {
@@ -45,6 +45,7 @@ describe('resolvePlayback', () => {
     expect(rows[UID]?.token).toBe('minted');
     const call = (d.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(call[0]).toBe(`https://api.cloudflare.com/client/v4/accounts/acct/stream/${UID}/token`);
+    expect(call[1].method).toBe('POST');
     expect(JSON.parse(call[1].body)).toEqual({ exp: Math.floor(NOW.getTime() / 1000) + TOKEN_TTL_SECONDS, downloadable: false });
     expect(call[1].headers.Authorization).toBe('Bearer secret');
   });
@@ -76,6 +77,7 @@ describe('resolvePlayback', () => {
   it('returns null, never throws, when Cloudflare refuses or the network fails', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
     expect(await resolvePlayback(deps({ fetch: fakeFetch({ success: false, errors: [{ message: 'no' }] }) }), UID)).toBeNull();
+    expect(await resolvePlayback(deps({ fetch: fakeFetch({ errors: [{ message: 'no' }] }, false) }), UID)).toBeNull();
     const failing = vi.fn(async () => { throw new Error('offline'); }) as unknown as typeof fetch;
     expect(await resolvePlayback(deps({ fetch: failing }), UID)).toBeNull();
     expect(error).toHaveBeenCalled();

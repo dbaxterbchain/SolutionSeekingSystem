@@ -53,7 +53,7 @@ export default function StreamPlayer({ video, unavailable, pending, placeholder,
     return (
       <div className="rounded-2xl border border-amber-100 bg-amber-50 p-5 text-amber-900">
         <p className="font-semibold">The video is unavailable right now.</p>
-        <p className="mt-1 text-sm">The transcript, the exercise and everything else in this lesson still work.</p>
+        <p className="mt-1 text-sm">The rest of this lesson still works.</p>
         <button type="button" onClick={onRefresh} className="btn-secondary mt-4">
           Retry
         </button>

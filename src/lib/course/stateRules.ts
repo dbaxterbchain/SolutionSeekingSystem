@@ -1,10 +1,11 @@
-import { lessonComplete, type ProgressRow } from './progressRules';
+import type { PracticeState, ProgressRow } from './progressRules';
 import type { LessonKind, LessonStatus } from './types';
 
 /**
  * The learner's place in the course, derived at read time from at most 40
  * progress rows and the check attempts. Nothing here is stored: there is no
- * course_state table to drift.
+ * course_state table to drift. Complete means the learner marked the lesson
+ * complete; the readiness rule in progressRules only guards that action.
  */
 
 export interface StateLesson {
@@ -34,6 +35,8 @@ export interface StateInput {
   attempts: CheckAttemptLite[];
   orientationLessonId: string;
   planLessonId: string;
+  /** The module that holds the assessment and the plan, so it is not counted as a study module. */
+  assessmentModuleId: string;
   assessmentSubmitted: boolean;
   certificationVersion: string;
 }
@@ -41,7 +44,7 @@ export interface StateInput {
 export interface LessonStateView {
   completed: boolean;
   studied: boolean;
-  practice_state: string;
+  practice_state: PracticeState;
   model_revealed: boolean;
   acknowledged: boolean;
   last_opened_at: string;
@@ -65,6 +68,7 @@ export interface CourseStateView {
 }
 
 export function deriveCourseState(input: StateInput): CourseStateView {
+  // Published is what a learner may see; visibility.ts holds the same rule for pages.
   const published = [...input.lessons]
     .filter((l) => l.status === 'published')
     .sort((a, b) => a.seq - b.seq);
@@ -74,7 +78,7 @@ export function deriveCourseState(input: StateInput): CourseStateView {
   const isComplete = (id: string): boolean => {
     const lesson = byId.get(id);
     const row = rowFor.get(id);
-    return Boolean(lesson && row && lessonComplete(row, lesson.kind));
+    return Boolean(lesson && row && row.completed_at);
   };
 
   const lessons: Record<string, LessonStateView> = {};
@@ -108,6 +112,7 @@ export function deriveCourseState(input: StateInput): CourseStateView {
   // Resume: the most recently opened lesson while it is incomplete, else the
   // first incomplete lesson after it, else the first incomplete overall.
   let resume: string | null = null;
+  // Ties keep chain order (the sort is stable), so the earliest lesson wins.
   const opened = published
     .filter((l) => rowFor.has(l.id))
     .sort((a, b) => rowFor.get(b.id)!.last_opened_at.localeCompare(rowFor.get(a.id)!.last_opened_at));
@@ -119,7 +124,7 @@ export function deriveCourseState(input: StateInput): CourseStateView {
     resume = after.find((l) => !isComplete(l.id))?.id ?? published.find((l) => !isComplete(l.id))?.id ?? null;
   }
 
-  const studyModules = input.modules.filter((m) => m.id !== 'm09');
+  const studyModules = input.modules.filter((m) => m.id !== input.assessmentModuleId);
   const assessmentEligible =
     studyModules.length > 0 && studyModules.every((m) => modules[m.id]?.complete) && isComplete(input.orientationLessonId);
   const planComplete = isComplete(input.planLessonId);

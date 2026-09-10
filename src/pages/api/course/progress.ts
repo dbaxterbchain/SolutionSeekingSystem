@@ -5,6 +5,7 @@ import { getLessonForLearner } from '../../../lib/server/course/content';
 import { loadProgress, saveProgress } from '../../../lib/server/course/progress';
 import { computeCourseState } from '../../../lib/server/course/state';
 import { LESSON_ID_RE } from '../../../lib/course/ids';
+import { isLearnerVisible } from '../../../lib/course/visibility';
 import { PROGRESS_ACTIONS, applyAction, newProgressRow, progressView } from '../../../lib/course/progressRules';
 
 export const prerender = false;
@@ -37,6 +38,18 @@ export const POST: APIRoute = async ({ request }) => {
     if (!result.ok) return privateJson({ error: result.error, ...(result.extra ?? {}) }, result.status);
 
     const row = result.changed ? await saveProgress(auth.user.id, result.row) : before;
+
+    // The database keeps the stored response when a concurrent save moved the
+    // revision first (see course_progress_monotone). If what came back is not
+    // what this save wrote, the learner has to choose, exactly as for a stale
+    // expected_revision.
+    if (action === 'save_response' && row.response_text !== result.row.response_text) {
+      return privateJson(
+        { error: 'revision_conflict', server: { text: row.response_text, revision: row.revision } },
+        409
+      );
+    }
+
     const lessonCompleted = !before.completed_at && Boolean(row.completed_at);
 
     let moduleCompleted = false;
@@ -49,7 +62,7 @@ export const POST: APIRoute = async ({ request }) => {
       progress: progressView(row),
       lesson_completed: lessonCompleted,
       module_completed: moduleCompleted,
-      next_lesson_id: next && next.status === 'published' ? next.id : null,
+      next_lesson_id: next && isLearnerVisible(next) ? next.id : null,
       ...(result.reveal ? { model_response: lesson.sections.modelResponse } : {}),
     });
   } catch (err) {
