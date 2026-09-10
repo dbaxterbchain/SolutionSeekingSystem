@@ -54,6 +54,8 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
   const [save, setSave] = useState<SaveState>({ kind: 'idle' });
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  /** Which action the error belongs to, so it renders once, beside that control. */
+  const [errorAction, setErrorAction] = useState<string | null>(null);
   const [missing, setMissing] = useState<string[]>([]);
   const [completedNow, setCompletedNow] = useState(false);
   const saveTimer = useRef<number | undefined>(undefined);
@@ -133,6 +135,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
       if (!token) return null;
       setBusy(body.action);
       setActionError(null);
+      setErrorAction(null);
       setMissing([]);
       try {
         const res = await enqueue(() => postProgress(token, { lesson_id: lessonId, ...body }));
@@ -141,6 +144,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
         // its text would let the next autosave overwrite it silently.
         return res;
       } catch (err) {
+        setErrorAction(body.action);
         if (err instanceof CourseActionError) {
           if (err.code === 'incomplete' && Array.isArray(err.extra.missing)) setMissing(err.extra.missing as string[]);
           setActionError(courseErrorMessage(err.code));
@@ -157,7 +161,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
 
   const saveNow = useCallback(
     async (opts: { keepPrevious?: boolean; expected?: number } = {}) => {
-      if (!token || !user) return;
+      if (!token || !user) return false;
       const value = textRef.current;
       setSave({ kind: 'saving' });
       try {
@@ -182,21 +186,24 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
             // Nothing to clean up.
           }
         }
+        return true;
       } catch (err) {
         if (err instanceof CourseActionError && err.code === 'revision_conflict') {
           setSave({ kind: 'conflict', server: err.extra.server as { text: string; revision: number } });
         } else {
           setSave({ kind: 'failed', keptFrom: lastSavedAt.current });
         }
+        return false;
       }
     },
     [token, user, lessonId, enqueue]
   );
 
-  /** Send any unsaved typing before an action that depends on it. */
+  /** Send any unsaved typing before an action that depends on it. False when that save did not land. */
   const flushSave = useCallback(async () => {
     window.clearTimeout(saveTimer.current);
-    if (textRef.current !== lastSavedText.current) await saveNow();
+    if (textRef.current === lastSavedText.current) return true;
+    return saveNow();
   }, [saveNow]);
 
   const onType = (value: string) => {
@@ -215,13 +222,14 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
   useEffect(() => () => window.clearTimeout(saveTimer.current), []);
 
   const reveal = async () => {
-    await flushSave();
+    // A save that conflicted or failed leaves its card on screen; resolve it first.
+    if (!(await flushSave())) return;
     const res = await act({ action: 'reveal_model' });
     if (res?.model_response !== undefined) setModelResponse(res.model_response);
   };
 
   const complete = async () => {
-    await flushSave();
+    if (!(await flushSave())) return;
     const res = await act({ action: 'complete' });
     if (!res) return;
     setMissing([]);
@@ -384,7 +392,9 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
               <button type="button" onClick={() => void reveal()} disabled={busy !== null || !hasPractice} className="btn-primary mt-4 disabled:opacity-60">
                 {p?.model_revealed ? 'Show the model response again' : 'Reveal the model response'}
               </button>
-              {actionError && <p role="alert" className="mt-3 text-sm text-red-600">{actionError}</p>}
+              {actionError && errorAction === 'reveal_model' && (
+                <p role="alert" className="mt-3 text-sm text-red-600">{actionError}</p>
+              )}
             </div>
           ) : (
             <div className="mt-4 space-y-8">
@@ -435,7 +445,9 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
             .
           </p>
         )}
-        {actionError && <p className="mt-3 text-sm text-red-600">{actionError}</p>}
+        {actionError && errorAction !== 'reveal_model' && (
+          <p role="alert" className="mt-3 text-sm text-red-600">{actionError}</p>
+        )}
         {(done || completedNow) && (
           <div className="mt-4 flex flex-wrap gap-3">
             {lesson.prev && lesson.prev.available && (

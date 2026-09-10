@@ -107,7 +107,7 @@ create table if not exists public.course_stream_tokens (
 
 /*
  * Completion is monotone: revisiting, rewatching, or editing a practice answer
- * never erases it. The API is the writer, but the database refuses a
+ * never erases it. The API is the writer, but the database silently corrects a
  * regression even if a future route gets it wrong.
  */
 create or replace function public.course_progress_monotone() returns trigger
