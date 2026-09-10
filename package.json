@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro build",
+    "build": "astro build && node scripts/check-dist-leak.mjs",
     "preview": "astro preview",
-    "check": "astro check",
+    "check": "astro check && node scripts/check-private-content.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
