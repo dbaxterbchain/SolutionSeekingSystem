@@ -10,6 +10,16 @@ import { GRADE_OUTPUT_SCHEMA, buildGraderRequest, type GradingInput } from './pr
  * store understands. No tools, no sampling parameters, no thinking override
  * (adaptive thinking is the model's default). Worker-shared: the Anthropic
  * client is injected and tests pass a fake.
+ *
+ * The four time budgets nest, shortest first. One call gets
+ * GRADER_CALL_TIMEOUT_MS and the SDK retries nothing, so a slow call can never
+ * quietly become three. One grade makes at most two calls and has
+ * GRADER_BUDGET_MS for both: before every call after the first, a grade with no
+ * room left for a whole call stops and reports a retryable failure rather than
+ * run past its lease. The lease the runner takes (DEFAULT_LEASE_SECONDS in
+ * gradingJob.ts) is longer than that budget, so the lease is still this
+ * worker's while it finishes, and the Netlify background limit of 900 seconds
+ * is longer again, so the function is never killed while holding a lease.
  */
 
 /** The slice of the SDK the grader uses. */
@@ -22,9 +32,15 @@ export interface GraderSettings {
   model: string;
   maxTokens?: number;
   retryMaxTokens?: number;
+  /** Epoch ms this grade must be finished by. Defaults to now plus GRADER_BUDGET_MS. */
+  deadlineAt?: number;
 }
 export const DEFAULT_MAX_TOKENS = 16000;
 export const RETRY_MAX_TOKENS = 24000;
+/** What one call gets, and what both client constructions pass as their SDK timeout. */
+export const GRADER_CALL_TIMEOUT_MS = 300_000;
+/** What one grade gets for every call it makes. Shorter than the lease. */
+export const GRADER_BUDGET_MS = 720_000;
 
 export interface GradeUsage {
   input_tokens: number;
@@ -79,6 +95,18 @@ export async function gradeAttempt(args: {
   const { anthropic, input, ctx, settings } = args;
   const request = buildGraderRequest(input);
   const usage = emptyUsage();
+  const startedAt = Date.now();
+  const deadline = settings.deadlineAt ?? startedAt + GRADER_BUDGET_MS;
+  /** True when a whole call still fits before the deadline. */
+  const roomForAnotherCall = () => Date.now() + GRADER_CALL_TIMEOUT_MS <= deadline;
+  const outOfBudget = (raw: string | null): GradeOutcome => ({
+    ok: false,
+    category: 'upstream',
+    retryable: true,
+    message: 'grading budget exhausted before the next call',
+    raw,
+    usage,
+  });
   const base = {
     model: settings.model,
     system: request.system,
@@ -102,6 +130,7 @@ export async function gradeAttempt(args: {
       }
       if (message.stop_reason === 'max_tokens') {
         if (round === 0) {
+          if (!roomForAnotherCall()) return { ok: false, outcome: outOfBudget(text || null) };
           maxTokens = settings.retryMaxTokens ?? RETRY_MAX_TOKENS;
           continue;
         }
@@ -117,6 +146,8 @@ export async function gradeAttempt(args: {
   const p1 = parseJson(first.text);
   const v1 = p1.error ? { ok: false as const, errors: [p1.error] } : validateGradeOutput(p1.parsed, ctx);
   if (v1.ok) return { ok: true, raw: first.text, grade: v1.grade, usage, model: settings.model, warnings: v1.warnings, corrected: false };
+
+  if (!roomForAnotherCall()) return outOfBudget(first.text || null);
 
   // One corrective turn on the same cached prefix, listing every problem.
   const correction: Anthropic.MessageParam[] = [

@@ -131,6 +131,14 @@ describe('gradeAttempt', () => {
     expect(r).toMatchObject({ ok: false, category: 'invalid_output', retryable: true });
   });
 
+  it('skips the corrective turn when the budget is already spent', async () => {
+    const { calls, client } = fakeClient([message(goodGrade({ attempt_id: 'wrong' })), message(goodGrade())]);
+    const r = await gradeAttempt({ anthropic: client, input, ctx, settings: { ...settings, deadlineAt: Date.now() - 1 } });
+    expect(r).toMatchObject({ ok: false, category: 'upstream', retryable: true, message: 'grading budget exhausted before the next call' });
+    if (!r.ok) expect(r.raw).toContain('"attempt_id":"wrong"');
+    expect(calls).toHaveLength(1);
+  });
+
   it('maps a refusal', async () => {
     const { client } = fakeClient([message('', { stop_reason: 'refusal' })]);
     expect(await gradeAttempt({ anthropic: client, input, ctx, settings })).toMatchObject({ ok: false, category: 'refusal', retryable: false });

@@ -2,7 +2,7 @@ import type { Config } from '@netlify/functions';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
-import { gradeAttempt } from '../../src/lib/server/course/grader';
+import { GRADER_CALL_TIMEOUT_MS, gradeAttempt } from '../../src/lib/server/course/grader';
 import { runGradingJob } from '../../src/lib/server/course/gradingJob';
 import { supabaseJobStore } from '../../src/lib/server/course/jobStore';
 
@@ -41,7 +41,10 @@ export default async (req: Request) => {
   const supabase = createClient(env('PUBLIC_SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const anthropic = new Anthropic({ apiKey: env('ANTHROPIC_API_KEY'), timeout: 300_000, maxRetries: 2 });
+  // No SDK retries: the job runner owns retries through fail_course_grading_job,
+  // so a failed call is counted against the job's budget and claimed again with
+  // a fresh lease instead of being retried invisibly inside this one.
+  const anthropic = new Anthropic({ apiKey: env('ANTHROPIC_API_KEY'), timeout: GRADER_CALL_TIMEOUT_MS, maxRetries: 0 });
   const model = env('COURSE_GRADER_MODEL') || 'claude-opus-5';
   const outcome = await runGradingJob({
     jobId,

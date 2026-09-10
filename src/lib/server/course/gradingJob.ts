@@ -64,7 +64,13 @@ export type RunOutcome =
   | { outcome: 'finalized'; passed: boolean }
   | { outcome: 'unavailable' | 'exhausted' | 'stale' }
   | { outcome: 'requeued' | 'failed'; category: ErrorCategory };
-export const DEFAULT_LEASE_SECONDS = 600;
+/**
+ * Longer than the grader's own budget (GRADER_BUDGET_MS, 720 seconds) and
+ * shorter than the Netlify background limit of 900 seconds, so a worker still
+ * holds its lease when it finishes and the function is never killed holding
+ * one. The sweeper mirrors this number, and so does the SQL default.
+ */
+export const DEFAULT_LEASE_SECONDS = 840;
 
 export async function runGradingJob(args: {
   jobId: string;

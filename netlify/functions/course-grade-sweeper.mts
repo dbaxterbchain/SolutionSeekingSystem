@@ -3,9 +3,9 @@ import { createClient } from '@supabase/supabase-js';
 
 /**
  * Every ten minutes on the published deploy: re-trigger jobs that sat queued
- * for more than ninety seconds (a lost hand-off) or ran past their ten minute
- * lease (a worker that died), at most fifty at a time. Whether a job has any
- * budget left is the claim function's decision, never this one's.
+ * for more than ninety seconds (a lost hand-off) or ran past their lease (a
+ * worker that died), at most fifty at a time. Whether a job has any budget left
+ * is the claim function's decision, never this one's.
  */
 export default async () => {
   const env = (name: string): string => Netlify.env.get(name) ?? '';
@@ -19,7 +19,10 @@ export default async () => {
   });
   const now = Date.now();
   const queuedBefore = new Date(now - 90_000).toISOString();
-  const runningBefore = new Date(now - 600_000).toISOString();
+  // 840 seconds is DEFAULT_LEASE_SECONDS in src/lib/server/course/gradingJob.ts,
+  // the lease every claim takes. This function only mirrors it; the claim
+  // function is what actually decides whether a lease has expired.
+  const runningBefore = new Date(now - 840_000).toISOString();
   const [queued, running] = await Promise.all([
     supabase.from('course_grading_jobs').select('id').eq('state', 'queued').lt('updated_at', queuedBefore).order('updated_at', { ascending: true }).limit(50),
     supabase.from('course_grading_jobs').select('id').eq('state', 'running').lt('locked_at', runningBefore).order('locked_at', { ascending: true }).limit(50),
