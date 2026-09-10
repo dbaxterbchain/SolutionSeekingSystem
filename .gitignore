@@ -30,3 +30,6 @@ google-ads.yaml
 ads/.venv/
 ads/uv.lock
 ads/__pycache__/
+
+# course placeholder clip renders (scripts/render-placeholder-video.mjs)
+scripts/placeholder-video/out/
