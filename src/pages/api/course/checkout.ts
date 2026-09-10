@@ -8,6 +8,7 @@ import { resolveCourseOffer } from '../../../lib/server/course/offer';
 import { getCourseEntitlement, recordCheckoutCreated } from '../../../lib/server/course/enrollment';
 import { COURSE, COURSE_STATUS } from '../../../data/course';
 import type { FirstTouch } from '../../../lib/attribution';
+import type { CourseEntitlement } from '../../../lib/server/course/enrollmentRules';
 
 export const prerender = false;
 
@@ -36,6 +37,13 @@ const trimmed = (value: unknown, max = 120): string | undefined =>
   typeof value === 'string' && value.trim() !== '' ? value.slice(0, max) : undefined;
 
 const CLICK_ID_MAX = 500;
+
+/** Append checkout=cancelled to a same-origin path, keeping any query and fragment where they belong. */
+function cancelUrl(origin: string, path: string): string {
+  const [pathAndQuery, fragment] = path.split('#', 2);
+  const joiner = pathAndQuery.includes('?') ? '&' : '?';
+  return `${origin}${pathAndQuery}${joiner}checkout=cancelled${fragment ? `#${fragment}` : ''}`;
+}
 
 /**
  * Create a one-time Checkout Session for the course.
@@ -69,7 +77,13 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     return privateJson({ error: 'rate_limited' }, 429);
   }
 
-  const entitlement = await getCourseEntitlement(user);
+  let entitlement: CourseEntitlement;
+  try {
+    entitlement = await getCourseEntitlement(user);
+  } catch (err) {
+    console.error('course checkout: entitlement lookup failed', err);
+    return privateJson({ error: 'entitlement_unavailable' }, 503);
+  }
   if (entitlement.kind === 'enrolled') return privateJson({ error: 'already_enrolled' }, 409);
   if (entitlement.kind === 'inactive' && entitlement.reason === 'revoked') {
     return privateJson({ error: 'enrollment_revoked' }, 403);
@@ -81,11 +95,15 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
   // A subscriber already has a Stripe customer; reuse it so one person is one
   // customer in Stripe. Otherwise Checkout creates one, so the receipt and a
   // refund have a customer to hang off.
-  const { data: sub } = await supabaseAdmin
+  const { data: sub, error: subError } = await supabaseAdmin
     .from('subscriptions')
     .select('stripe_customer_id')
     .eq('user_id', user.id)
     .maybeSingle();
+  if (subError) {
+    console.error('course checkout: subscription lookup failed', subError);
+    return privateJson({ error: 'checkout_unavailable' }, 503);
+  }
 
   const origin = new URL(request.url).origin;
   const returnPath = safePath(body.returnPath, '/course');
@@ -135,7 +153,7 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         // Copied onto the PaymentIntent so a refund event can name the learner.
         payment_intent_data: { metadata },
         success_url: `${origin}/course/learn/?checkout=success`,
-        cancel_url: `${origin}${returnPath}${returnPath.includes('?') ? '&' : '?'}checkout=cancelled`,
+        cancel_url: cancelUrl(origin, returnPath),
       },
       // A retry with the same key gets the same session back from Stripe.
       { idempotencyKey: `course:${user.id}:${body.request_key}` }
@@ -147,6 +165,13 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
     );
     return privateJson({ url: session.url });
   } catch (err) {
+    // The same request key with different parameters: Stripe refuses to replay
+    // it. Tell the client to mint a fresh key rather than retry into the same wall.
+    // Stripe's SDK sets `.type` to the error CLASS name (StripeIdempotencyError);
+    // the raw API error type string ('idempotency_error') is on `.rawType`.
+    if (err instanceof Error && (err as { rawType?: string }).rawType === 'idempotency_error') {
+      return privateJson({ error: 'request_key_reused' }, 409);
+    }
     console.error('course checkout session failed', err);
     return privateJson({ error: 'checkout_failed' }, 502);
   }

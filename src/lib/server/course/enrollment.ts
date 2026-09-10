@@ -139,7 +139,8 @@ export const enrollmentStore: EnrollmentStore = {
 /**
  * The checkout endpoint's ledger row. Best effort: the Stripe session already
  * exists when this runs, and a failed audit row must not turn a working
- * checkout into a 502.
+ * checkout into a 502. A replayed session (the same Stripe idempotency key,
+ * called again) leaves exactly one row: checked for here before inserting.
  */
 export async function recordCheckoutCreated(
   userId: string,
@@ -147,6 +148,19 @@ export async function recordCheckoutCreated(
   enrollmentId: string | null
 ): Promise<void> {
   try {
+    const { data: existing, error: lookupError } = await supabaseAdmin
+      .from('course_enrollment_events')
+      .select('id')
+      .eq('kind', 'checkout_created')
+      .eq('stripe_checkout_session_id', sessionId)
+      .limit(1)
+      .maybeSingle();
+    if (lookupError) {
+      console.error('course checkout_created lookup failed', lookupError);
+      return;
+    }
+    if (existing) return;
+
     await enrollmentStore.addEvent({
       enrollment_id: enrollmentId,
       user_id: userId,
