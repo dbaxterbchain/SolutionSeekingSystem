@@ -42,6 +42,9 @@ export function moduleId(n: number): string {
 
 export const worksheetIdFor = (moduleIdValue: string): string => `w-${moduleIdValue}`;
 
+/** The id a module check is recorded under: `m03-c2` is the second check of module 3. */
+export const checkId = (moduleIdValue: string, n: number): string => `${moduleIdValue}-c${n}`;
+
 /**
  * The house copy rule (CLAUDE.md): no em dashes, no en dashes, and no template
  * token left unrendered. Checked on every string and body in the course content.

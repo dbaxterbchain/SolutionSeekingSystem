@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro build",
+    "build": "astro build && node scripts/check-dist-leak.mjs",
     "preview": "astro preview",
-    "check": "astro check",
+    "check": "astro check && node scripts/check-private-content.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -35,6 +35,7 @@
     "unpdf": "^1.6.2"
   },
   "devDependencies": {
+    "@netlify/functions": "^6.0.0",
     "opentype.js": "^2.0.0",
     "vite": "^6.4.3",
     "vitest": "^5.0.0"

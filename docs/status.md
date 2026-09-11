@@ -1,13 +1,13 @@
 # Project Status
 
-_Last updated: 2026-08-04 (gold ramp meaning "the solution"; before that, the public design guide at /design)_
-set; before that, the ad landing conversion pass)_
+_Last updated: 2026-09-10 (paid video course, Phase 1 built on branch `course`; before that, icons
+for the 12 Wisdom Principles and the gold ramp meaning "the solution")_
 
 ## At a glance
 
 | | |
 |---|---|
-| **Current phase** | Growth plan P1-P5 shipped (measurement, anonymous trial, pricing, email capture, social proof + testimonial collector). Next: SEO/community channels, then a small paid test. |
+| **Current phase** | Growth plan P1-P5 shipped (measurement, anonymous trial, pricing, email capture, social proof + testimonial collector). In progress: the **paid video course**, whose Phase 1 is built on branch `course` and not yet deployed. Next: SEO/community channels, then a small paid test. |
 | **Live URL** | https://solutionseeking.com (apex is primary; www and the netlify.app subdomain 301 to it) |
 | **Build health** | `npm run build` ✅ · `npm run check` ✅ (0 errors) |
 | **Hosting** | Netlify (Beanchain team), site `solution-seeking-system` |
@@ -43,6 +43,59 @@ set; before that, the ad landing conversion pass)_
       does not join queries to conversions. The sitemap is live and healthy (50 URLs: all 8 mode
       pages, all 7 demos, `/guide` and `/pricing`; `/admin` and `/account` correctly excluded).
       The GA4 link is what makes "which query led to a subscription" answerable at all.
+
+### Paid video course (in progress, 4 phases)
+
+A one-time-purchase video course with a printable worksheet per module and an AI-assessed
+certification, sold from `/course` and delivered at `/course/learn/`. Design agreed
+**2026-09-09** ([the spec](superpowers/specs/2026-09-09-paid-video-course-design.md)); Phase 1
+was built on branch `course` across five sub-plans, all executed **2026-09-10**. Nothing is
+deployed: `PUBLIC_COURSE_STATUS` defaults to `hidden`, so a merge changes nothing a visitor can
+see.
+
+- [x] **1a, foundations** ([plan](superpowers/plans/2026-09-09-course-phase1a-foundations.md)).
+      The content collections and the catalog validator (the lesson chain, module contiguity,
+      the six fixed lesson sections, the status ladder), the pure rule modules under
+      `src/lib/course/`, migration `0030`, the launch flag, and `npm test` wired into the
+      Netlify build command so a validator regression cannot ship.
+- [x] **1b, commerce** ([plan](superpowers/plans/2026-09-10-course-phase1b-commerce.md)). The
+      one-time Stripe offer, the enrollment store and its ledger, the webhook's course branch,
+      `/api/course/{entitlement,checkout}`, the sales page and the learner dashboard shell.
+      Verified in a browser: a purchase, a delayed webhook recovered through "Check access", the
+      cancel banner, a non-admin refused while hidden.
+- [x] **1c, lesson delivery**
+      ([plan](superpowers/plans/2026-09-10-course-phase1c-lesson-delivery.md)). The lesson and
+      worksheet shells with their islands, Cloudflare Stream playback on shared signed tokens,
+      autosaved practice responses with a monotone trigger and a revision conflict answer so a
+      stray click can never erase typed work, and the printable worksheet.
+- [x] **1d, the assessment data path**
+      ([plan](superpowers/plans/2026-09-10-course-phase1d-assessment-data-path.md)). Migration
+      `0031`, the private forms collection with two guard scripts, the staged assessment with
+      frozen snapshots, the background grading worker and its sweeper, lock tokens on every
+      worker write, and the admin grading queue. Verified live against `claude-opus-5`: a real
+      pass and a real not-yet with verbatim quotes, a prompt-cache hit on the second grade, and
+      a dead-worker recovery.
+- [x] **1e, admin, wiring, docs**
+      ([plan](superpowers/plans/2026-09-10-course-phase1e-admin-wiring-docs-ship.md)). Grant,
+      revoke, record refund and reinstate from `/admin` → Enrollments; an alert email when a
+      grading job fails for good; the certification page; the public touchpoints (nav, account
+      menu, home, practice, pricing, FAQ, JSON-LD, llms.txt, OG cards) all behind the flag; and
+      these docs. Screenshots in [docs/features/course/](features/course/).
+
+**Still to happen, in order.** Push `0030` and `0031` to the hosted project and run the
+advisors. Set the course variables in Netlify, add the two async payment events to the Stripe
+webhook, and upload the stand-in clip so `COURSE.placeholderStreamUid` can be set. Then the
+pilot. The content the code is waiting on is David's (Forms A and B, the workbook explanations,
+the remaining worksheet bodies) and Bradley's (the real recordings, captions and UIDs); until
+the videos exist an `open` build is refused by design, which is the intended behaviour and not
+a bug to route around.
+
+**Phases 2 to 4.** Phase 2 is the content system: every lesson published through the ladder,
+the module checks, a finished worksheet per module, the free preview lesson page. Phase 3 is the
+certification journey: Forms A and B, certificates and verification, the result and certificate
+emails, the review queue, and the grader benchmark that decides whether
+`COURSE_AWARDS_ENABLED` can be turned on. Phase 4 is the release itself, gated on the
+ready-to-open checklist in [deployment.md](deployment.md#ready-to-open-checklist).
 
 ### Dashboard, documents & specialized assistants (in progress, 4 phases)
 A subscriber-only **/dashboard** that makes the whole toolset more productive, then three
@@ -208,7 +261,9 @@ step per customer (manual), and any tuning from real subscriber use.
       `src/assets/` and rendered with `astro:assets` `<Image>` (responsive srcset, AVIF/WebP, no
       CLS; the repo's first `astro:assets` use), home hero marked `fetchpriority="high"`. Small
       fixes: `robots.txt` disallows `/saved`; `twitter:title`/`twitter:description` added. Deferred:
-      font self-hosting, `Course`/`Review` schema. Screenshots in [docs/features/faq/](features/faq/).
+      font self-hosting, `Review` schema. (The deferred **`Course` schema** shipped with the paid
+      video course on 2026-09-10: `course()` in `src/lib/schema.ts` renders it on `/course`.)
+      Screenshots in [docs/features/faq/](features/faq/).
 
 ### Phase 2 — Interactive practice tools ✅ _(done)_
 - [x] Guided Introspection worksheet — `/practice/introspection` (7-step stepper, localStorage, copyable prep summary)

@@ -26,9 +26,11 @@
  *   --keep-frames   leave the PNG frames on disk after encoding
  *   --serve         only start the preview server and print its URL (Ctrl+C to stop)
  *
- * Upload the MP4 to Cloudflare Stream with "Require signed URLs" on, add the VTT
- * as the English caption track, and put the returned UID in every lesson file
- * that carries `videoPlaceholder: true`.
+ * Upload the MP4 to Cloudflare Stream with "Require signed URLs" on and add the
+ * VTT as the English caption track. The returned UID goes in one place only:
+ * COURSE.placeholderStreamUid in src/data/course.ts. Every lesson carrying
+ * `videoPlaceholder: true` and no `streamUid` of its own plays it from there, so
+ * one upload covers all of them and no lesson file mentions this clip.
  */
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';

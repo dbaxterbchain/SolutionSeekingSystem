@@ -8,6 +8,14 @@
   command = "npm test && npm run build"
   publish = "dist"
 
+# The course grading worker (background) and its sweeper (scheduled). The
+# Astro adapter's SSR function is separate and untouched. Bundled by esbuild
+# outside Vite, which is why everything they import is checked for
+# astro:content and import.meta.env by scripts/check-private-content.mjs.
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
 # Astro fingerprints everything under /_astro/, so it can be cached forever.
 [[headers]]
   for = "/_astro/*"

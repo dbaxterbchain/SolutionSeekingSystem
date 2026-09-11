@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '../../lib/useSession';
-import { useDialog } from './Dialog';
+import { useDialog, type PromptOptions } from './Dialog';
 
 /**
  * The operator's console.
@@ -13,7 +13,7 @@ import { useDialog } from './Dialog';
  * false sense of where the boundary is. The boundary is the API.
  */
 
-type Tab = 'feedback' | 'orgs' | 'subscribers' | 'enquiries';
+type Tab = 'feedback' | 'orgs' | 'subscribers' | 'enquiries' | 'grading' | 'enrollments';
 
 interface FeedbackRow {
   id: string;
@@ -70,8 +70,44 @@ interface EnquiryRow {
   created_at: string;
 }
 
+interface GradingRow {
+  id: string;
+  attempt_id: string;
+  generation: number;
+  state: 'queued' | 'running' | 'succeeded' | 'failed';
+  reason: 'submission' | 'retry' | 'regrade';
+  attempts: number;
+  max_attempts: number;
+  error_category: string | null;
+  last_error: string | null;
+  model: string | null;
+  locked_by: string | null;
+  locked_at: string | null;
+  created_at: string;
+  updated_at: string;
+  attempt_state: string | null;
+  user_id: string | null;
+  form_id: string | null;
+  submitted_at: string | null;
+}
+
+interface EnrollmentRow {
+  id: string;
+  user_id: string;
+  email: string | null;
+  status: 'enrolled' | 'revoked' | 'refunded';
+  source: 'stripe' | 'admin';
+  purchased_at: string | null;
+  access_starts_at: string;
+  access_ends_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 const date = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+const time = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
 
 export default function AdminView() {
   const { session, user, loading } = useSession();
@@ -86,7 +122,9 @@ export default function AdminView() {
   const [subscribers, setSubscribers] = useState<SubscriberRow[] | null>(null);
   const [bySource, setBySource] = useState<Record<string, { total: number; confirmed: number }>>({});
   const [enquiries, setEnquiries] = useState<EnquiryRow[] | null>(null);
-  const { confirm, dialog } = useDialog();
+  const [grading, setGrading] = useState<GradingRow[] | null>(null);
+  const [enrollments, setEnrollments] = useState<EnrollmentRow[] | null>(null);
+  const { confirm, prompt, dialog } = useDialog();
 
   const call = async (path: string, body?: unknown) => {
     if (!session) return null;
@@ -124,6 +162,12 @@ export default function AdminView() {
         setSubscribers(d.rows);
         setBySource(d.bySource ?? {});
       }
+    } else if (which === 'grading') {
+      const d = await call('course?view=grading');
+      if (d) setGrading(d.rows);
+    } else if (which === 'enrollments') {
+      const d = await call('course?view=enrollments');
+      if (d) setEnrollments(d.rows);
     } else {
       const d = await call('enquiries');
       if (d) setEnquiries(d.rows);
@@ -179,6 +223,8 @@ export default function AdminView() {
     { id: 'orgs', label: 'Organizations', count: orgs?.length },
     { id: 'subscribers', label: 'Email list', count: subscribers?.length },
     { id: 'enquiries', label: 'Enquiries', count: enquiries?.filter((e) => !e.handled).length },
+    { id: 'grading', label: 'Grading' },
+    { id: 'enrollments', label: 'Enrollments', count: enrollments?.filter((e) => e.status === 'enrolled').length },
   ];
 
   return (
@@ -236,6 +282,27 @@ export default function AdminView() {
             const d = await call('enquiries', { id, handled });
             if (d?.ok) void loadTab('enquiries');
           }}
+        />
+      )}
+      {tab === 'grading' && (
+        <GradingTab
+          rows={grading}
+          onAction={async (action, jobId) => {
+            const d = await call('course', { action, job_id: jobId });
+            if (d) {
+              setNotice(action === 'retry_job' ? 'Job queued for another try.' : 'Worker triggered.');
+              await loadTab('grading');
+            }
+          }}
+        />
+      )}
+      {tab === 'enrollments' && (
+        <EnrollmentsTab
+          rows={enrollments}
+          call={call}
+          reload={() => loadTab('enrollments')}
+          setNotice={setNotice}
+          prompt={prompt}
         />
       )}
       {dialog}
@@ -720,6 +787,305 @@ function EnquiriesTab({
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------- Grading */
+
+function GradingTab({
+  rows,
+  onAction,
+}: {
+  rows: GradingRow[] | null;
+  onAction: (action: 'retry_job' | 'kick_job', jobId: string) => void;
+}) {
+  if (!rows) return <p className="text-sm text-slate-400">Loading…</p>;
+  if (rows.length === 0) {
+    return <Empty>No grading jobs yet.</Empty>;
+  }
+
+  const stateBadge: Record<GradingRow['state'], string> = {
+    queued: 'bg-slate-100 text-slate-600',
+    running: 'bg-amber-100 text-amber-800',
+    succeeded: 'bg-emerald-100 text-emerald-700',
+    failed: 'bg-red-50 text-red-700',
+  };
+
+  return (
+    <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-card">
+      <table className="w-full text-left text-sm">
+        <thead className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">
+          <tr>
+            <th className="px-5 py-3">Job</th>
+            <th className="px-5 py-3">Attempt state</th>
+            <th className="px-5 py-3">Learner</th>
+            <th className="px-5 py-3">Form</th>
+            <th className="px-5 py-3">Job state</th>
+            <th className="px-5 py-3">Attempts</th>
+            <th className="px-5 py-3">Error</th>
+            <th className="px-5 py-3">Updated</th>
+            <th className="px-5 py-3">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id} className="border-b border-slate-50 last:border-0">
+              <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{r.id.slice(0, 8)}</td>
+              <td className="px-5 py-2.5 text-slate-500">{r.attempt_state ?? ''}</td>
+              <td className="px-5 py-2.5 font-mono text-xs text-slate-500">
+                {r.user_id ? r.user_id.slice(0, 8) : ''}
+              </td>
+              <td className="px-5 py-2.5 text-slate-500">{r.form_id ?? ''}</td>
+              <td className="px-5 py-2.5">
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${stateBadge[r.state]}`}>
+                  {r.state}
+                </span>
+              </td>
+              <td className="px-5 py-2.5 text-slate-500">
+                {r.attempts}/{r.max_attempts}
+              </td>
+              <td className="max-w-xs px-5 py-2.5 align-top text-slate-500">
+                {r.error_category && (
+                  <p className="text-xs font-semibold text-red-700">{r.error_category}</p>
+                )}
+                {r.last_error && (
+                  <p className="mt-0.5 break-words text-xs text-slate-400">{r.last_error}</p>
+                )}
+              </td>
+              <td className="px-5 py-2.5 text-slate-400">
+                {date(r.updated_at)} {time(r.updated_at)}
+              </td>
+              <td className="px-5 py-2.5">
+                {r.state === 'failed' && (
+                  <button
+                    type="button"
+                    onClick={() => onAction('retry_job', r.id)}
+                    className="rounded-full bg-brand-500 px-3.5 py-1 text-xs font-semibold text-white hover:bg-brand-600"
+                  >
+                    Retry
+                  </button>
+                )}
+                {(r.state === 'queued' || r.state === 'running') && (
+                  <button
+                    type="button"
+                    onClick={() => onAction('kick_job', r.id)}
+                    className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300"
+                  >
+                    Kick
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------- Enrollments */
+
+const NOTE_MAX = 500;
+
+function EnrollmentsTab({
+  rows,
+  call,
+  reload,
+  setNotice,
+  prompt,
+}: {
+  rows: EnrollmentRow[] | null;
+  call: (path: string, body?: unknown) => Promise<any>;
+  reload: () => void;
+  setNotice: (notice: string | null) => void;
+  prompt: (opts: PromptOptions) => Promise<string | null>;
+}) {
+  const [email, setEmail] = useState('');
+  const [note, setNote] = useState('');
+  const [granting, setGranting] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const grant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setGranting(true);
+    const d = await call('course', { action: 'grant', email: email.trim(), note: note.trim() || undefined });
+    setGranting(false);
+    if (d?.ok) {
+      setEmail('');
+      setNote('');
+      setNotice('Access granted.');
+    }
+    // Reload either way. A refusal usually means this list is behind what the
+    // database says, and the fix the operator needs is the current row.
+    reload();
+  };
+
+  /**
+   * Each access change asks for a note, which lands in the ledger beside the
+   * admin's id. The note is optional; cancelling the dialog returns null and
+   * nothing happens.
+   */
+  const act = async (
+    action: 'revoke' | 'refund' | 'reinstate',
+    row: EnrollmentRow,
+    opts: PromptOptions,
+    successNotice: string
+  ) => {
+    const note = await prompt({ label: 'Note for the ledger (optional)', maxLength: NOTE_MAX, ...opts });
+    if (note === null) return;
+    setBusyId(row.id);
+    const d = await call('course', { action, user_id: row.user_id, note: note.trim() || undefined });
+    setBusyId(null);
+    if (d?.ok) setNotice(successNotice);
+    reload();
+  };
+
+  const statusBadge: Record<EnrollmentRow['status'], string> = {
+    enrolled: 'bg-emerald-100 text-emerald-700',
+    revoked: 'bg-slate-100 text-slate-600',
+    refunded: 'bg-amber-100 text-amber-800',
+  };
+
+  return (
+    <div className="space-y-4">
+      <form onSubmit={grant} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-xs font-semibold text-slate-600">
+            Email
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              required
+              placeholder="learner@example.com"
+              className="mt-1 block rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Note
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Why, for the ledger (optional)"
+              maxLength={NOTE_MAX}
+              className="mt-1 block w-64 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            />
+          </label>
+          <button type="submit" disabled={granting} className="btn-primary py-2 text-xs disabled:opacity-60">
+            {granting ? 'Granting…' : 'Grant access'}
+          </button>
+        </div>
+      </form>
+
+      {!rows ? (
+        <p className="text-sm text-slate-400">Loading…</p>
+      ) : rows.length === 0 ? (
+        <Empty>No enrollments yet.</Empty>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-card">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">
+              <tr>
+                <th className="px-5 py-3">Email</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3">Source</th>
+                <th className="px-5 py-3">Since</th>
+                <th className="px-5 py-3">Ended</th>
+                <th className="px-5 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const label = r.email ?? r.user_id.slice(0, 8);
+                const busy = busyId === r.id;
+                return (
+                  <tr key={r.id} className="border-b border-slate-50 last:border-0">
+                    <td className="px-5 py-2.5 text-slate-700">{label}</td>
+                    <td className="px-5 py-2.5">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadge[r.status]}`}>
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-2.5 text-slate-500">{r.source}</td>
+                    <td className="px-5 py-2.5 text-slate-400">{date(r.access_starts_at)}</td>
+                    <td className="px-5 py-2.5 text-slate-400">{date(r.access_ends_at)}</td>
+                    <td className="px-5 py-2.5">
+                      <div className="flex flex-wrap gap-2">
+                        {r.status === 'enrolled' && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              act(
+                                'revoke',
+                                r,
+                                {
+                                  title: `Revoke access for ${label}?`,
+                                  message:
+                                    'The learner keeps their progress but cannot open lessons until access is reinstated.',
+                                  confirmLabel: 'Revoke',
+                                },
+                                'Access revoked.'
+                              )
+                            }
+                            className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
+                          >
+                            Revoke
+                          </button>
+                        )}
+                        {/* A refund often follows a revoke days later, when the money actually moves. */}
+                        {(r.status === 'enrolled' || r.status === 'revoked') && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              act(
+                                'refund',
+                                r,
+                                {
+                                  title: `Record a refund for ${label}?`,
+                                  message:
+                                    r.status === 'enrolled'
+                                      ? 'This ends access and writes the ledger. Move the money in the Stripe dashboard.'
+                                      : 'Access has already ended. This records the refund beside it. Move the money in the Stripe dashboard.',
+                                  confirmLabel: 'Record refund',
+                                },
+                                'Refund recorded. Move the money in the Stripe dashboard.'
+                              )
+                            }
+                            className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
+                          >
+                            Record refund
+                          </button>
+                        )}
+                        {(r.status === 'revoked' || r.status === 'refunded') && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              act(
+                                'reinstate',
+                                r,
+                                { title: `Reinstate access for ${label}?`, confirmLabel: 'Reinstate' },
+                                'Access reinstated.'
+                              )
+                            }
+                            className="rounded-full bg-brand-500 px-3.5 py-1 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+                          >
+                            Reinstate
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

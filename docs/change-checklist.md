@@ -6,7 +6,9 @@ stale docs, no orphaned pages, no broken prompt cache.
 
 ## Every change
 
-- [ ] `npm run check` passes (types + content schemas).
+- [ ] `npm run check` passes (types + content schemas) **and `npm test` passes**. The course's
+      pure rule modules are unit-tested, and Netlify runs `npm test` before every build
+      (`netlify.toml`), so a broken test is a failed deploy, not a nagging warning.
 - [ ] `npm run build` passes. Locally without a `.env`, set placeholder public vars first:
       `PUBLIC_SUPABASE_URL=https://placeholder.supabase.co`, `PUBLIC_SUPABASE_ANON_KEY=x`
       (prerendering imports the Supabase client at module load).
@@ -68,6 +70,39 @@ stale docs, no orphaned pages, no broken prompt cache.
 - [ ] Renamed slug/id: it's a live URL — check inbound links across the site, `llms.txt`,
       OG route keys, and anything that hardcodes the id (e.g. demo `context` frontmatter,
       `protocolSteps` in `src/data/concepts.ts`).
+
+## Course content and course pages
+
+- [ ] **The catalog validator runs at build time and names the file that broke it.** It checks
+      the lesson chain (every lesson reachable from `v01` through `next`, in id order, ending
+      at the last one), module contiguity, the six `##` sections in their fixed order, the
+      status ladder's requirements, and the no-dash rule on every string a learner could read.
+      Read the message: it lists every failure at once so you can fix a batch.
+- [ ] **Publishing a lesson walks the ladder**, `draft` to `approved` to `filmed` to `edited`
+      to `captioned` to `staged` to `published`, and each rung adds a requirement rather than
+      replacing one. If copy or the master changes *after* publish, bump `contentVersion`.
+      Progress is never reset by a bump.
+- [ ] **A lesson with no recording yet carries `videoPlaceholder: true`** and plays the
+      stand-in clip. It cannot reach `staged` or `published` while the course is `open`; the
+      validator stops the build, deliberately, because selling a lesson that is still a
+      placard is the one failure worth breaking a deploy over.
+- [ ] **Assessment forms are private content.** The only module that may read the collection
+      is [`src/lib/server/course/forms.ts`](../src/lib/server/course/forms.ts). `npm run check`
+      fails on a second reference to it, and on a worker-shared module importing
+      `astro:content`, the env helper, `supabaseAdmin`, the rate limiter, `src/data/course.ts`
+      or `import.meta.env`.
+      `npm run build` fails if a reveal, a reference response or a later-stage prompt reaches
+      `dist/`. If one of those guards fires, the fix is the import, never the guard.
+- [ ] **A change to a public course surface needs two builds**, one with
+      `PUBLIC_COURSE_STATUS` unset or `hidden` and one with `preview`. They produce different
+      page sets, and production serves the hidden one today.
+- [ ] **A new course event follows the four-place rule** like every other event (the union in
+      `analytics.ts`, the GTM trigger regex, GA4 key events and dimensions, the Ads import).
+      See [Registering the course events](deployment.md#registering-the-course-events).
+- [ ] **Update the doc that owns what you changed:** the authoring format goes in
+      [content-guide.md](content-guide.md), the filming and upload steps in
+      [course-production.md](course-production.md), anything operational in
+      [deployment.md](deployment.md#paid-video-course).
 
 ## AI / chat changes (`src/lib/server/agents.ts`, `contexts.ts`, `/api/chat`)
 
@@ -140,6 +175,14 @@ stale docs, no orphaned pages, no broken prompt cache.
 - [ ] **Verify the RLS claim rather than asserting it.** Hit the table with the *publishable*
       key and confirm the read is empty and the write is refused. Local and the hosted project
       have had different default grants, so "it's safe locally" has proven nothing.
+- [ ] **The course tables follow the same server-write-only pattern**, and the assessment's
+      state changes go through the SQL functions in `0031` (`create_course_attempt`,
+      `submit_course_attempt`, `claim_course_grading_job`, `finalize_course_grade`,
+      `fail_course_grading_job`, `retry_course_grading_job`), which is where the lock tokens
+      and the one-open-attempt rule are enforced. An access change goes the same way, through
+      `admin_change_course_access` in `0030`, so the row update and its ledger row commit
+      together. Never add a client policy to a `course_*` table, and never write one of those
+      state transitions from application code.
 - [ ] Update TypeScript types that mirror the schema (e.g. `src/lib/chatSessions.ts`).
 
 ## Claims about users, and social proof
@@ -218,6 +261,12 @@ stale docs, no orphaned pages, no broken prompt cache.
 
 - [ ] Add to `.env.example` with a comment.
 - [ ] Set in Netlify (mark secrets as secret values).
+- [ ] **Decide the Netlify scope deliberately**: Builds (anything a page reads while it
+      prerenders), Functions (anything a server endpoint or a Netlify function reads at
+      request time), or both. A variable in the wrong scope reads as an empty string, which
+      usually looks like a feature that quietly does nothing. Keep the Functions set under
+      about 4 KB in total: it is a shared budget, and the grading worker's variables count
+      against it too.
 - [ ] Document in [deployment.md](deployment.md); read server-side via
       `serverEnv()` (`src/lib/server/env.ts`), never expose secrets with a `PUBLIC_` prefix.
 

@@ -21,6 +21,8 @@ export const COURSE = {
   navLabel: 'Video course',
   presenter: 'David Baxter',
   learnerHours: '10-12',
+  /** The top of that range, on its own because the JSON-LD workload reads a number. */
+  learnerHoursMax: 12,
   suggestedWeeks: 6,
   /** Asserted against the content collections at build time. */
   plan: { modules: 9, lessons: 40 },
@@ -33,6 +35,12 @@ export const COURSE = {
   planLessonId: 'v40',
   /** ISO date David confirmed every launch token below. Required for an `open` build. */
   launchConfirmed: null as string | null,
+  /**
+   * The Stream UID of the stand-in clip (scripts/render-placeholder-video.mjs)
+   * that every lesson with `videoPlaceholder: true` and no `streamUid` plays.
+   * Null until the clip is uploaded; the lesson then shows a "being filmed" note.
+   */
+  placeholderStreamUid: null as string | null,
 } as const;
 
 export type CourseToken =

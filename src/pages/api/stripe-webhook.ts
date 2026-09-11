@@ -9,14 +9,14 @@ import { handleCourseCheckoutEvent } from '../../lib/server/course/enrollment';
 export const prerender = false;
 
 /**
- * Stripe webhook — the ONLY writer of subscription entitlement state.
+ * The Stripe webhook is the ONLY writer of subscription entitlement state.
  * Register in the Stripe dashboard for: checkout.session.completed,
  * checkout.session.async_payment_succeeded, checkout.session.async_payment_failed,
  * customer.subscription.created / .updated / .deleted.
  */
 export const POST: APIRoute = async ({ request }) => {
   const signature = request.headers.get('stripe-signature');
-  // Raw body bytes — signature verification fails on anything re-serialized.
+  // Keep the raw body bytes. Signature verification fails on anything re-serialized.
   const rawBody = await request.text();
 
   let event: Stripe.Event;
@@ -259,7 +259,7 @@ async function handleOrgCheckout(session: Stripe.Checkout.Session) {
  *
  * For self-serve orgs on the per-seat team price, the item QUANTITY is the
  * seat count, so a quantity change (from /api/org's set_seats, or a portal
- * edit) syncs `seats` too — clamped to the member count, because billing can
+ * edit) syncs `seats` too. That sync clamps to the member count, because billing can
  * say "3 seats" but three existing members cannot be unseated by a webhook.
  * The clamp conflict is logged loudly for an admin to resolve.
  */

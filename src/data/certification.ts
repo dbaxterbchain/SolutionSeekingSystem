@@ -58,6 +58,14 @@ export const CRITERIA = [
 export type CriterionId = (typeof CRITERIA)[number]['id'];
 export const CRITERION_IDS: readonly CriterionId[] = CRITERIA.map((c) => c.id);
 
+/**
+ * How many criteria there are, spelled the way a sentence wants it. Prose that
+ * says "the six criteria" reads this rather than typing the number, so adding a
+ * criterion cannot leave a published page counting wrong.
+ */
+const COUNT_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+export const CRITERIA_COUNT_WORD: string = COUNT_WORDS[CRITERIA.length] ?? String(CRITERIA.length);
+
 /** What each score from 0 to 4 means. Substance is judged, never length. */
 export const SCORE_ANCHORS = {
   0: 'Missing or contrary evidence.',

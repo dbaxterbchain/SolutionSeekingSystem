@@ -92,3 +92,25 @@
     @apply font-medium text-brand-600 underline decoration-brand-200 underline-offset-2 hover:text-brand-700;
   }
 }
+
+/* Printing a worksheet: the sheet and its title, nothing else. */
+@media print {
+  header,
+  footer,
+  nav,
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  .print-sheet {
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+  .container-page {
+    max-width: none;
+    padding: 0;
+  }
+}

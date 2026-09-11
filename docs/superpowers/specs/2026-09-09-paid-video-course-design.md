@@ -285,7 +285,7 @@ All routes: `prerender = false`; bearer auth; hand-rolled validation; snake_case
 | action | fields | rule | failure |
 |---|---|---|---|
 | `open` | | upsert row, `last_opened_at = now()`, no revision change | |
-| `studied` | | learner confirms "I watched the video or studied the transcript" (playback telemetry is never required) | |
+| `studied` | | learner confirms "I watched the video or studied this lesson" (playback telemetry is never required) | |
 | `save_response` | `text`, `expected_revision`, `keep_previous?` | compare-and-set on `revision`; sets `practice_state = in_site` when non-blank; `keep_previous` moves the server text to `previous_response_text` first | 409 `revision_conflict` `{ server }`; 400 `too_long` |
 | `practiced_offline` | | `practice_state = offline` only if `none` | 400 if the lesson has no exercise |
 | `reveal_model` | | requires an attempt; sets `model_revealed_at`; **returns the model response** (never in the GET) | 409 `practice_required` |

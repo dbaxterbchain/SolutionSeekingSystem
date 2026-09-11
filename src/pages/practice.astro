@@ -6,6 +6,7 @@ import PricingLine from '../components/react/PricingLine.tsx';
 
 import { MODES } from '../data/modes';
 import { priceCopy } from '../data/pricing';
+import { COURSE, COURSE_STATUS } from '../data/course';
 import { breadcrumbs, collectionPage } from '../lib/schema';
 
 const allDemos = (await getCollection('demos')).sort((a, b) => a.data.order - b.data.order);
@@ -234,5 +235,21 @@ const schemas = [
         }
       </div>
     </section>
+
+    {
+      COURSE_STATUS !== 'hidden' && (
+        <section class="mt-20 rounded-3xl border border-brand-100 bg-brand-50/60 p-7 sm:p-8">
+          <p class="eyebrow mb-3">Video course</p>
+          <h2 class="text-2xl font-bold text-ink-800">Want a step-by-step learning path?</h2>
+          <p class="mt-3 max-w-2xl text-slate-600">
+            The course walks the whole system in order with {COURSE.presenter}, one short lesson at a time, with an
+            exercise to practise after each and a certification at the end.
+          </p>
+          <a href="/course" class="btn-secondary mt-5" data-track-cta="practice_course" data-track-label="See the video course">
+            See the video course
+          </a>
+        </section>
+      )
+    }
   </div>
 </BaseLayout>

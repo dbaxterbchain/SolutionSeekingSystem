@@ -6,6 +6,7 @@ import { PLANS } from '../../data/pricing';
 import { getCourseCatalog } from '../../lib/course/catalog';
 import { hasShell } from '../../lib/course/visibility';
 import { COURSE, COURSE_STATUS } from '../../data/course';
+import { CERTIFICATION_TITLE, CRITERIA_COUNT_WORD } from '../../data/certification';
 
 /**
  * Generated 1200×630 social-share cards, one per page. Route keys mirror page
@@ -30,6 +31,9 @@ const courseLessonPages = Object.fromEntries(
     `course/learn/lessons/${lesson.id}`,
     { title: lesson.title, description: lesson.sections.outcome },
   ])
+);
+const courseWorksheetPages = Object.fromEntries(
+  courseCatalog.worksheets.map((w) => [`course/learn/worksheets/${w.id}`, { title: w.title, description: 'A printable worksheet from the Complete Solution Seeking course.' }])
 );
 
 const pages: Record<string, OgPage> = {
@@ -119,18 +123,27 @@ const pages: Record<string, OgPage> = {
     title: 'About',
     description: 'Why Beanchain Coffee built the Solution Seeking System, and how to use it.',
   },
-  // The sales page exists only when the course is public; its card follows.
+  // The sales and certification pages exist only when the course is public;
+  // their cards follow.
   ...(COURSE_STATUS !== 'hidden'
     ? {
         course: {
           title: COURSE.title,
           description: `Learn the Solution Seeking System with ${COURSE.presenter}: video lessons, practical exercises, and AI-assessed certification.`,
         },
+        'course/certification': {
+          title: CERTIFICATION_TITLE,
+          description: `The ${CRITERIA_COUNT_WORD} criteria, their weights, the score anchors and the pass rule.`,
+        },
       }
     : {}),
   'course/learn': {
     title: 'Your course',
     description: 'Your lessons, worksheets and progress in the Complete Solution Seeking course.',
+  },
+  'course/learn/assessment': {
+    title: 'Final assessment',
+    description: 'The staged final assessment for the Complete Solution Seeking course.',
   },
   account: {
     title: 'Your Account',
@@ -170,6 +183,7 @@ const pages: Record<string, OgPage> = {
     ])
   ),
   ...courseLessonPages,
+  ...courseWorksheetPages,
   ...Object.fromEntries(
     MODES.map((m) => [
       `practice/modes/${m.id}`,
@@ -184,7 +198,7 @@ export const { getStaticPaths, GET } = await OGImageRoute({
     title: page.title,
     description: page.description,
     logo: {
-      // The S mark only — the full logo's wordmark is unreadable at card size.
+      // Only the S mark is used here. The full logo's wordmark is unreadable at card size.
       path: './src/assets/og-logo.png',
       size: [96],
     },

@@ -107,7 +107,7 @@ create table if not exists public.course_stream_tokens (
 
 /*
  * Completion is monotone: revisiting, rewatching, or editing a practice answer
- * never erases it. The API is the writer, but the database refuses a
+ * never erases it. The API is the writer, but the database silently corrects a
  * regression even if a future route gets it wrong.
  */
 create or replace function public.course_progress_monotone() returns trigger
@@ -122,6 +122,13 @@ begin
   end if;
   -- The optimistic-concurrency token never moves backwards.
   if new.revision < old.revision then new.revision := old.revision; end if;
+  -- The response is written only by a save whose revision moves forward. A
+  -- stale whole-row write (an action that loaded the row before a concurrent
+  -- save landed) therefore cannot erase what the learner typed.
+  if new.revision <= old.revision then
+    new.response_text := old.response_text;
+    new.previous_response_text := old.previous_response_text;
+  end if;
   new.first_opened_at := old.first_opened_at;
   return new;
 end $$;
@@ -157,6 +164,80 @@ grant select, insert                 on public.course_enrollment_events to servi
 grant select, insert, update, delete on public.course_progress          to service_role;
 grant select, insert                 on public.course_check_attempts    to service_role;
 grant select, insert, update, delete on public.course_stream_tokens     to service_role;
+
+/*
+ * Access changes made from /admin. The row update and the ledger row commit
+ * together, so an audit row can never be missing for a change that took
+ * effect. p_action is grant, revoke, refund or reinstate; the outcome names
+ * the ledger kind that was written, or why nothing was.
+ *
+ * Revoke needs an enrolled row, because there is nothing to take away twice.
+ * Refund accepts a revoked row as well: ending access and moving the money
+ * back are two separate acts, often days apart, and the usual order is the
+ * revoke first. Only a row already recorded as refunded refuses.
+ */
+create or replace function public.admin_change_course_access(
+  p_user uuid, p_course text, p_admin uuid, p_action text, p_note text
+) returns jsonb
+language plpgsql security invoker set search_path = '' as $$
+declare
+  v_row public.course_enrollments%rowtype;
+  v_kind text;
+begin
+  if p_action not in ('grant', 'revoke', 'refund', 'reinstate') then
+    return jsonb_build_object('outcome', 'invalid');
+  end if;
+  select * into v_row from public.course_enrollments
+    where user_id = p_user and course_id = p_course for update;
+  if p_action = 'grant' then
+    if found and v_row.status = 'enrolled' then
+      return jsonb_build_object('outcome', 'already_enrolled');
+    end if;
+    if found then
+      update public.course_enrollments
+        set status = 'enrolled', access_starts_at = now(), access_ends_at = null
+        where id = v_row.id returning * into v_row;
+      v_kind := 'reinstated';
+    else
+      insert into public.course_enrollments (user_id, course_id, status, source, access_starts_at)
+        values (p_user, p_course, 'enrolled', 'admin', now()) returning * into v_row;
+      v_kind := 'admin_granted';
+    end if;
+  elsif p_action = 'revoke' then
+    if not found or v_row.status <> 'enrolled' then
+      return jsonb_build_object('outcome', 'not_enrolled');
+    end if;
+    update public.course_enrollments set status = 'revoked', access_ends_at = now()
+      where id = v_row.id returning * into v_row;
+    v_kind := 'revoked';
+  elsif p_action = 'refund' then
+    if not found then
+      return jsonb_build_object('outcome', 'not_enrolled');
+    end if;
+    if v_row.status = 'refunded' then
+      return jsonb_build_object('outcome', 'already_refunded');
+    end if;
+    -- A refund after a revoke keeps the date access actually ended, rather than
+    -- restamping it with the day the money moved.
+    update public.course_enrollments
+      set status = 'refunded', access_ends_at = coalesce(access_ends_at, now())
+      where id = v_row.id returning * into v_row;
+    v_kind := 'refunded';
+  else
+    if not found or v_row.status = 'enrolled' then
+      return jsonb_build_object('outcome', 'not_inactive');
+    end if;
+    update public.course_enrollments set status = 'enrolled', access_ends_at = null
+      where id = v_row.id returning * into v_row;
+    v_kind := 'reinstated';
+  end if;
+  insert into public.course_enrollment_events
+    (enrollment_id, user_id, course_id, kind, actor, actor_user_id, note)
+    values (v_row.id, v_row.user_id, v_row.course_id, v_kind, 'admin', p_admin, p_note);
+  return jsonb_build_object('outcome', v_kind, 'enrollment', to_jsonb(v_row));
+end $$;
+revoke execute on function public.admin_change_course_access(uuid, text, uuid, text, text) from public, anon, authenticated;
+grant  execute on function public.admin_change_course_access(uuid, text, uuid, text, text) to service_role;
 
 -- Each `generated always as identity` column above (course_enrollment_events.id,
 -- course_check_attempts.id) creates a sequence in `public`. Migration 0010's

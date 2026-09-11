@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSession } from '../../lib/useSession';
 import { accountLink } from '../../lib/accountLink';
 import { useCourseEntitlement } from '../../lib/useCourseEntitlement';
+import { fetchCourseState, type CourseStateView } from '../../lib/courseClient';
 import { track } from '../../lib/analytics';
 import CourseSalesCta from './CourseSalesCta';
 import type { PublicCurriculum } from '../../lib/course/curriculum';
@@ -107,6 +108,33 @@ export default function CourseDashboard(props: Props) {
 
   const enrolled = entitlement?.kind === 'enrolled';
 
+  const [courseState, setCourseState] = useState<CourseStateView | null>(null);
+  // Settled means the lookup finished, either way. Until then the page says it
+  // is looking rather than guessing at a lesson the learner has already done.
+  const [courseStateSettled, setCourseStateSettled] = useState(false);
+  // The token is read when the effect runs, not depended on: a silent refresh
+  // swaps the session object and would otherwise refetch on every rotation.
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+  useEffect(() => {
+    const current = sessionRef.current;
+    if (!current || !enrolled) return;
+    let active = true;
+    fetchCourseState(current.access_token)
+      .then((s) => {
+        if (!active) return;
+        setCourseState(s);
+        setCourseStateSettled(true);
+      })
+      .catch(() => {
+        if (active) setCourseStateSettled(true);
+      });
+    return () => {
+      active = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enrolled, user?.id]);
+
   if (sessionLoading || (fromCheckout && !session && !graceOver)) {
     // The same text on the server and the client: fromCheckout reads the query
     // string, which the prerendered HTML cannot know.
@@ -202,9 +230,18 @@ export default function CourseDashboard(props: Props) {
     );
   }
 
-  const firstLesson = props.curriculum.modules
-    .flatMap((m) => m.lessons)
-    .find((l) => l.status === 'published');
+  const allLessons = props.curriculum.modules.flatMap((m) => m.lessons);
+  // An enrolled learner waits for their real place; anyone else (a failed
+  // entitlement lookup, say) gets the first published lesson as before.
+  const findingPlace = enrolled && !courseStateSettled;
+  const resumeId = courseState
+    ? courseState.resume_lesson_id
+    : findingPlace
+      ? null
+      : allLessons.find((l) => l.status === 'published')?.id ?? null;
+  const resume = resumeId ? allLessons.find((l) => l.id === resumeId) ?? null : null;
+  const anyPublished = allLessons.some((l) => l.status === 'published');
+  const everythingDone = courseState !== null && anyPublished && courseState.resume_lesson_id === null;
 
   return (
     <div>
@@ -222,17 +259,23 @@ export default function CourseDashboard(props: Props) {
             .
           </p>
         )}
-        {firstLesson ? (
+        {findingPlace ? (
+          <p className="mt-4 text-sm text-slate-500">Finding your place…</p>
+        ) : resume ? (
           <div className="mt-6">
-            <a href={`/course/learn/lessons/${firstLesson.id}`} className="btn-primary">
-              Open the first lesson
+            <a href={`/course/learn/lessons/${resume.id}`} className="btn-primary">
+              {courseState?.lessons[resume.id] ? 'Continue' : 'Start here'}
             </a>
-            <p className="mt-3 text-sm text-slate-500">{firstLesson.title}</p>
+            <p className="mt-3 text-sm text-slate-500">{resume.title}</p>
           </div>
+        ) : everythingDone ? (
+          <p className="mt-4 text-slate-600">You have finished every lesson available so far. More are on the way.</p>
         ) : (
           <p className="mt-4 text-slate-600">The first lessons are being prepared. Check back soon.</p>
         )}
       </header>
+
+      {courseState && <CertificationPanel state={courseState} />}
 
       <ol className="mt-10 grid gap-4 md:grid-cols-2">
         {props.curriculum.modules.map((m) => (
@@ -247,13 +290,11 @@ export default function CourseDashboard(props: Props) {
                       {l.title}
                     </a>
                   ) : (
-                    <>
-                      <span className="text-slate-500">{l.title}</span>
-                      <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Coming soon
-                      </span>
-                    </>
+                    <span className="text-slate-500">{l.title}</span>
                   )}
+                  <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    {l.status !== 'published' ? 'Coming soon' : courseState?.lessons[l.id]?.completed ? 'Done' : courseState?.lessons[l.id] ? 'In progress' : ''}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -280,4 +321,37 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
       <div className="mt-3 space-y-3">{children}</div>
     </div>
   );
+}
+
+function CertificationPanel({ state }: { state: CourseStateView }) {
+  const { body, linkLabel } = certificationCopy(state);
+  return (
+    <section className="mt-10 max-w-xl rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
+      <h2 className="font-heading text-lg font-bold text-ink-800">Certification</h2>
+      <p className="mt-3 text-slate-700">{body}</p>
+      <a href="/course/learn/assessment/" className="btn-primary mt-4">
+        {linkLabel}
+      </a>
+    </section>
+  );
+}
+
+/** The dashboard's one-line summary of where the learner stands with the final assessment. */
+function certificationCopy(state: CourseStateView): { body: string; linkLabel: string } {
+  switch (state.certification.status) {
+    case 'none':
+      return state.assessment_eligible
+        ? { body: 'You have finished the modules. The final assessment is ready when you are.', linkLabel: 'Start the final assessment' }
+        : { body: 'The final assessment opens when modules 1 to 8 and the orientation lesson are complete.', linkLabel: 'About the final assessment' };
+    case 'in_progress':
+      return { body: 'Your assessment is in progress.', linkLabel: 'Continue your assessment' };
+    case 'submitted':
+      return { body: 'Your assessment is being graded. Results usually take a few minutes.', linkLabel: 'Check the status' };
+    case 'passed':
+      return { body: 'You passed the final assessment.', linkLabel: 'See your result' };
+    case 'needs_revision':
+      return { body: 'Your result is ready, with lessons to revisit before a retake.', linkLabel: 'See your feedback' };
+    case 'grading_error':
+      return { body: 'We hit a technical problem while grading. This is not a failed attempt.', linkLabel: 'See the details' };
+  }
 }

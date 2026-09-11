@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { attributionFooter, methodologyMarkdown } from '../lib/llms';
 import { PLANS, FREE_ANON_MESSAGES, FREE_ACCOUNT_MESSAGES } from '../data/pricing';
+import { COURSE_STATUS } from '../data/course';
 
 export const prerender = true;
 
@@ -27,6 +28,16 @@ export const GET: APIRoute = async ({ site }) => {
       '',
       `The complete source guide is a free PDF: ${new URL('/solution-seeking-complete-guide.pdf', site).href}`,
     ].join('\n'),
+    ...(COURSE_STATUS !== 'hidden'
+      ? [
+          [
+            '# Video course (paid)',
+            '',
+            `- The Complete Solution Seeking course (syllabus and access): ${new URL('/course.md', site).href}`,
+            `- The certification rubric: ${new URL('/course/certification.md', site).href}`,
+          ].join('\n'),
+        ]
+      : []),
     attributionFooter(site),
   ];
 

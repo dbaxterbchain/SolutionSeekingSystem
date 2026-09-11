@@ -10,7 +10,7 @@ import type { ReactNode } from 'react';
  * pages), so the assistant renders identically everywhere. Kept deliberately
  * small: the assistants are told to write light markdown.
  */
-export default function Markdown({ text }: { text: string }) {
+export default function Markdown({ text, headings = 'compact' }: { text: string; headings?: 'compact' | 'semantic' }) {
   const blocks: ReactNode[] = [];
   const lines = text.split('\n');
   let list: { ordered: boolean; items: string[] } | null = null;
@@ -18,11 +18,15 @@ export default function Markdown({ text }: { text: string }) {
   const flushList = (key: number) => {
     if (!list) return;
     const items = list.items.map((item, i) => <li key={i}>{inline(item)}</li>);
+    // Semantic mode renders inside a prose container that draws its own list
+    // markers (see .prose-sss in global.css); the chat lists carry their own.
+    const olClass = headings === 'semantic' ? 'space-y-1' : 'ml-5 list-decimal space-y-1';
+    const ulClass = headings === 'semantic' ? 'space-y-1' : 'ml-5 list-disc space-y-1';
     blocks.push(
       list.ordered ? (
-        <ol key={`l${key}`} className="ml-5 list-decimal space-y-1">{items}</ol>
+        <ol key={`l${key}`} className={olClass}>{items}</ol>
       ) : (
-        <ul key={`l${key}`} className="ml-5 list-disc space-y-1">{items}</ul>
+        <ul key={`l${key}`} className={ulClass}>{items}</ul>
       )
     );
     list = null;
@@ -45,8 +49,23 @@ export default function Markdown({ text }: { text: string }) {
     if (/^\s*$/.test(line)) return;
     const heading = /^(#{2,4})\s+(.*)/.exec(line);
     if (heading) {
+      const level = heading[1].length;
+      if (headings === 'semantic') {
+        // Real headings, for long-form lesson text a screen reader navigates by.
+        const Tag = (`h${level}` as unknown) as 'h2';
+        const cls =
+          level === 2
+            ? 'mt-6 font-heading text-lg font-bold text-ink-800'
+            : 'mt-4 font-heading text-base font-semibold text-ink-800';
+        blocks.push(
+          <Tag key={i} className={cls}>
+            {inline(heading[2])}
+          </Tag>
+        );
+        return;
+      }
       const cls =
-        heading[1].length === 2
+        level === 2
           ? 'mt-4 font-heading text-base font-bold text-ink-800'
           : 'mt-3 font-heading text-sm font-bold text-ink-800';
       blocks.push(

@@ -1,0 +1,27 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import WorksheetView from '../../../../components/react/WorksheetView.tsx';
+import { getCourseCatalog } from '../../../../lib/course/catalog';
+
+/** Worksheet shells: title and module only; the sheet itself comes from /api/course/worksheet. */
+export async function getStaticPaths() {
+  const catalog = await getCourseCatalog();
+  return catalog.worksheets.map((w) => {
+    const module = catalog.modules.find((m) => m.id === w.module);
+    return { params: { id: w.id }, props: { title: w.title, moduleTitle: module?.title ?? '', moduleOrder: module?.order ?? 0 } };
+  });
+}
+
+const { title, moduleTitle, moduleOrder } = Astro.props;
+const worksheetId = Astro.params.id!;
+---
+
+<BaseLayout title={title} description={`The worksheet for Module ${moduleOrder}, ${moduleTitle}.`} noindex>
+  <div class="container-page py-10">
+    <p class="eyebrow no-print">Module {moduleOrder}, {moduleTitle}. Worksheet</p>
+    <h1 class="mt-3 text-3xl font-extrabold tracking-tight text-ink-800 sm:text-4xl">{title}</h1>
+    <div class="mt-8">
+      <WorksheetView client:load worksheetId={worksheetId} title={title} />
+    </div>
+  </div>
+</BaseLayout>

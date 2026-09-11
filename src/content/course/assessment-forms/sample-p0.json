@@ -1,0 +1,140 @@
+{
+  "form_id": "sample-p0",
+  "version": 1,
+  "certification_version": "1",
+  "status": "sample",
+  "order": 0,
+  "private_marker": "SSS-PRIVATE-ASSESSMENT-FORM",
+  "notes": "Sample form for the pilot. The scenario is fictional. Reference responses show one sound path, not the only one; credit any response that applies the principles and tools to this situation with reasons.",
+  "lesson_ids": ["v04", "v05", "v06", "v07", "v08", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23", "v24", "v25", "v29", "v30", "v31", "v32", "v33", "v34", "v36"],
+  "stages": [
+    {
+      "id": "part-a",
+      "part": "A",
+      "title": "Understand the situation",
+      "intro": "You manage a product team. Last week a release slipped by four days. In the retrospective, Maya, the project lead, said in front of the whole team that Jordan, the engineer who owned the final integration, had checked out and let everyone down. Jordan left the meeting without speaking. Today both of them have asked to talk to you, separately. Work through the situation as you would in real life, using the Solution Seeking System.",
+      "lock_on_advance": true,
+      "prompts": [
+        {
+          "prompt_id": "a1",
+          "text": "Before you meet either of them, separate the account of events from your own reaction. Write the account as you would state it to both people, then list the feelings it raises in you, the assumptions you are making about each person, and the questions you cannot yet answer.",
+          "required": true,
+          "min_chars": 200,
+          "max_chars": 4000,
+          "principle_ids": ["understanding", "humility", "critical-thinking"],
+          "tool_ids": []
+        },
+        {
+          "prompt_id": "a2",
+          "text": "Write the questions you will ask Jordan and Maya in your separate conversations so that you understand each account, and describe how you will summarise each person's account back to them so they can correct and confirm it.",
+          "required": true,
+          "min_chars": 200,
+          "max_chars": 4000,
+          "principle_ids": ["understanding", "good-faith", "compassion-empathy", "patience"],
+          "tool_ids": ["one-on-ones"]
+        },
+        {
+          "prompt_id": "a3",
+          "text": "Decide which of the four Leadership Tools fits the main case here, which you would use in support, and which you would avoid for now. Give your reasons, say who takes part in each, and name anything a tool must not be used for in this situation.",
+          "required": true,
+          "min_chars": 150,
+          "max_chars": 3000,
+          "principle_ids": ["fairness", "bravery"],
+          "tool_ids": ["one-on-ones", "feedback", "targeted-conversations", "solution-seeking-sessions"]
+        }
+      ]
+    },
+    {
+      "id": "part-b",
+      "part": "B",
+      "title": "New information",
+      "reveal": "In your one-on-one, Jordan tells you the deadline slipped because Maya changed the scope twice in the final week and told nobody else. Jordan also says the retrospective was the third time this quarter Maya criticised them in public, and that they have started interviewing elsewhere. When you meet Maya, she says she was under pressure from the client and believes Jordan agreed to the changes in a hallway conversation.",
+      "lock_on_advance": true,
+      "prompts": [
+        {
+          "prompt_id": "b1",
+          "text": "Given what you have now heard, what changes in your understanding of the situation, and what do you still need to check? Show how you keep good faith with both people while the accounts disagree, and what you will say about the hallway conversation.",
+          "required": true,
+          "min_chars": 200,
+          "max_chars": 4000,
+          "principle_ids": ["good-faith", "forgiveness", "flexibility", "integrity"],
+          "tool_ids": ["one-on-ones"]
+        },
+        {
+          "prompt_id": "b2",
+          "text": "Draft the solution you would bring to a session with both of them. Include the actions, who owns each, the evidence that would show each action is working, when they start, and when you will all review them. Make clear which parts are a proposal and which parts are already agreed.",
+          "required": true,
+          "min_chars": 250,
+          "max_chars": 5000,
+          "principle_ids": ["fairness", "integrity", "bravery", "vulnerability"],
+          "tool_ids": ["solution-seeking-sessions"]
+        }
+      ]
+    },
+    {
+      "id": "part-c",
+      "part": "C",
+      "title": "Six weeks later",
+      "reveal": "Six weeks on, scope changes now go through the team channel and the release cadence has held. Jordan has missed two of the four weekly check-ins you all agreed to, and Maya has told you privately that she thinks the plan puts the whole burden of change on her.",
+      "lock_on_advance": false,
+      "prompts": [
+        {
+          "prompt_id": "c1",
+          "text": "Using what the six weeks have shown, say what you would revise in the solution and what you would keep. Describe the ongoing practice you would put in place so the team keeps learning from what happens, including how Jordan's missed check-ins and Maya's concern are handled.",
+          "required": true,
+          "min_chars": 200,
+          "max_chars": 4000,
+          "principle_ids": ["flexibility", "patience", "critical-thinking", "compassion-empathy"],
+          "tool_ids": ["feedback", "one-on-ones"]
+        },
+        {
+          "prompt_id": "c2",
+          "text": "Look back over your own conduct across all three parts. Where did you apply a Wisdom Principle at its limit, where did you fall short, and what would you do differently next time?",
+          "required": true,
+          "min_chars": 100,
+          "max_chars": 3000,
+          "principle_ids": ["humility", "vulnerability", "integrity"],
+          "tool_ids": []
+        }
+      ]
+    }
+  ],
+  "reference_responses": [
+    {
+      "prompt_id": "a1",
+      "text": "Account: the release slipped four days. In the retrospective Maya said, in front of the team, that Jordan had checked out and let everyone down. Jordan left without speaking. Both have asked to talk to me. Feelings: I am irritated that the retrospective became a public judgment, worried about Jordan, and uneasy that I did not step in during the meeting. Assumptions: that Maya was venting rather than reporting a fact; that Jordan is hurt rather than indifferent; that the slip has one cause. Each of these could be wrong. Questions I cannot answer yet: what actually delayed the integration, what Jordan and Maya each believe was agreed, whether this has happened before, and what each of them wants from me now. I will hold my own version loosely until I have heard both accounts."
+    },
+    {
+      "prompt_id": "a2",
+      "text": "With Jordan: What happened from your side in the last week? What did you understand the scope to be, and when did it change? What did the retrospective feel like, and what would you have wanted instead? What do you need from me? With Maya: Walk me through the final week as you saw it. What did you understand Jordan had agreed to? What led you to raise it in the retrospective rather than with Jordan directly? What outcome do you want? After each conversation I will say back what I heard in my own words, in the order they told it, including the feelings they named, and ask: Have I got that right, and is there anything I have missed or got wrong? I will correct my summary until they confirm it, and I will not move to solutions until both accounts are confirmed."
+    },
+    {
+      "prompt_id": "a3",
+      "text": "The main case is a one-on-one with each person first, because I cannot represent two accounts I have not heard, and Jordan will not speak freely in a group after being criticised publicly. A Solution Seeking Session with both of them comes after the one-on-ones, once each account is understood, to build a shared solution. Feedback is the supporting tool for Maya about raising performance concerns in public; it is a private conversation with a specific example and a request, not a reprimand in front of others. I would avoid a Targeted Conversation for now because there is no confirmed pattern yet, only one incident and two untested accounts. The session must not be used to relitigate the retrospective or to have the team vote on who was at fault. Participants: the one-on-ones are me and one person each; the session is the three of us; the feedback conversation is me and Maya."
+    },
+    {
+      "prompt_id": "b1",
+      "text": "My picture changes in three ways. The slip probably has a process cause, scope changing late without the team knowing, rather than a single person checking out. The retrospective was not a one-off for Jordan, so the harm is larger than one meeting. And Maya believes she had agreement, so she is not lying; the two of them remember a hallway conversation differently. I still need to check what was actually said in that hallway conversation and whether anyone else heard it, and whether the earlier public criticisms were raised with Maya at the time. Good faith means I treat both accounts as honest attempts to describe what happened. I will tell each of them that the other remembers the hallway conversation differently, without saying who is right, and ask what would make agreement clear next time. Forgiveness here means dropping the search for a culprit so that the pattern can be fixed."
+    },
+    {
+      "prompt_id": "b2",
+      "text": "Proposal for the session. 1. Scope changes go to the team channel in writing before they take effect; owner Maya; evidence: every change in the channel with a date; starts this week. 2. Jordan flags any risk to the date within a day of noticing it; owner Jordan; evidence: risk notes in the channel; starts this week. 3. Performance concerns are raised privately first; owner all three of us, and I hold myself to it too; evidence: no surprises in retrospectives. 4. A weekly fifteen-minute check-in for the next six weeks between Maya and Jordan, with me present for the first two; owner me; evidence: the check-ins happen and both say they are useful. Review in six weeks, with a shorter check at three. Already agreed: that both of them want the release cadence to hold and that public criticism stops. Not yet agreed: the check-in format and whether I attend. I will say plainly that this is a proposal they can change, and I will ask each of them what is unfair about it before we adopt anything."
+    },
+    {
+      "prompt_id": "c1",
+      "text": "Keep: written scope changes and the private-first rule, because the evidence shows they are working and the cadence has held. Revise: the check-ins. Jordan missing two of four is evidence, not a verdict, so I will ask Jordan what got in the way before deciding anything; if the format is the problem, the format changes. Maya's concern that the burden falls on her is fair to raise, and it points to a gap in the plan: Jordan's commitments are less visible than hers. I would add a shared change log that both of them write to, so the effort is visible on both sides, and I would ask Maya what she would consider a fair share. Ongoing practice: a monthly retrospective on the agreement itself, not just the work, with the question What did we learn and what do we change? I will give feedback to Jordan privately about the missed check-ins with a specific example and a request, and I will keep the review date rather than letting the agreement drift."
+    },
+    {
+      "prompt_id": "c2",
+      "text": "Bravery: I raised the public criticism with Maya directly instead of hoping it would not happen again, which was uncomfortable. Patience: I waited for both accounts before proposing anything, though I felt pressure to fix it in the first meeting. Where I fell short: humility. I assumed early on that Maya was the problem, and the hallway conversation showed that both of them had reasonable beliefs. I also did not step in during the retrospective, which let the harm happen in front of the team. Next time I would interrupt public criticism in the moment, kindly, and take it offline. I would also write down agreements at the end of each conversation, since most of this conflict came from an agreement nobody recorded."
+    }
+  ],
+  "scoring_anchors": [
+    { "criterion_id": "self_understanding", "note": "A 3 separates the four-day slip and the retrospective remark from the learner's own irritation and worry, names at least one assumption as an assumption, and lists real open questions. A 4 also says how those assumptions could be wrong." },
+    { "criterion_id": "mutual_understanding", "note": "A 3 asks open questions of both people and describes summarising each account back for correction. A 4 does this before any solution and keeps the two accounts separate rather than blending them." },
+    { "criterion_id": "wisdom_principles", "note": "Credit principles applied to this situation with a reason, not named in a list. Forgiveness means dropping the search for a culprit; good faith means treating both accounts as honest while they disagree." },
+    { "criterion_id": "solution_quality", "note": "A 3 has actions with owners, evidence, timing and a review, and separates proposal from agreement. A 4 also invites each person to say what is unfair before adopting it." },
+    { "criterion_id": "judgment_tools", "note": "A 3 chooses one-on-ones first with a reason and reserves the session for after both accounts are understood. Using a Targeted Conversation or a team vote as the main case caps this at 2." },
+    { "criterion_id": "learning_living_systems", "note": "A 3 treats the six-week evidence as evidence and revises the plan from it, keeping what works. A 4 also names an ongoing practice that reviews the agreement itself." }
+  ]
+}

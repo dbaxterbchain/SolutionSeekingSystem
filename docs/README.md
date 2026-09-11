@@ -5,11 +5,12 @@ Project documentation for the **Solution Seeking System** website.
 | Doc | What's in it |
 |-----|--------------|
 | [status.md](status.md) | Current project status — what's done, what's in progress, what's next. **Start here.** |
-| [roadmap.md](roadmap.md) | The phased plan (Phase 1 → 3) with detailed scope for each phase. |
+| [roadmap.md](roadmap.md) | The phased plan, Phase 1 through Phase 6, with the scope of each. Phases 1 to 4 are shipped; 5 (subscriber dashboard and specialized assistants) and 6 (the paid video course) are in progress. |
 | [architecture.md](architecture.md) | Tech stack, why we chose it, and how the project is structured. |
 | [content-guide.md](content-guide.md) | How to add or edit teaching content (principles, protocol steps, tools, glossary). |
 | [design-system.md](design-system.md) | Brand tokens, fonts, and the shared UI components. |
 | [deployment.md](deployment.md) | Hosting on Netlify, continuous deploys, and the custom domain. |
+| [course-production.md](course-production.md) | Recording and publishing a course lesson: filenames, the media baseline, the Cloudflare Stream upload steps, and who moves a lesson up each rung of the status ladder. Written for Bradley. |
 | [change-checklist.md](change-checklist.md) | **The standard for shipping changes** — touchpoints to check per change type (pages, content, AI/prompts, database, env vars, deploys). |
 | [ads-campaign.md](ads-campaign.md) | The Google Ads build sheet: settings, keywords, ad copy, negatives, and the decision rule for the paid test. |
 | [ads-api-setup.md](ads-api-setup.md) | Pointer stub: the Google Ads tooling moved to the private **adkit** repo (multi-client CLI); this site is its `sss` client. |
@@ -34,6 +35,11 @@ npm run check    # type-check (.astro + content schemas)
 These are living documents. When you ship a change that affects scope, status, or how
 things work, update the relevant doc in the same commit. `status.md` should always
 reflect reality.
+
+`features/` holds the visual record: one folder per shipped feature, with curated screenshots
+and a README captioning each. [features/course/](features/course/) is the paid video course's,
+covering the sales page, the learner dashboard, a lesson, the printable worksheet, the staged
+assessment and its results, and the admin tabs.
 
 Before shipping any change, walk the matching sections of
 [change-checklist.md](change-checklist.md) — it lists the touchpoints (OG images,

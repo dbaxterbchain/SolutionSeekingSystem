@@ -720,6 +720,303 @@ Anonymous users are blocked from `/api/checkout` and `/api/billing-portal`: they
 email address, so Stripe would attach a subscription to an account they could never sign
 back into.
 
+## Paid video course
+
+A one-time purchase that unlocks the video course at `/course/learn/`. The learner area is
+prerendered shells plus React islands talking to a Bearer-authed API, the videos live on
+Cloudflare Stream, and the final assessment is graded by a background Netlify function.
+Authoring formats are in [content-guide.md](content-guide.md); the recording and upload
+steps Bradley follows are in [course-production.md](course-production.md).
+
+### The launch flag
+
+`PUBLIC_COURSE_STATUS` ([`src/lib/course/status.ts`](../src/lib/course/status.ts)) decides
+how much of the course exists in a given build. Three values:
+
+- **`hidden`**, the default, and what an unset variable means. No public course page is
+  built: the nav and footer carry nothing, the home, practice, pricing and FAQ touchpoints
+  render nothing, and `/course` is a 404. The learner area at `/course/learn/` still works
+  by URL for an enrollment granted from `/admin`, so a pilot can run while the public site
+  says nothing about it. Checkout refuses anyone who is not an admin.
+- **`preview`**. The sales page, the certification page, their `.md` variants, the llms.txt
+  sections, the nav entry and the home, practice, pricing and FAQ touchpoints all appear,
+  with "Opens soon" where a price would be. Nothing can be bought.
+- **`open`**. Purchase is enabled, and the build asserts the offer is real: every launch
+  token in [`src/data/course.ts`](../src/data/course.ts), `COURSE_PRICE` in
+  [`src/data/pricing.ts`](../src/data/pricing.ts) and `launchConfirmed` must all be set, and
+  the catalog validator refuses a lesson still playing the stand-in clip or a free preview
+  lesson that is not yet published.
+
+Per deploy context: **production stays `hidden` through the pilots.** A `course-beta` branch
+deploy carries `open` with Stripe test keys and a test-mode webhook endpoint, and that is
+where an end-to-end purchase gets exercised. When you change anything on a public course
+surface, run a `hidden` build and a `preview` build locally before pushing. They produce
+different page sets, and only one of them is what production serves today.
+
+### Environment variables
+
+| Variable | Scope | Secret | What it does |
+|---|---|---|---|
+| `PUBLIC_COURSE_STATUS` | Builds | no | The launch flag above. Unset means `hidden`. |
+| `STRIPE_PRICE_ID_COURSE` | Functions | no | The one-time price on the "Solution Seeking Course" product. Unset means `/api/course/checkout` answers 503 and nothing else breaks. |
+| `CLOUDFLARE_STREAM_API_TOKEN` | Functions | **yes** | Mints the signed playback tokens. Scoped to Stream only, and deliberately a different token from `CLOUDFLARE_API_TOKEN`, so the white-label token never grows a video permission. |
+| `CLOUDFLARE_ACCOUNT_ID` | Functions | no | Already set for the white-label work. The Stream API calls need it too. |
+| `CLOUDFLARE_STREAM_CUSTOMER_CODE` | Functions | no | The `<code>` in `customer-<code>.cloudflarestream.com`. It appears in every embed URL, so it is not a secret. |
+| `COURSE_WORKER_SECRET` | Functions | **yes** | Who may call the grading function. 32 random bytes base64url: `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`. The SSR function and the sweeper send it as `x-course-worker-secret`; the worker compares it with a constant-time compare. Unset means the worker refuses everything and jobs sit queued. |
+| `COURSE_GRADER_MODE` | Functions | no | `worker`, `inline` or `off`. Unset means `worker` on Netlify and `inline` under `astro dev`. `off` leaves jobs queued, which is how the recovery path gets tested. |
+| `COURSE_GRADER_MODEL` | Functions | no | The grading model. Defaults to `claude-opus-5`. |
+| `COURSE_AWARDS_ENABLED` | Functions | no | Certificates are issued only when this is exactly `true`. It stays `false` until the grader passes its release gate; a pass recorded while it is false is kept and can be awarded later. |
+| `COURSE_SAMPLE_FORMS` | Functions | no | Whether the sample assessment form may be assigned. `astro dev` always allows it; set `true` only on the `course-beta` context. |
+
+The grading worker is a Netlify function of its own, so it reads its configuration from the
+function environment and not from the site's build. Beside the course variables it needs these,
+which the site already sets, all in **Functions** scope: `ANTHROPIC_API_KEY`,
+`PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and then `RESEND_API_KEY`, `EMAIL_FROM`
+and `ALERTS_TO`, because the worker sends its own failed-job alert rather than asking the
+site to.
+
+Netlify itself supplies `URL`, `DEPLOY_PRIME_URL` and `CONTEXT`. The trigger reads all three
+so a deploy preview or a branch deploy calls the worker belonging to the deploy that is
+running, never production's
+([`workerTrigger.ts`](../src/lib/server/course/workerTrigger.ts)).
+
+Keep the combined function environment under about 4 KB. It is a shared budget: every
+variable in Functions scope counts against it, not only the course's.
+
+### Stripe
+
+The course is a **one-time** payment rather than a plan, so it sits outside `PLANS` and
+`PlanId` on purpose. Set it up in test mode first, then repeat in live mode.
+
+1. **Product and price:** Product catalog → Add product → "Solution Seeking Course", with a
+   **one-time** price. Copy the `price_...` id into `STRIPE_PRICE_ID_COURSE`.
+2. **Webhook events:** the existing endpoint (`https://solutionseeking.com/api/stripe-webhook`)
+   must also subscribe to **`checkout.session.async_payment_succeeded`** and
+   **`checkout.session.async_payment_failed`** beside the four events it already carries.
+   Without them a bank-debit purchase takes the money and never enrolls anybody.
+3. The webhook picks the course branch on `metadata.purchase_intent = course`, tested before
+   the organization and personal-subscription paths, so a course purchase can never
+   contaminate the `subscriptions` table.
+
+What the enrollment path already survives, all verified: a re-delivered event, a second
+purchase started from another tab, and a delivery that died after the charge but before its
+ledger row was written. Each of those ends with one enrollment and one charge. A genuine
+second payment against an account that is already enrolled is recorded and emails
+`ALERTS_TO` a `duplicate_payment` alert, because that one is a refund somebody has to action.
+
+**Refunds.** Money never moves from this site:
+
+1. Refund the payment in the Stripe dashboard.
+2. In `/admin` → **Enrollments**, press **Record refund** on that learner's row. Access ends
+   immediately and the ledger records who did it.
+3. **Reinstate** on the same row puts access back if the refund was a mistake.
+
+One thing to expect in the Stripe dashboard: a learner who buys the course and later
+subscribes, or who buys again after a refund, can end up with two Stripe customers, because
+`/api/checkout` reuses only the subscription's customer. Search by email address, not by
+customer id.
+
+### Cloudflare Stream
+
+One video per lesson. The media baseline and the upload clicks are Bradley's, in
+[course-production.md](course-production.md); the operator's half is this:
+
+- Every video has **"Require signed URLs" on**, with one exception: the free preview lesson,
+  which has to be watchable without an account.
+- The English captions are uploaded on the video itself, and the UID goes into the lesson
+  file's `streamUid`.
+- **The stand-in clip.** `node scripts/render-placeholder-video.mjs` renders a short "being
+  filmed" clip with its own captions. Upload it once with signed URLs on, and put the
+  returned UID in `COURSE.placeholderStreamUid`
+  ([`src/data/course.ts`](../src/data/course.ts)). Every lesson carrying
+  `videoPlaceholder: true` and no `streamUid` of its own plays it, so one upload covers all
+  of them.
+- **Playback tokens are shared, not per viewer.** One token per video, valid twelve hours,
+  cached in `course_stream_tokens` and reused while more than an hour of its life remains, so
+  the mint rate stays at a handful a day however many people are watching. Minting uses the
+  Stream-scoped token. If a token is ever found shared beyond a learner, the upgrade path is
+  per-viewer tokens signed locally with a Stream signing key, written up in
+  [`streamUrls.ts`](../src/lib/course/streamUrls.ts).
+- Once a UID and the three Stream variables exist, **verify playback on a deploy preview**
+  rather than locally. A wrong customer code or an invalid token leaves the player empty,
+  because the customer code is the host the embed itself is loaded from
+  ([`streamUrls.ts`](../src/lib/course/streamUrls.ts)). Check the embed URL in the page source
+  against the code in the Stream dashboard before looking anywhere else.
+
+### Course migrations and advisors
+
+The course adds two migrations: [`0030_course.sql`](../supabase/migrations/0030_course.sql)
+(enrollments, the enrollment ledger, progress, check attempts, Stream tokens) and
+[`0031_course_assessment.sql`](../supabase/migrations/0031_course_assessment.sql) (source
+packs, attempts, responses, grading jobs, grades, certificates, review requests). Apply them
+before the deploy that needs them:
+
+```bash
+npx supabase db push
+npx supabase migration list     # both must show on remote
+```
+
+`migration list` only says the file ran. The course puts most of its rules in SQL functions,
+and a function that was never created fails at the first grant or the first submit, in
+production, with a PostgREST error nobody reads until a learner writes in. So prove the
+functions exist and then prove one of them works:
+
+```sql
+select proname from pg_proc where proname like '%course%' order by proname;
+```
+
+Eight names come back: `admin_change_course_access`, `create_course_attempt`,
+`submit_course_attempt`, `claim_course_grading_job`, `finalize_course_grade`,
+`fail_course_grading_job` and `retry_course_grading_job`, which the routes call, plus the
+`course_progress_monotone` trigger function behind `course_progress`. A short list means a
+migration ran against a schema that already had part of it, and the missing function is the
+one to run by hand from the migration file.
+
+Then, on the hosted stack, **grant access to one real account from `/admin` and revoke it
+again.** That exercises `admin_change_course_access`, the ledger insert, the auth admin
+lookup and the service-role grants in one click each, and `course_enrollment_events` shows two
+rows with `actor = admin` afterwards. Grant it back if the account is meant to keep access.
+
+Then run the advisors (Dashboard → **Advisors**, or
+`npx supabase db advisors --linked`). Expect `rls_enabled_no_policy` on every one of the
+twelve course tables. That is the accepted server-write-only pattern, the same one the email
+list and the org tables use: RLS on, no policy, and only the service role touching them. Add
+the tables to the accepted table in
+[Database advisors & accepted findings](#database-advisors--accepted-findings) rather than
+"fixing" the finding.
+
+Two checks that prove the claim instead of asserting it:
+
+- Probe every course table with the **publishable** key and confirm each answers 401 or 403.
+  Local and hosted have had different default grants before, so a local pass proves nothing.
+- The two identity sequences (behind `course_enrollment_events` and `course_check_attempts`)
+  and the certificate serial sequence are revoked from `anon` and `authenticated` in the
+  migrations. Supabase's hosted bootstrap grants ALL on sequences in `public`, so without
+  those revokes the sequences would stay reachable even with their tables locked down.
+
+### Grading, the sweeper and the admin queue
+
+**The path.** A submit writes the attempt's responses and the grading job in one transaction,
+then triggers the worker. The worker claims the job for a lease, recomputes the submission
+hash (a mismatch is an integrity failure and is never retried), grades with structured
+output, checks that every quote in the result is verbatim from the learner's own response,
+applies the decision rule, and finalizes with the lock token it claimed under. A stale token
+is refused, so a worker that outlived its lease cannot bank a second grade over the top of
+the first.
+
+**The time budgets nest**, shortest first: one model call gets 300 s and the SDK retries
+nothing; one grade gets 720 s for every call it makes; the lease is 840 s; Netlify's
+background limit is 900 s. The function is therefore never killed while it still holds a
+lease ([`grader.ts`](../src/lib/server/course/grader.ts)).
+
+**The sweeper.**
+[`netlify/functions/course-grade-sweeper.mts`](../netlify/functions/course-grade-sweeper.mts)
+runs every ten minutes and re-triggers any job that has sat queued for more than 90 seconds
+(a lost hand-off) or has been running past its lease (a dead worker). Whether a job has any
+budget left is the claim function's decision, never the sweeper's. **Scheduled functions run
+only on published deploys**, so after the first production deploy check the deploy log to
+confirm the schedule registered.
+
+**The admin queue** (`/admin` → **Grading**): **Retry** re-queues a failed job with a fresh
+budget. **Kick** re-triggers the worker for any job, which is what to press when a hand-off
+was lost and you would rather not wait for the sweeper. A job that fails for good emails
+`ALERTS_TO` with the job and attempt ids, and the learner gets a panel saying plainly that
+this is not a failed attempt, pointing them at course support.
+
+**Deploy-preview checks**, once the secret is set:
+
+- POST to `/.netlify/functions/course-grade` **without** the secret. The job must be
+  untouched and the log must say `course-grade: refused`. The caller sees 202 either way,
+  because that is how a background function answers, so the log is the evidence and the
+  status code is not.
+- The same POST **with** the secret finalizes the job.
+- A preview calls its own worker through `DEPLOY_PRIME_URL`, so neither check can reach
+  production's function.
+
+**Cost** is roughly thirty cents a grade with a warm prompt cache. The second grade of a run
+should show `cache_read_input_tokens` above zero on the job row. If it does not, the cached
+prefix has been broken and every grade is paying the cold price.
+
+**What the rate limits guard is spend, not traffic.** `course_start` and `course_submit` are
+the two limits that matter, because only those two paths can end in a model call.
+`/api/course/progress` deliberately carries none: an autosave is one auth check, one
+enrollment read, one row load and one upsert, so a learner hammering it costs database work
+on a connection they already hold, never grading money. If that ever shows up in the Supabase
+metrics, the answer is a limit tuned to the autosave interval, not a limit copied from the
+assessment paths.
+
+**During the pilot there is one sample form, and one exposure per form per learner.** A
+learner who does not pass and starts again therefore gets the honest "every assessment form
+has been used" message rather than a second run at the same scenario. Support should expect
+that question until David's Form A and Form B exist.
+
+### Course access from /admin
+
+`/admin` → **Enrollments** lists every enrollment with its status and where it came from, and
+carries four actions:
+
+- **Grant by email.** The learner creates their account first; the grant finds it by address
+  through the auth admin API. A grant on a revoked or refunded row reinstates that row rather
+  than making a second one.
+- **Revoke**, for access that should stop without a refund.
+- **Record refund**, the second half of the Stripe refund above.
+- **Reinstate**, which undoes either of those.
+
+Every action writes a `course_enrollment_events` row with `actor = admin` and the admin's own
+user id, so the ledger says who changed what and when. What the learner sees afterwards:
+"Access to the course has ended for this account" on both the sales page and the dashboard,
+and every course endpoint answering 403 with the reason.
+
+### Registering the course events
+
+Course events follow the same four-place rule as every other event, and the mechanics are in
+the GTM and GA4 sections below. What to add:
+
+1. **The GTM custom-event trigger regex** gains
+   `course_viewed|enrollment_ready|lesson_completed|module_completed|assessment_submitted|grade_ready|grading_error`.
+   An event missing from that regex reaches the dataLayer and dies there, with no error
+   anywhere.
+2. **GA4 custom dimensions** (event-scoped): `course_id`, `sale_status`, `lesson_id`,
+   `module_id`, `content_version`, `attempt_id`, `form_id`, `result`. See
+   [4. GA4 UI setup](#4-ga4-ui-setup). Without them the parameters are collected and cannot
+   be reported on.
+3. **GA4 key events**: `course_enrolled`, which the Stripe webhook already sends server-side
+   through the Measurement Protocol the same way `subscription_completed` goes, and
+   `assessment_submitted`.
+4. **Google Ads**: import `course_enrolled` as a **secondary** conversion until a course
+   campaign exists. It is the money, but at pilot volume as a Primary it would make CPA
+   meaningless.
+
+### Ready to open checklist
+
+Phase 4 of the course plan, and most of it cannot be done by whoever wrote the code:
+
+- [ ] Every launch token and `launchConfirmed` set in `src/data/course.ts`, proved by running
+      an `open` build (the assertion fails the build otherwise).
+- [ ] `COURSE_PRICE` in `src/data/pricing.ts` agrees with the live Stripe price, and
+      `STRIPE_PRICE_ID_COURSE` points at that price.
+- [ ] The two async payment events on the live webhook endpoint.
+- [ ] Every lesson video signed except the preview lesson, captions on all of them, and a
+      Cloudflare spend alert set.
+- [ ] Migrations applied to the hosted project, advisors clean apart from the documented
+      acceptances.
+- [ ] The voice audit done on everything the course added: walk the dash and AI-tell audit in
+      [change-checklist.md](change-checklist.md), not just the new pages but the FAQ and pricing
+      copy the course edited.
+- [ ] The four-place analytics work done, and `course_enrolled` seen arriving in GA4
+      DebugView with the same `client_id` as the browser session.
+- [ ] One real live purchase by David, then a refund, with the revocation path watched end to
+      end.
+- [ ] Sitemap and `robots.txt` verified: the public course pages in, the learner area out.
+- [ ] The OG cards for `/course` and `/course/certification` render.
+- [ ] `llms.txt` carries its course section.
+- [ ] `course` and `certification` removed from the B2B campaign's negative keywords (see
+      [ads-campaign.md](ads-campaign.md#3-negative-keywords)); they were negatives only because
+      there was nothing to sell those searchers.
+- [ ] The support inbox staffed to the review target in `COURSE_TOKENS`.
+- [ ] [status.md](status.md) and the screenshots in `docs/features/course/` brought up to
+      date.
+
 ## Analytics & conversion tracking (GA4 + GTM)
 
 Google Tag Manager (`GTM-M987NM67`) is hardcoded in

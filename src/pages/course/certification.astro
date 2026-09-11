@@ -1,0 +1,142 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHero from '../../components/PageHero.astro';
+import { breadcrumbs } from '../../lib/schema';
+import { COURSE_STATUS } from '../../data/course';
+import { courseCopy } from '../../lib/course/copy';
+import {
+  CERTIFICATION_TITLE,
+  CERTIFICATION_VERSION,
+  CRITERIA,
+  CRITERIA_COUNT_WORD,
+  PASS_MIN_CRITERION,
+  PASS_TOTAL,
+  SCORE_ANCHORS,
+} from '../../data/certification';
+import { COVERAGE_CAP, MISCONCEPTION_CAP } from '../../lib/server/course/rubric';
+
+/**
+ * The public certification rubric. Prerendered like the sales page; there is
+ * no page at all while the course is hidden.
+ *
+ * The version sentence below ("a certificate keeps the version it was
+ * awarded under") is a promise this page only states: it is kept by
+ * finalize_course_grade, which stores certification_version on the attempt
+ * at grading time.
+ */
+if (COURSE_STATUS === 'hidden') return new Response(null, { status: 404 });
+
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  breadcrumbs(site, [
+    { name: 'Home', path: '/' },
+    { name: 'Video course', path: '/course' },
+    { name: 'Certification', path: '/course/certification' },
+  ]),
+];
+---
+
+<BaseLayout
+  title={CERTIFICATION_TITLE}
+  description={`How the Solution Seeking System Certification is assessed: the ${CRITERIA_COUNT_WORD} criteria, their weights, the score anchors and the pass rule.`}
+  schemas={schemas}
+  markdownAlt="/course/certification.md"
+>
+  <PageHero
+    eyebrow="Video course"
+    title={CERTIFICATION_TITLE}
+    intro="The certification at the end of the course is AI-assessed and unproctored. The rubric below is the whole rubric: what is scored, how much each criterion counts, what each score means, and what it takes to pass."
+  />
+
+  <div class="container-page py-16">
+    <section class="max-w-2xl">
+      <p class="eyebrow mb-3">The format</p>
+      <h2 class="text-3xl font-bold text-ink-800">How the assessment works</h2>
+      <p class="mt-4 text-slate-600">
+        The final assessment presents one scenario in three parts. Each part reveals new
+        information, and your answers to the earlier parts are locked before you see it.
+      </p>
+      <p class="mt-4 text-slate-600">
+        An AI grader scores each criterion against the rubric below, quotes the passages in your
+        response it relied on, and names the lessons to revisit for anything below the bar.
+      </p>
+      <p class="mt-4 text-slate-600">{courseCopy('{{retakes_summary}}')}</p>
+    </section>
+
+    <section class="mt-16">
+      <p class="eyebrow mb-3">The rubric</p>
+      <h2 class="text-3xl font-bold text-ink-800">What is scored</h2>
+      <div class="mt-6 overflow-x-auto">
+        <table class="w-full min-w-[640px] text-left text-sm">
+          <thead class="border-b border-slate-200 text-ink-800">
+            <tr>
+              <th class="py-3 pr-4 font-semibold">Criterion</th>
+              <th class="py-3 pr-4 font-semibold">Weight</th>
+              <th class="py-3 font-semibold">What it demonstrates</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              CRITERIA.map((c) => (
+                <tr class="border-b border-slate-100 align-top last:border-0">
+                  <td class="py-3 pr-4 font-medium text-ink-800">{c.name}</td>
+                  <td class="py-3 pr-4 text-slate-600">{c.weight}%</td>
+                  <td class="py-3 text-slate-600">{c.demonstrates}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="mt-16 max-w-2xl">
+      <p class="eyebrow mb-3">The scale</p>
+      <h2 class="text-3xl font-bold text-ink-800">What each score means</h2>
+      <ul class="mt-6 space-y-3 text-slate-700">
+        {
+          Object.entries(SCORE_ANCHORS).map(([score, meaning]) => (
+            <li class="relative pl-5">
+              <span class="absolute left-0 top-2 h-1.5 w-1.5 rounded-full bg-brand-400" />
+              <strong class="text-ink-800">{score}:</strong> {meaning}
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section class="mt-16 max-w-2xl">
+      <p class="eyebrow mb-3">The bar</p>
+      <h2 class="text-3xl font-bold text-ink-800">What it takes to pass</h2>
+      <p class="mt-4 text-slate-600">
+        A weighted total of at least {PASS_TOTAL} out of 100, with every criterion at {PASS_MIN_CRITERION} or
+        more. A Wisdom Principle or a Leadership Tool that is missing or misapplied caps its
+        criterion at {COVERAGE_CAP}, and a material misconception caps the criterion it names
+        at {MISCONCEPTION_CAP}, so a strong total cannot carry a weak criterion.
+      </p>
+    </section>
+
+    <section class="mt-16 max-w-2xl">
+      <p class="eyebrow mb-3">The credential</p>
+      <h2 class="text-3xl font-bold text-ink-800">What the certification means</h2>
+      <p class="mt-4 text-slate-600">
+        An AI-assessed course credential earned on supplied scenarios. It is not an accreditation
+        and does not verify live behaviour.
+      </p>
+      <p class="mt-4 text-slate-600">
+        Version {CERTIFICATION_VERSION}. A change to the rubric bumps the version; a certificate
+        keeps the version it was awarded under.
+      </p>
+    </section>
+
+    <section class="mt-16">
+      <a
+        href="/course"
+        class="font-medium text-brand-600 underline decoration-brand-200 underline-offset-2"
+        data-track-cta="course_close"
+      >
+        See the course
+      </a>
+    </section>
+  </div>
+</BaseLayout>

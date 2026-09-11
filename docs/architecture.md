@@ -83,6 +83,17 @@ astro.config.mjs · tailwind.config.mjs · tsconfig.json · netlify.toml
 | `/practice/solution-builder` | `pages/practice/solution-builder.astro` | Solution builder (React island) |
 | `/account` | `pages/account.astro` | Sign in / register + saved-work library (React island) |
 | `/dashboard` | `pages/dashboard.astro` | Subscriber workspace (`DashboardView` island); prerendered shell, `noindex`, gates client-side |
+| `/course` | `pages/course/index.astro` | Course sales page. Built only when `PUBLIC_COURSE_STATUS` is `preview` or `open` |
+| `/course/certification` | `pages/course/certification.astro` | The published rubric, rendered from `src/data/certification.ts`; same gate |
+| `/course.md` · `/course/certification.md` | `pages/course.md.ts`, `pages/course/certification.md.ts` | GEO variants of the two public course pages; same gate |
+| `/course/learn` | `pages/course/learn/index.astro` | Learner dashboard shell (`CourseDashboard` island); `noindex`, sitemap-excluded, robots-disallowed, built in every mode |
+| `/course/learn/lessons/:id` | `pages/course/learn/lessons/[id].astro` | Lesson shell (`LessonView` island). The prose is fetched, never prerendered |
+| `/course/learn/worksheets/:id` | `pages/course/learn/worksheets/[id].astro` | Printable worksheet shell (`WorksheetView` island) |
+| `/course/learn/assessment` | `pages/course/learn/assessment.astro` | The staged final assessment (`AssessmentView` island) |
+| `/api/course/*` | `pages/api/course/{entitlement,checkout,lesson,progress,state,worksheet,assessment}.ts` | The learner API: Bearer token in, `Cache-Control: no-store` out |
+| `/api/admin/course` | `pages/api/admin/course.ts` | Enrollment actions and the grading queue, behind `requireAdmin()` |
+| `/api/stripe-webhook` (course branch) | `pages/api/stripe-webhook.ts` | `metadata.purchase_intent = course` is tested before the org and personal paths |
+| `/.netlify/functions/course-grade` · `course-grade-sweeper` | `netlify/functions/*.mts` | The background grader and its ten-minute sweeper, outside Astro entirely |
 | `/a/:org/:slug` | `pages/a/[org]/[slug].astro` | **Server-rendered** (`prerender = false`) white-label page; bare `WhiteLabelLayout`, `noindex`, 404 for unknown/inactive; the only per-request `.astro` route |
 | `/about` | `pages/about.astro` | Story + resources |
 | `404` | `pages/404.astro` | Not-found |
@@ -216,8 +227,69 @@ domain-bound code (`wl_auth_codes`) → `/wl-callback` → `setSession`. The das
 (`/api/white-label-domain` + `cloudflare.ts` + `dnsVerify.ts`) provisions the custom hostname and
 KV route and polls the cert to live. Full runbook in deployment.md.
 
+### Course delivery
+
+The paid video course is **prerendered shells plus React islands plus a Bearer-authed API**.
+Astro cannot gate a page before it renders (auth is a token in localStorage, not a cookie),
+so a server-gated lesson page is not available to us. Rather than pretend, every learner page
+is a static shell carrying a title and nothing else, and the island fetches the lesson from
+`/api/course/lesson`. **No lesson prose, worksheet body, model response or assessment prompt
+is ever in the HTML that ships**, so the interesting question is not "can someone read the
+page source" but "does the API say yes", which is a question with one answer in one place.
+
+**Entitlement.** `getCourseEntitlement` and `requireEnrolled`
+(`src/lib/server/course/enrollment.ts`) sit beside `checkEntitlement` and follow the same
+rule: the server decides, the browser asks. `GET /api/course/entitlement` reports; every other
+course endpoint enforces. Course access and a chat subscription are independent, so buying the
+course grants nothing in the dashboard and subscribing grants nothing in the course.
+
+**Pure rules and their bindings.** `src/lib/course/` holds plain functions with no imports
+from Astro, the database or the environment: the catalog validator, the progress and state
+rules, the lesson-view helpers, the Stream URL and token-reuse arithmetic, and the assessment
+form rules. They carry the unit tests, which is why `npm test` guards a deploy.
+`src/lib/server/course/` holds the bindings: the Supabase reads and writes, the Stripe offer,
+the Stream token store, the grader and the job store.
+
+**The worker-shared subset.** The grading worker is a Netlify function bundled by esbuild
+outside Vite, so anything it reaches must avoid `astro:content`, `import.meta.env`, the env
+helper, `supabaseAdmin`, the rate limiter and `src/data/course.ts` (which reads
+`import.meta.env` at module load). `scripts/check-private-content.mjs` walks the
+import closure from `netlify/functions/*.mts` and `gradingJob.ts` inside `npm run check` and
+fails on a violation, so "it worked locally" cannot become a broken bundle in production.
+Worker-shared modules take their configuration and clients as arguments for the same reason.
+
+**Video.** Cloudflare Stream, with signed URLs on every video except the free preview lesson.
+Tokens are not bound to a viewer, so one token per video is shared: twelve hours, cached in
+`course_stream_tokens`, reused while more than an hour remains, memoised per function
+instance. Token minting failing or the configuration missing leaves the lesson working with
+`video_unavailable: true`, because a video outage should not take the transcript and the
+exercise with it.
+
+**The assessment data path.** At `start`, the attempt freezes two snapshots: `snapshot_public`
+(the stages and prompts the learner may eventually see) and `snapshot_private` (the coverage
+map, reference responses, anchors, allowed lesson ids and the source-pack hash). The learner
+is only ever served stages up to the one they are on, so a later prompt cannot leak the shape
+of a reveal. A submit writes the responses and the grading job in one transaction; every
+worker write carries a `lock_token` that the finalize and fail functions compare first, so a
+worker whose lease expired is discarded rather than allowed to overwrite a banked grade. The
+grader's prompt is three `cache_control`'d system blocks (the methodology source pack, the
+instructions and rubric, the form's private material) with nothing per learner in `system`, so
+the cache hits from the second grade onward. Two guard scripts keep the private half private:
+`check-private-content.mjs` in `npm run check` and `check-dist-leak.mjs` in `npm run build`.
+
 ## Content model
 
 The 12 principles share an identical schema (`principles` collection), so the detail
 template renders any principle uniformly — add a new YAML file and a new page appears,
 guaranteed to have every section. See [content-guide.md](content-guide.md).
+
+The course adds four collections under `src/content/course/`: `courseModules` (YAML),
+`courseLessons` (Markdown with six fixed `##` sections), `courseWorksheets` (Markdown), and
+`assessmentForms` (JSON, private). The first three are read only through
+`getCourseCatalog()` ([`src/lib/course/catalog.ts`](../src/lib/course/catalog.ts)), which runs
+every cross-file rule and throws at build time on a violation, the same way
+`src/lib/demoExcerpt.ts` guards the home page quote. Per-entry rules live in the Zod schemas;
+anything spanning files (the lesson chain, module contiguity, the check counts, the status
+gates) lives in `validate.ts` so one error message can list every problem at once.
+`assessmentForms` has exactly one reader, `src/lib/server/course/forms.ts`, enforced by a
+script rather than by convention. Authoring formats: [content-guide.md](content-guide.md).

@@ -3,8 +3,9 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import PageHero from '../../components/PageHero.astro';
 import CourseSyllabus from '../../components/CourseSyllabus.astro';
 import CourseSalesCta from '../../components/react/CourseSalesCta.tsx';
-import { breadcrumbs } from '../../lib/schema';
+import { breadcrumbs, course } from '../../lib/schema';
 import { COURSE, COURSE_STATUS, COURSE_TOKENS, type CourseToken } from '../../data/course';
+import { CERTIFICATION_TITLE } from '../../data/certification';
 import { COURSE_PRICE } from '../../data/pricing';
 import { assertLaunchSettings, courseCopy } from '../../lib/course/copy';
 import { getCourseCatalog } from '../../lib/course/catalog';
@@ -60,11 +61,22 @@ const included = [
 ];
 
 const site = Astro.site ?? Astro.url;
+const description = `Learn the Solution Seeking System with ${COURSE.presenter} through ${curriculum.totalLessons} video lessons, practical exercises, and AI-assessed certification.`;
 const schemas = [
   breadcrumbs(site, [
     { name: 'Home', path: '/' },
     { name: 'Video course', path: '/course' },
   ]),
+  course(site, {
+    path: '/course',
+    name: COURSE.title,
+    description,
+    presenter: COURSE.presenter,
+    workloadHours: COURSE.learnerHoursMax,
+    sections: curriculum.modules.map((m) => ({ name: m.title, lessons: m.lessons.map((l) => l.title) })),
+    credential: CERTIFICATION_TITLE,
+    offer: COURSE_STATUS === 'open' && COURSE_PRICE ? { price: String(COURSE_PRICE.priceAmount), currency: COURSE_PRICE.currency } : null,
+  }),
 ];
 
 const cta = {
@@ -78,8 +90,9 @@ const cta = {
 
 <BaseLayout
   title="Solution Seeking Course"
-  description={`Learn the Solution Seeking System with ${COURSE.presenter} through ${curriculum.totalLessons} video lessons, practical exercises, and AI-assessed certification.`}
+  description={description}
   schemas={schemas}
+  markdownAlt="/course.md"
 >
   <PageHero
     eyebrow="Video course"

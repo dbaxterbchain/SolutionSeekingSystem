@@ -173,6 +173,16 @@ describe('validateCatalog', () => {
     );
   });
 
+  it('lets a placeholder lesson publish with no video of its own', () => {
+    const input = withLesson(buildInput(), 'v04', {
+      ...PUBLISHED_FIELDS,
+      videoPlaceholder: true,
+      streamUid: null,
+      approvals: { copy: '2026-09-09 DB' },
+    });
+    expect(() => validateCatalog(input)).not.toThrow();
+  });
+
   it('requires the preview lesson to be published once the course is open, not for a preview build', () => {
     expect(() => validateCatalog({ ...buildInput(), courseStatus: 'preview' })).not.toThrow();
     expect(() => validateCatalog({ ...buildInput(), courseStatus: 'open' })).toThrow(
