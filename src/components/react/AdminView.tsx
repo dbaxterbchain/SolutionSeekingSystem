@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '../../lib/useSession';
-import { useDialog } from './Dialog';
+import { useDialog, type ConfirmOptions } from './Dialog';
 
 /**
  * The operator's console.
@@ -13,7 +13,7 @@ import { useDialog } from './Dialog';
  * false sense of where the boundary is. The boundary is the API.
  */
 
-type Tab = 'feedback' | 'orgs' | 'subscribers' | 'enquiries' | 'grading';
+type Tab = 'feedback' | 'orgs' | 'subscribers' | 'enquiries' | 'grading' | 'enrollments';
 
 interface FeedbackRow {
   id: string;
@@ -91,6 +91,19 @@ interface GradingRow {
   submitted_at: string | null;
 }
 
+interface EnrollmentRow {
+  id: string;
+  user_id: string;
+  email: string | null;
+  status: 'enrolled' | 'revoked' | 'refunded';
+  source: 'stripe' | 'admin';
+  purchased_at: string | null;
+  access_starts_at: string;
+  access_ends_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 const date = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
 const time = (iso: string | null) =>
@@ -110,6 +123,7 @@ export default function AdminView() {
   const [bySource, setBySource] = useState<Record<string, { total: number; confirmed: number }>>({});
   const [enquiries, setEnquiries] = useState<EnquiryRow[] | null>(null);
   const [grading, setGrading] = useState<GradingRow[] | null>(null);
+  const [enrollments, setEnrollments] = useState<EnrollmentRow[] | null>(null);
   const { confirm, dialog } = useDialog();
 
   const call = async (path: string, body?: unknown) => {
@@ -151,6 +165,9 @@ export default function AdminView() {
     } else if (which === 'grading') {
       const d = await call('course?view=grading');
       if (d) setGrading(d.rows);
+    } else if (which === 'enrollments') {
+      const d = await call('course?view=enrollments');
+      if (d) setEnrollments(d.rows);
     } else {
       const d = await call('enquiries');
       if (d) setEnquiries(d.rows);
@@ -207,6 +224,7 @@ export default function AdminView() {
     { id: 'subscribers', label: 'Email list', count: subscribers?.length },
     { id: 'enquiries', label: 'Enquiries', count: enquiries?.filter((e) => !e.handled).length },
     { id: 'grading', label: 'Grading' },
+    { id: 'enrollments', label: 'Enrollments', count: enrollments?.filter((e) => e.status === 'enrolled').length },
   ];
 
   return (
@@ -276,6 +294,15 @@ export default function AdminView() {
               await loadTab('grading');
             }
           }}
+        />
+      )}
+      {tab === 'enrollments' && (
+        <EnrollmentsTab
+          rows={enrollments}
+          call={call}
+          reload={() => loadTab('enrollments')}
+          setNotice={setNotice}
+          confirm={confirm}
         />
       )}
       {dialog}
@@ -853,6 +880,202 @@ function GradingTab({
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/* ----------------------------------------------------------- Enrollments */
+
+function EnrollmentsTab({
+  rows,
+  call,
+  reload,
+  setNotice,
+  confirm,
+}: {
+  rows: EnrollmentRow[] | null;
+  call: (path: string, body?: unknown) => Promise<any>;
+  reload: () => void;
+  setNotice: (notice: string | null) => void;
+  confirm: (opts: ConfirmOptions) => Promise<boolean>;
+}) {
+  const [email, setEmail] = useState('');
+  const [note, setNote] = useState('');
+  const [granting, setGranting] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const grant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setGranting(true);
+    const d = await call('course', { action: 'grant', email: email.trim(), note: note.trim() || undefined });
+    setGranting(false);
+    if (d?.ok) {
+      setEmail('');
+      setNote('');
+      setNotice('Access granted.');
+      reload();
+    }
+  };
+
+  const act = async (
+    action: 'revoke' | 'refund' | 'reinstate',
+    row: EnrollmentRow,
+    opts: ConfirmOptions,
+    successNotice: string
+  ) => {
+    const ok = await confirm(opts);
+    if (!ok) return;
+    setBusyId(row.id);
+    const d = await call('course', { action, user_id: row.user_id });
+    setBusyId(null);
+    if (d?.ok) {
+      setNotice(successNotice);
+      reload();
+    }
+  };
+
+  const statusBadge: Record<EnrollmentRow['status'], string> = {
+    enrolled: 'bg-emerald-100 text-emerald-700',
+    revoked: 'bg-slate-100 text-slate-600',
+    refunded: 'bg-amber-100 text-amber-800',
+  };
+
+  return (
+    <div className="space-y-4">
+      <form onSubmit={grant} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-xs font-semibold text-slate-600">
+            Email
+            <input
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              required
+              placeholder="learner@example.com"
+              className="mt-1 block rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Note
+            <input
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Why, for the ledger (optional)"
+              className="mt-1 block w-64 rounded-xl border border-slate-200 px-3 py-2 text-sm"
+            />
+          </label>
+          <button type="submit" disabled={granting} className="btn-primary py-2 text-xs disabled:opacity-60">
+            {granting ? 'Granting…' : 'Grant access'}
+          </button>
+        </div>
+      </form>
+
+      {!rows ? (
+        <p className="text-sm text-slate-400">Loading…</p>
+      ) : rows.length === 0 ? (
+        <Empty>No enrollments yet.</Empty>
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-card">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">
+              <tr>
+                <th className="px-5 py-3">Email</th>
+                <th className="px-5 py-3">Status</th>
+                <th className="px-5 py-3">Source</th>
+                <th className="px-5 py-3">Since</th>
+                <th className="px-5 py-3">Ended</th>
+                <th className="px-5 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const label = r.email ?? r.user_id.slice(0, 8);
+                const busy = busyId === r.id;
+                return (
+                  <tr key={r.id} className="border-b border-slate-50 last:border-0">
+                    <td className="px-5 py-2.5 text-slate-700">{label}</td>
+                    <td className="px-5 py-2.5">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadge[r.status]}`}>
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-2.5 text-slate-500">{r.source}</td>
+                    <td className="px-5 py-2.5 text-slate-400">{date(r.access_starts_at)}</td>
+                    <td className="px-5 py-2.5 text-slate-400">{date(r.access_ends_at)}</td>
+                    <td className="px-5 py-2.5">
+                      <div className="flex flex-wrap gap-2">
+                        {r.status === 'enrolled' && (
+                          <>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                act(
+                                  'revoke',
+                                  r,
+                                  {
+                                    title: `Revoke access for ${label}?`,
+                                    message:
+                                      'The learner keeps their progress but cannot open lessons until access is reinstated.',
+                                    confirmLabel: 'Revoke',
+                                    tone: 'danger',
+                                  },
+                                  'Access revoked.'
+                                )
+                              }
+                              className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
+                            >
+                              Revoke
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() =>
+                                act(
+                                  'refund',
+                                  r,
+                                  {
+                                    title: `Record a refund for ${label}?`,
+                                    message:
+                                      'This ends access and writes the ledger. Move the money in the Stripe dashboard.',
+                                    confirmLabel: 'Record refund',
+                                  },
+                                  'Refund recorded. Move the money in the Stripe dashboard.'
+                                )
+                              }
+                              className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
+                            >
+                              Record refund
+                            </button>
+                          </>
+                        )}
+                        {(r.status === 'revoked' || r.status === 'refunded') && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              act(
+                                'reinstate',
+                                r,
+                                { title: `Reinstate access for ${label}?`, confirmLabel: 'Reinstate' },
+                                'Access reinstated.'
+                              )
+                            }
+                            className="rounded-full bg-brand-500 px-3.5 py-1 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+                          >
+                            Reinstate
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
