@@ -858,6 +858,29 @@ Nothing in this task runs without David's explicit go-ahead in the conversation;
 - [ ] **4. The branch deploy.** Push `course` as `course-beta` (or point the context at `course`), watch the deploy log for the sweeper's schedule registration and the two functions; on the deploy: `/course` open with the test checkout (the 1b walk), a grant from `/admin`, a lesson with the stand-in clip once `COURSE.placeholderStreamUid` is set, a POST to `/.netlify/functions/course-grade` without the secret (the log says refused, the job untouched) and an assessment submission that grades through the real worker with `cache_read_input_tokens` on the second grade; the failure alert email received at `ALERTS_TO` after a deliberate bad-model run if David wants to see it.
 - [ ] **5. Production.** Stays `hidden`. When David is satisfied, the branch is merged through PR #15 (the finishing skill's menu: merge locally, PR, or keep).
 
+## Execution record (2026-09-10 to 2026-09-11)
+
+Executed with subagent-driven development: Tasks 1 to 6 in eight commits from `66d4051` to `a22ead0` (Task 1 had one fix round that moved the admin's row update and ledger insert into one SQL function, `admin_change_course_access`, appended to the unpushed `0030`; the plan's three module functions became one `changeCourseAccess` binding over it), the controller's browser pass (Task 7), a whole-branch review and a docs review, and one fix wave of five commits (`781e307` to `b87e11f`). Amendments the reviews forced on this plan, now in the code:
+
+- The grading alert also fires when the claim retires a job whose retry budget is spent (`exhausted` now carries the attempt id and the last error), not only on an in-run failure; its idempotency key includes the attempt count so a retried job that fails again alerts again; the alert's admin link uses the running deploy's own address.
+- A refund can follow a revoke (`already_refunded` refuses a second one); Revoke, Record refund and Reinstate ask for a note through the dialog's prompt and every refusal carries a message; the route echoes the module's error code.
+- Published rubric numbers (the count of criteria, the caps) are derived from the data file; the JSON-LD workload reads `COURSE.learnerHoursMax`.
+- The header's entitlement lookup is shared across the page's mounts and skipped for an anonymous session.
+- The docs lost a wrong Stream diagnostic, gained the post-push proof for the course functions, the sixth banned worker import, the second allowed collection reader, the plan lesson's completion assertion returned to the tests, and the placeholder render script's header now matches the shipped rule.
+
+Browser verification (Task 7) on 2026-09-11: the Enrollments tab (grant refusal for an unknown email, revoke with its dialog and notice, the learner's "access has ended" dashboard, reinstate), the account menu ("My course" for an enrolled account in hidden mode, "Explore the course" for a not-enrolled account in preview mode), the preview build's nav entry, home section, practice band, pricing panel, FAQ entries, certification page at both widths, `/course.md` and the llms section, the hidden build's 404s and empty nav, and the alert path's log line when Resend is not configured locally. Screenshots are in `docs/features/course/`.
+
+Carried forward:
+
+1. Task 8 (ship) runs with David: the hosted push of `0030` and `0031` with the post-push function check and a real grant and revoke, the advisors run, the Netlify environment (with `ALERTS_TO` confirmed in Functions scope), the two Stripe async events, the `course-beta` branch context, the deploy-preview checks of the worker and sweeper, production staying hidden.
+2. The webhook's enrollment writes are still two statements (`enrollment.ts`); the admin path now has the transactional shape to copy (Phase 2).
+3. A repeatable SQL test for the two state-function matrices (a `supabase/snippets/` script) would pay for itself on the next edit.
+4. The `course/learn` OG card is built in hidden mode (the learner area works in every mode) and the account menu's chunk carries the "Explore the course" string; neither renders while hidden.
+5. `syllabusSections` and `Syllabus` are pending schema.org vocabulary; validators flag them as unknown.
+6. A session-scoped entitlement cache would turn the header's request per page load into one per session.
+7. `listUsers` paging caps the grant lookup at 5,000 accounts; the enrollment list resolves emails one account at a time.
+8. The dev-only React "Invalid hook call" warning noted in 1c on `/dashboard` and `/course/learn` is untouched.
+
 ## Handoff
 
 Phase 2 (the content system) consumes the catalog, `LessonNav`, the worksheet route and the dashboard as they stand, and adds `GET/POST /api/course/check` with the `ModuleCheck` island (the `checkId` convention from 1c), the free preview page at `/course/preview/` rendering `LessonSections` at build time once V05 is published, the module-by-module import loop for David's lesson copy and Bradley's masters (the ladder in `docs/course-production.md`), the dashboard's module cards with check status, and the resources page. Phase 3 consumes the assessment data path: Forms A and B and the practice form P1 in the private collection, the `list` and `review` actions, certificates with the verify page, the result and certificate emails keyed `course-result/<job>-<generation>` and `course-certificate/<id>`, the review queue's single `snapshot_private` read, the benchmark script against `grader.ts`, `decision.ts` and `gradeValidation.ts`, and the release gate that flips `COURSE_AWARDS_ENABLED`. Phase 4 consumes the ready-to-open checklist in `deployment.md`.
