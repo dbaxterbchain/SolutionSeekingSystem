@@ -6,6 +6,7 @@ import { PLANS } from '../../data/pricing';
 import { getCourseCatalog } from '../../lib/course/catalog';
 import { hasShell } from '../../lib/course/visibility';
 import { COURSE, COURSE_STATUS } from '../../data/course';
+import { CERTIFICATION_TITLE } from '../../data/certification';
 
 /**
  * Generated 1200×630 social-share cards, one per page. Route keys mirror page
@@ -122,12 +123,17 @@ const pages: Record<string, OgPage> = {
     title: 'About',
     description: 'Why Beanchain Coffee built the Solution Seeking System, and how to use it.',
   },
-  // The sales page exists only when the course is public; its card follows.
+  // The sales and certification pages exist only when the course is public;
+  // their cards follow.
   ...(COURSE_STATUS !== 'hidden'
     ? {
         course: {
           title: COURSE.title,
           description: `Learn the Solution Seeking System with ${COURSE.presenter}: video lessons, practical exercises, and AI-assessed certification.`,
+        },
+        'course/certification': {
+          title: CERTIFICATION_TITLE,
+          description: 'The six criteria, their weights, the score anchors and the pass rule.',
         },
       }
     : {}),

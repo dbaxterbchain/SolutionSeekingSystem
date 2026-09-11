@@ -264,3 +264,59 @@ export function aboutPage(site: URL): Schema {
     },
   };
 }
+
+/**
+ * The paid video course. `offers` is present only while the course is open,
+ * so a preview build never claims a price. The workload is the top of the
+ * learner-hours range.
+ */
+export function course(
+  site: URL,
+  opts: {
+    path: string;
+    name: string;
+    description: string;
+    presenter: string;
+    workloadHours: number;
+    sections: { name: string; lessons: string[] }[];
+    credential: string;
+    offer: { price: string; currency: string } | null;
+  }
+): Schema {
+  return {
+    '@context': CONTEXT,
+    '@type': 'Course',
+    name: opts.name,
+    description: opts.description,
+    url: new URL(opts.path, site).href,
+    provider: { '@type': 'Organization', name: SITE_NAME, url: site.href },
+    isAccessibleForFree: false,
+    educationalCredentialAwarded: {
+      '@type': 'EducationalOccupationalCredential',
+      name: opts.credential,
+      credentialCategory: 'certificate',
+    },
+    syllabusSections: opts.sections.map((s) => ({ '@type': 'Syllabus', name: s.name, description: s.lessons.join('. ') })),
+    hasCourseInstance: [
+      {
+        '@type': 'CourseInstance',
+        courseMode: 'Online',
+        courseWorkload: `PT${opts.workloadHours}H`,
+        instructor: { '@type': 'Person', name: opts.presenter },
+      },
+    ],
+    ...(opts.offer
+      ? {
+          offers: [
+            {
+              '@type': 'Offer',
+              price: opts.offer.price,
+              priceCurrency: opts.offer.currency,
+              availability: 'https://schema.org/InStock',
+              category: 'Paid',
+            },
+          ],
+        }
+      : {}),
+  };
+}

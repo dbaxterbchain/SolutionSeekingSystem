@@ -1,5 +1,16 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { glossary, pillars, systemDefinition } from '../data/concepts';
+import { COURSE } from '../data/course';
+import {
+  CERTIFICATION_METHOD,
+  CERTIFICATION_TITLE,
+  CERTIFICATION_VERSION,
+  CRITERIA,
+  PASS_MIN_CRITERION,
+  PASS_TOTAL,
+  SCORE_ANCHORS,
+} from '../data/certification';
+import type { PublicCurriculum } from './course/curriculum';
 
 /**
  * Serializers that turn content-collection entries into clean, standalone
@@ -210,5 +221,54 @@ export function overviewToMarkdown(): string {
     '## Key terminology',
     '',
     ...glossary.map((t) => `- **${t.term}**: ${t.definition}`),
+  ].join('\n');
+}
+
+/** /course.md: the public shape of the course for machines, never lesson prose. */
+export function courseToMarkdown(
+  site: URL | undefined,
+  curriculum: PublicCurriculum,
+  opts: { status: 'preview' | 'open'; priceLine: string | null }
+): string {
+  const link = (path: string) => (site ? new URL(path, site).href : path);
+  return [
+    `# ${COURSE.title}`,
+    '',
+    `A paid video course with ${COURSE.presenter}: ${curriculum.totalLessons} short lessons across ${curriculum.modules.length} modules, an exercise and a model response for each, a printable worksheet for every module, and an AI-assessed certification at the end. About ${COURSE.learnerHours} hours of learner time over ${COURSE.suggestedWeeks} weeks.`,
+    '',
+    opts.status === 'open' && opts.priceLine ? opts.priceLine : 'Not on sale yet.',
+    '',
+    '## Syllabus',
+    '',
+    ...curriculum.modules.flatMap((m) => [`### ${m.title}`, '', ...m.lessons.map((l) => `- ${l.title}`), '']),
+    '## Certification',
+    '',
+    `${link('/course/certification')}`,
+    '',
+    `Course page: ${link('/course')}`,
+  ].join('\n');
+}
+
+/** /course/certification.md: the published rubric. */
+export function certificationToMarkdown(site: URL | undefined): string {
+  const link = (path: string) => (site ? new URL(path, site).href : path);
+  return [
+    `# ${CERTIFICATION_TITLE}`,
+    '',
+    `${CERTIFICATION_METHOD}. An AI-assessed course credential earned on supplied scenarios. It is not an accreditation and does not verify live behaviour. Version ${CERTIFICATION_VERSION}.`,
+    '',
+    '## Criteria',
+    '',
+    ...CRITERIA.map((c) => `- ${c.name} (${c.weight}%): ${c.demonstrates}`),
+    '',
+    '## Score anchors',
+    '',
+    ...Object.entries(SCORE_ANCHORS).map(([score, meaning]) => `- ${score}: ${meaning}`),
+    '',
+    '## Passing',
+    '',
+    `A weighted total of at least ${PASS_TOTAL} out of 100 with every criterion at ${PASS_MIN_CRITERION} or more. A missing or misapplied Wisdom Principle or Leadership Tool caps its criterion at 2, as does a material misconception.`,
+    '',
+    `Course page: ${link('/course')}`,
   ].join('\n');
 }

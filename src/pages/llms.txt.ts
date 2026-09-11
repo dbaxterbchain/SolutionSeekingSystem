@@ -3,6 +3,7 @@ import { getCollection } from 'astro:content';
 import { protocolSteps, systemDefinition } from '../data/concepts';
 import { MODES } from '../data/modes';
 import { PLANS, FREE_ANON_MESSAGES, FREE_ACCOUNT_MESSAGES } from '../data/pricing';
+import { COURSE_STATUS } from '../data/course';
 
 export const prerender = true;
 
@@ -59,6 +60,15 @@ export const GET: APIRoute = async ({ site }) => {
     `- [Conversation Planner](${abs('/practice/conversation-planner')}): plan a Mutual Understanding conversation with goals, openers, and question bank`,
     `- [Solution Builder](${abs('/practice/solution-builder')}): draft solutions and score them as actionable, testable, effective, and time-bound`,
     '',
+    ...(COURSE_STATUS !== 'hidden'
+      ? [
+          '## Video course (paid)',
+          '',
+          `- The Complete Solution Seeking course (syllabus and access): ${abs('/course.md')}`,
+          `- The certification rubric: ${abs('/course/certification.md')}`,
+          '',
+        ]
+      : []),
     `## AI assistants (${FREE_ANON_MESSAGES} free messages with no account, ${FREE_ACCOUNT_MESSAGES} with a free account, then ${PLANS.monthly.priceLabel}/month or ${PLANS.annual.priceLabel}/year for unlimited)`,
     '',
     `- [Solution Seeking Guide](${abs('/practice/guide')}): AI chat that walks you through the Communication Protocol for a real conflict, step by step`,
