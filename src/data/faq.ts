@@ -3,6 +3,10 @@ import {
   FREE_ANON_MESSAGES,
   FREE_ACCOUNT_MESSAGES,
 } from './pricing';
+import { COURSE, COURSE_STATUS } from './course';
+import { CERTIFICATION_TITLE, PASS_MIN_CRITERION, PASS_TOTAL } from './certification';
+
+const courseVisible = COURSE_STATUS !== 'hidden';
 
 /**
  * Site-wide FAQ, rendered on /faq and emitted as FAQPage JSON-LD. Deliberately
@@ -16,7 +20,9 @@ export const siteFaq: { q: string; a: string }[] = [
   },
   {
     q: 'Is it really free?',
-    a: 'Yes. The entire system is free to read and always will be: every page, the complete PDF guide, the interactive worksheets, and the annotated example conversations. You only pay if you want unlimited conversations with the AI assistants.',
+    a: courseVisible
+      ? 'Yes. Every page, the complete PDF guide, the interactive worksheets and the annotated example conversations are free and always will be. You pay only for unlimited conversations with the AI assistants, or for the video course if you want the guided path and the certification.'
+      : 'Yes. The entire system is free to read and always will be: every page, the complete PDF guide, the interactive worksheets, and the annotated example conversations. You only pay if you want unlimited conversations with the AI assistants.',
   },
   {
     q: 'What are the Guide and the Mentor?',
@@ -50,4 +56,16 @@ export const siteFaq: { q: string; a: string }[] = [
     q: 'Who created the Solution Seeking System?',
     a: 'It is a Beanchain Process, created by David and Shannon Baxter of Beanchain Coffee. It grew out of running their own business and wanting a better, more democratic way to solve problems together.',
   },
+  ...(courseVisible
+    ? [
+        {
+          q: 'Is there a course?',
+          a: `Yes. The ${COURSE.title} is a paid video course with ${COURSE.presenter}: ${COURSE.plan.lessons} short lessons across ${COURSE.plan.modules} modules, an exercise and a model response for each, a printable worksheet for every module, and an AI-assessed certification at the end. Everything else on the site stays free.`,
+        },
+        {
+          q: `What does the ${CERTIFICATION_TITLE} mean?`,
+          a: `An AI-assessed course credential earned on supplied scenarios. It is not an accreditation and does not verify live behaviour. You pass with a weighted total of at least ${PASS_TOTAL} out of 100 and every criterion at ${PASS_MIN_CRITERION} or more, against a rubric that is published in full.`,
+        },
+      ]
+    : []),
 ];

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useSession } from '../../lib/useSession';
+import { useCourseEntitlement } from '../../lib/useCourseEntitlement';
+import { COURSE_STATUS } from '../../data/course';
 
 /**
  * Header account control. Signed out → a "Sign in" link to /account. Signed in →
@@ -19,6 +21,13 @@ import { useSession } from '../../lib/useSession';
 export default function AuthMenu({ variant = 'desktop' }: { variant?: 'desktop' | 'mobile' }) {
   const { user, loading } = useSession();
   const [open, setOpen] = useState(false);
+  const course = useCourseEntitlement({ cacheSeconds: 300 });
+  const courseLink =
+    course.entitlement?.kind === 'enrolled'
+      ? { href: '/course/learn/', label: 'My course' }
+      : COURSE_STATUS !== 'hidden'
+        ? { href: '/course', label: 'Explore the course' }
+        : null;
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -69,6 +78,14 @@ export default function AuthMenu({ variant = 'desktop' }: { variant?: 'desktop' 
         >
           My account
         </a>
+        {courseLink && (
+          <a
+            href={courseLink.href}
+            className="rounded-xl px-4 py-3 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            {courseLink.label}
+          </a>
+        )}
         <a
           href="/saved"
           className="rounded-xl px-4 py-3 text-base font-medium text-slate-700 transition-colors hover:bg-slate-50"
@@ -126,6 +143,15 @@ export default function AuthMenu({ variant = 'desktop' }: { variant?: 'desktop' 
             >
               My account
             </a>
+            {courseLink && (
+              <a
+                href={courseLink.href}
+                role="menuitem"
+                className="block px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                {courseLink.label}
+              </a>
+            )}
             <a
               href="/saved"
               role="menuitem"

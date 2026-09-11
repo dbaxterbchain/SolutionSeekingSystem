@@ -11,8 +11,17 @@ export interface CourseEntitlementState {
   refetch: () => Promise<CourseEntitlementView | null>;
 }
 
+/**
+ * Cross-mount cache, keyed by user id. Lets a caller that mounts on every
+ * page (the account menu) pass `cacheSeconds` and skip the request while its
+ * last result is still fresh.
+ */
+const cache = new Map<string, { at: number; value: CourseEntitlementView }>();
+
 /** Mirrors useEntitlement() for the course. Null means "ask the server", never "deny". */
-export function useCourseEntitlement(): CourseEntitlementState {
+export function useCourseEntitlement(
+  options: { cacheSeconds?: number } = {}
+): CourseEntitlementState {
   const { session, user, loading: sessionLoading } = useSession();
   const [state, setState] = useState<Omit<CourseEntitlementState, 'refetch'>>({
     entitlement: null,
@@ -39,6 +48,9 @@ export function useCourseEntitlement(): CourseEntitlementState {
     const entitlement = await fetchCourseEntitlement(current.access_token);
     if (mine !== generation.current) return entitlement;
     setState({ entitlement, loading: false, failed: entitlement === null });
+    if (entitlement !== null) {
+      cache.set(current.user.id, { at: Date.now(), value: entitlement });
+    }
     return entitlement;
   }, []);
 
@@ -47,6 +59,13 @@ export function useCourseEntitlement(): CourseEntitlementState {
     if (!session) {
       setState({ entitlement: null, loading: false, failed: false });
       return;
+    }
+    if (options.cacheSeconds) {
+      const cached = cache.get(session.user.id);
+      if (cached && Date.now() - cached.at < options.cacheSeconds * 1000) {
+        setState({ entitlement: cached.value, loading: false, failed: false });
+        return;
+      }
     }
     setState((s) => ({ ...s, loading: true }));
     void refetch();

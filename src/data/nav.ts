@@ -1,3 +1,5 @@
+import { COURSE, COURSE_STATUS } from './course';
+
 export interface NavLink {
   label: string;
   href: string;
@@ -27,6 +29,8 @@ export const navItems: NavItem[] = [
       { label: 'Protocol', href: '/protocol' },
       { label: 'Principles', href: '/principles' },
       { label: 'Leadership Tools', href: '/tools' },
+      // The course joins the Learn group only once it is public; the footer follows through navLinks.
+      ...(COURSE_STATUS !== 'hidden' ? [{ label: COURSE.navLabel, href: '/course' }] : []),
     ],
   },
   { label: 'Practice', href: '/practice' },
