@@ -13,10 +13,11 @@ import { GRADE_OUTPUT_SCHEMA, buildGraderRequest, type GradingInput } from './pr
  *
  * The four time budgets nest, shortest first. One call gets
  * GRADER_CALL_TIMEOUT_MS and the SDK retries nothing, so a slow call can never
- * quietly become three. One grade makes at most two calls and has
- * GRADER_BUDGET_MS for both: before every call after the first, a grade with no
- * room left for a whole call stops and reports a retryable failure rather than
- * run past its lease. The lease the runner takes (DEFAULT_LEASE_SECONDS in
+ * quietly become three. One grade makes up to four calls (the max_tokens retry
+ * and the corrective turn each add one) inside GRADER_BUDGET_MS: before every
+ * call after the first, a grade with no room left for a whole call stops and
+ * reports a retryable failure rather than run past its lease, so the gate, not
+ * the call count, is what keeps the budget. The lease the runner takes (DEFAULT_LEASE_SECONDS in
  * gradingJob.ts) is longer than that budget, so the lease is still this
  * worker's while it finishes, and the Netlify background limit of 900 seconds
  * is longer again, so the function is never killed while holding a lease.

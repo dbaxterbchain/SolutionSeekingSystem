@@ -29,12 +29,17 @@ export function graderSettings(): { model: string; awardsEnabled: boolean } {
  * Where the worker lives. The trigger carries the shared secret, so the
  * destination comes from configuration and never from the request: anyone who
  * can set the Host header on a call to the SSR function would otherwise choose
- * where that secret is sent. Netlify sets URL to the deploy's own address,
- * PUBLIC_CANONICAL_ORIGIN covers a host that does not, and the request origin is
- * trusted only under astro dev, where the port moves between runs.
+ * where that secret is sent. On Netlify, URL is always the production address
+ * and DEPLOY_PRIME_URL is the address of the deploy that is running, so a
+ * deploy preview or a branch deploy calls its own worker rather than
+ * production's. PUBLIC_CANONICAL_ORIGIN covers a host that sets neither, and
+ * the request origin is trusted only under astro dev, where the port moves
+ * between runs.
  */
 export function workerOrigin(requestOrigin: string): string {
-  return serverEnv('URL') || serverEnv('PUBLIC_CANONICAL_ORIGIN') || (import.meta.env.DEV ? requestOrigin : '');
+  const context = serverEnv('CONTEXT');
+  const ownDeploy = context && context !== 'production' ? serverEnv('DEPLOY_PRIME_URL') : '';
+  return ownDeploy || serverEnv('URL') || serverEnv('PUBLIC_CANONICAL_ORIGIN') || (import.meta.env.DEV ? requestOrigin : '');
 }
 
 // No SDK retries: the job runner owns retries through fail_course_grading_job,
