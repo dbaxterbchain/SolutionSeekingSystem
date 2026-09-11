@@ -49,8 +49,8 @@ for the 12 Wisdom Principles and the gold ramp meaning "the solution")_
 A one-time-purchase video course with a printable worksheet per module and an AI-assessed
 certification, sold from `/course` and delivered at `/course/learn/`. Design agreed
 **2026-09-09** ([the spec](superpowers/specs/2026-09-09-paid-video-course-design.md)); Phase 1
-was built on branch `course` across five sub-plans, all executed **2026-09-10**. Nothing is
-deployed: `PUBLIC_COURSE_STATUS` defaults to `hidden`, so a merge changes nothing a visitor can
+was built on branch `course` across five sub-plans, all executed **2026-09-10**, and merged to
+`main` through PRs #15 and #16 (**2026-09-11**). Production runs it hidden, so there is nothing a visitor can
 see.
 
 - [x] **1a, foundations** ([plan](superpowers/plans/2026-09-09-course-phase1a-foundations.md)).
@@ -82,9 +82,14 @@ see.
       menu, home, practice, pricing, FAQ, JSON-LD, llms.txt, OG cards) all behind the flag; and
       these docs. Screenshots in [docs/features/course/](features/course/).
 
-**Still to happen, in order.** Push `0030` and `0031` to the hosted project and run the
-advisors. Set the course variables in Netlify, add the two async payment events to the Stripe
-webhook, and upload the stand-in clip so `COURSE.placeholderStreamUid` can be set. Then the
+**Shipped to the hosted stack on 2026-09-11.** `0030` and `0031` are applied to the hosted
+project (all twelve tables and eight functions checked, the advisors showing only the accepted
+twelve rows), the course variables are set in Netlify (the worker secret, the grader model,
+awards off, the launch flag per context, the Stream customer code, and a `course-beta` branch
+context carrying `preview` with the sample form and Stripe test mode), the live webhook carries
+the two async payment events, and the stand-in clip is on Stream with its captions, so
+`COURSE.placeholderStreamUid` is set. Two values were left for David to paste into Netlify:
+`CLOUDFLARE_STREAM_API_TOKEN` and the branch context's test-mode `STRIPE_SECRET_KEY`. Then the
 pilot. The content the code is waiting on is David's (Forms A and B, the workbook explanations,
 the remaining worksheet bodies) and Bradley's (the real recordings, captions and UIDs); until
 the videos exist an `open` build is refused by design, which is the intended behaviour and not

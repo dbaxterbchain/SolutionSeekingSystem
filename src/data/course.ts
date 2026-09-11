@@ -40,7 +40,7 @@ export const COURSE = {
    * that every lesson with `videoPlaceholder: true` and no `streamUid` plays.
    * Null until the clip is uploaded; the lesson then shows a "being filmed" note.
    */
-  placeholderStreamUid: null as string | null,
+  placeholderStreamUid: '07811cf467f0257738287c6a95a5ec10' as string | null,
 } as const;
 
 export type CourseToken =
