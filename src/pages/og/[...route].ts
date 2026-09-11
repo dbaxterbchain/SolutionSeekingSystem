@@ -198,7 +198,7 @@ export const { getStaticPaths, GET } = await OGImageRoute({
     title: page.title,
     description: page.description,
     logo: {
-      // The S mark only — the full logo's wordmark is unreadable at card size.
+      // Only the S mark is used here. The full logo's wordmark is unreadable at card size.
       path: './src/assets/og-logo.png',
       size: [96],
     },

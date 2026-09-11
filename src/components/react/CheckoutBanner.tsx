@@ -4,7 +4,7 @@ import { track } from '../../lib/analytics';
 /**
  * Recovery for an abandoned Stripe checkout. Stripe sends the user back to the
  * page they left from with ?checkout=cancelled; before this, that param was set
- * and then silently ignored — no message, no event, no second chance.
+ * and then silently ignored: no message, no event, no second chance.
  *
  * Mounted once in BaseLayout, so every page is covered.
  */

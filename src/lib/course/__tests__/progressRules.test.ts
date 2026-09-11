@@ -4,7 +4,6 @@ import {
   RESPONSE_MAX,
   applyAction,
   hasPractice,
-  lessonComplete,
   missingForComplete,
   newProgressRow,
   progressView,
@@ -137,16 +136,12 @@ describe('complete', () => {
   it('completes a standard lesson after the full path', () => {
     const row = run('standard', [['studied'], ['save_response', { text: 'answer', expected_revision: 0 }], ['reveal_model'], ['acknowledge'], ['complete']]);
     expect(row.completed_at).toBe(T1.toISOString());
-    expect(lessonComplete(row, 'standard')).toBe(true);
   });
   it('orientation needs studied and acknowledge only', () => {
     expect(missingForComplete(fresh(), 'orientation')).toEqual(['studied', 'acknowledge']);
-    expect(lessonComplete(run('orientation', [['studied'], ['acknowledge'], ['complete']], false), 'orientation')).toBe(true);
   });
   it('plan needs studied, a written response and acknowledge', () => {
     expect(missingForComplete(fresh(), 'plan')).toEqual(['studied', 'response', 'acknowledge']);
-    const row = run('plan', [['studied'], ['save_response', { text: 'my plan', expected_revision: 0 }], ['acknowledge'], ['complete']]);
-    expect(lessonComplete(row, 'plan')).toBe(true);
   });
   it('completing twice keeps the first timestamp and reports no change', () => {
     const row = run('orientation', [['studied'], ['acknowledge'], ['complete']], false);

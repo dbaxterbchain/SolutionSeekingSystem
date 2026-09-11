@@ -95,9 +95,6 @@ export function missingForComplete(row: ProgressRow, kind: LessonKind): MissingS
   return missing;
 }
 
-export const lessonComplete = (row: ProgressRow, kind: LessonKind): boolean =>
-  missingForComplete(row, kind).length === 0;
-
 const fail = (status: 400 | 409, error: string, extra?: Record<string, unknown>): ActionResult => ({
   ok: false,
   status,
