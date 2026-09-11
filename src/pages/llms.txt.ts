@@ -64,8 +64,8 @@ export const GET: APIRoute = async ({ site }) => {
       ? [
           '## Video course (paid)',
           '',
-          `- The Complete Solution Seeking course (syllabus and access): ${abs('/course.md')}`,
-          `- The certification rubric: ${abs('/course/certification.md')}`,
+          `- [The Complete Solution Seeking course](${abs('/course.md')}): syllabus and access`,
+          `- [The certification rubric](${abs('/course/certification.md')}): the six criteria, their weights, the score anchors and the pass rule`,
           '',
         ]
       : []),
