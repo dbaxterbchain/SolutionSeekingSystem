@@ -89,7 +89,8 @@ stale docs, no orphaned pages, no broken prompt cache.
 - [ ] **Assessment forms are private content.** The only module that may read the collection
       is [`src/lib/server/course/forms.ts`](../src/lib/server/course/forms.ts). `npm run check`
       fails on a second reference to it, and on a worker-shared module importing
-      `astro:content`, the env helper, `supabaseAdmin`, the rate limiter or `import.meta.env`.
+      `astro:content`, the env helper, `supabaseAdmin`, the rate limiter, `src/data/course.ts`
+      or `import.meta.env`.
       `npm run build` fails if a reveal, a reference response or a later-stage prompt reaches
       `dist/`. If one of those guards fires, the fix is the import, never the guard.
 - [ ] **A change to a public course surface needs two builds**, one with
@@ -178,8 +179,10 @@ stale docs, no orphaned pages, no broken prompt cache.
       state changes go through the SQL functions in `0031` (`create_course_attempt`,
       `submit_course_attempt`, `claim_course_grading_job`, `finalize_course_grade`,
       `fail_course_grading_job`, `retry_course_grading_job`), which is where the lock tokens
-      and the one-open-attempt rule are enforced. Never add a client policy to a `course_*`
-      table, and never write one of those state transitions from application code.
+      and the one-open-attempt rule are enforced. An access change goes the same way, through
+      `admin_change_course_access` in `0030`, so the row update and its ledger row commit
+      together. Never add a client policy to a `course_*` table, and never write one of those
+      state transitions from application code.
 - [ ] Update TypeScript types that mirror the schema (e.g. `src/lib/chatSessions.ts`).
 
 ## Claims about users, and social proof

@@ -5,7 +5,7 @@ Project documentation for the **Solution Seeking System** website.
 | Doc | What's in it |
 |-----|--------------|
 | [status.md](status.md) | Current project status — what's done, what's in progress, what's next. **Start here.** |
-| [roadmap.md](roadmap.md) | The phased plan (Phase 1 → 3) with detailed scope for each phase. |
+| [roadmap.md](roadmap.md) | The phased plan, Phase 1 through Phase 6, with the scope of each. Phases 1 to 4 are shipped; 5 (subscriber dashboard and specialized assistants) and 6 (the paid video course) are in progress. |
 | [architecture.md](architecture.md) | Tech stack, why we chose it, and how the project is structured. |
 | [content-guide.md](content-guide.md) | How to add or edit teaching content (principles, protocol steps, tools, glossary). |
 | [design-system.md](design-system.md) | Brand tokens, fonts, and the shared UI components. |

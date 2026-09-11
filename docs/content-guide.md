@@ -419,7 +419,10 @@ read it beside this list.
 - Every `required` prompt has a reference response, and every reference response names a real
   prompt.
 - One scoring anchor per criterion at most, and the criterion has to be one of the real ones.
-- `lesson_ids` is non-empty, unique, and every entry is a real lesson id.
+- `lesson_ids` is non-empty, unique, and every entry is a well-formed lesson id. The check is
+  the shape of the id, not whether a lesson stands behind it: an id with no lesson is shown to
+  the learner as the bare id in the revision list on their result, so write ids that name real
+  lessons and check them against the catalog yourself.
 - No em dashes, no en dashes and no unrendered `{{token}}` in any string a learner or the grader
   reads.
 
@@ -440,9 +443,10 @@ the dev path with it.
 
 **The privacy rules, which are enforced rather than trusted:**
 
-- **Never reference the collection outside `src/lib/server/course/forms.ts`.**
-  `scripts/check-private-content.mjs` fails `npm run check` on any other reference to
-  `assessmentForms`, and on any page or component reaching into the forms directory.
+- **Exactly two files may name the collection**: `src/content/config.ts`, which defines it, and
+  `src/lib/server/course/forms.ts`, which reads it. `scripts/check-private-content.mjs` fails
+  `npm run check` on any other reference to `assessmentForms`, and on any page or component
+  reaching into the forms directory.
 - **Never render a form field in a page or an island.** The learner sees only the stages they
   have reached, served from the snapshot frozen onto their attempt, and a later prompt is
   withheld along with its reveal (a prompt like "what will you change" gives away the shape of

@@ -252,7 +252,8 @@ the Stream token store, the grader and the job store.
 
 **The worker-shared subset.** The grading worker is a Netlify function bundled by esbuild
 outside Vite, so anything it reaches must avoid `astro:content`, `import.meta.env`, the env
-helper, `supabaseAdmin` and the rate limiter. `scripts/check-private-content.mjs` walks the
+helper, `supabaseAdmin`, the rate limiter and `src/data/course.ts` (which reads
+`import.meta.env` at module load). `scripts/check-private-content.mjs` walks the
 import closure from `netlify/functions/*.mts` and `gradingJob.ts` inside `npm run check` and
 fails on a violation, so "it worked locally" cannot become a broken bundle in production.
 Worker-shared modules take their configuration and clients as arguments for the same reason.

@@ -838,8 +838,10 @@ One video per lesson. The media baseline and the upload clicks are Bradley's, in
   per-viewer tokens signed locally with a Stream signing key, written up in
   [`streamUrls.ts`](../src/lib/course/streamUrls.ts).
 - Once a UID and the three Stream variables exist, **verify playback on a deploy preview**
-  rather than locally. The poster URL carries the same token, so a wrong customer code shows
-  up as a video that plays and a poster that never appears.
+  rather than locally. A wrong customer code or an invalid token leaves the player empty,
+  because the customer code is the host the embed itself is loaded from
+  ([`streamUrls.ts`](../src/lib/course/streamUrls.ts)). Check the embed URL in the page source
+  against the code in the Stream dashboard before looking anywhere else.
 
 ### Course migrations and advisors
 
@@ -853,6 +855,27 @@ before the deploy that needs them:
 npx supabase db push
 npx supabase migration list     # both must show on remote
 ```
+
+`migration list` only says the file ran. The course puts most of its rules in SQL functions,
+and a function that was never created fails at the first grant or the first submit, in
+production, with a PostgREST error nobody reads until a learner writes in. So prove the
+functions exist and then prove one of them works:
+
+```sql
+select proname from pg_proc where proname like '%course%' order by proname;
+```
+
+Eight names come back: `admin_change_course_access`, `create_course_attempt`,
+`submit_course_attempt`, `claim_course_grading_job`, `finalize_course_grade`,
+`fail_course_grading_job` and `retry_course_grading_job`, which the routes call, plus the
+`course_progress_monotone` trigger function behind `course_progress`. A short list means a
+migration ran against a schema that already had part of it, and the missing function is the
+one to run by hand from the migration file.
+
+Then, on the hosted stack, **grant access to one real account from `/admin` and revoke it
+again.** That exercises `admin_change_course_access`, the ledger insert, the auth admin
+lookup and the service-role grants in one click each, and `course_enrollment_events` shows two
+rows with `actor = admin` afterwards. Grant it back if the account is meant to keep access.
 
 Then run the advisors (Dashboard → **Advisors**, or
 `npx supabase db advisors --linked`). Expect `rls_enabled_no_policy` on every one of the
@@ -913,6 +936,14 @@ this is not a failed attempt, pointing them at course support.
 **Cost** is roughly thirty cents a grade with a warm prompt cache. The second grade of a run
 should show `cache_read_input_tokens` above zero on the job row. If it does not, the cached
 prefix has been broken and every grade is paying the cold price.
+
+**What the rate limits guard is spend, not traffic.** `course_start` and `course_submit` are
+the two limits that matter, because only those two paths can end in a model call.
+`/api/course/progress` deliberately carries none: an autosave is one auth check, one
+enrollment read, one row load and one upsert, so a learner hammering it costs database work
+on a connection they already hold, never grading money. If that ever shows up in the Supabase
+metrics, the answer is a limit tuned to the autosave interval, not a limit copied from the
+assessment paths.
 
 **During the pilot there is one sample form, and one exposure per form per learner.** A
 learner who does not pass and starts again therefore gets the honest "every assessment form
