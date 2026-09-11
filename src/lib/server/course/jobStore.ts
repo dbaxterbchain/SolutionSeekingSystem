@@ -14,11 +14,14 @@ export function supabaseJobStore(client: SupabaseClient): GradingJobStore {
     async claim(jobId, worker, leaseSeconds): Promise<ClaimResult> {
       const { data, error } = await client.rpc('claim_course_grading_job', { p_job: jobId, p_worker: worker, p_lease_seconds: leaseSeconds });
       if (error) throw new Error(`claim failed: ${error.message}`);
-      const r = data as { outcome: string; lock_token?: string; attempt_id?: string; generation?: number; attempts?: number };
+      const r = data as { outcome: string; lock_token?: string; attempt_id?: string; generation?: number; attempts?: number; last_error?: string };
       if (r.outcome === 'claimed' && r.lock_token && r.attempt_id) {
         return { outcome: 'claimed', lockToken: r.lock_token, attemptId: r.attempt_id, generation: r.generation ?? 1, attempts: r.attempts ?? 1 };
       }
-      return { outcome: r.outcome === 'exhausted' ? 'exhausted' : 'unavailable' };
+      if (r.outcome === 'exhausted' && r.attempt_id) {
+        return { outcome: 'exhausted', attemptId: r.attempt_id, error: r.last_error || 'retry budget exhausted', attempts: r.attempts ?? 0 };
+      }
+      return { outcome: 'unavailable' };
     },
 
     async loadContext(attemptId): Promise<JobContext | null> {

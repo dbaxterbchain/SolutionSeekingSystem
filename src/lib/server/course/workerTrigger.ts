@@ -71,10 +71,19 @@ export async function triggerGradingWorker(args: { origin: string; jobId: string
       settings,
     })
       .then((outcome) => {
-        if (outcome.outcome === 'failed')
+        // Exhausted counts as a failure: the claim retired the job without
+        // grading it, so the learner is on grading_error with nobody told.
+        if (outcome.outcome === 'failed' || outcome.outcome === 'exhausted')
           return sendGradingFailureAlert(
             { apiKey: serverEnv('RESEND_API_KEY'), from: serverEnv('EMAIL_FROM'), to: serverEnv('ALERTS_TO') || serverEnv('TEAM_ENQUIRY_TO') || serverEnv('EMAIL_FROM') },
-            { jobId: args.jobId, attemptId: outcome.attemptId, category: outcome.category, error: outcome.error, adminUrl: `${workerOrigin(args.origin) || args.origin}/admin/` }
+            {
+              jobId: args.jobId,
+              attemptId: outcome.attemptId,
+              category: outcome.outcome === 'failed' ? outcome.category : 'retry_budget_exhausted',
+              error: outcome.error,
+              attempts: outcome.attempts,
+              adminUrl: `${workerOrigin(args.origin) || args.origin}/admin/`,
+            }
           );
       })
       .catch((err) => console.error(`grading job ${args.jobId}: inline run failed`, err));

@@ -285,6 +285,11 @@ end $$;
  * by a worker or the sweeper. The default lease of 840 seconds mirrors
  * DEFAULT_LEASE_SECONDS in gradingJob.ts: longer than the 720 seconds one
  * grade is allowed, shorter than the 900 second Netlify background limit.
+ *
+ * A job whose budget is already spent is retired here, and the answer carries
+ * the attempt, the spent count and the last error, because that retirement is
+ * a real failure: the learner is now looking at grading_error, and the runner
+ * turns this answer into the operator's alert.
  */
 create or replace function public.claim_course_grading_job(
   p_job uuid, p_worker text, p_lease_seconds integer default 840
@@ -308,7 +313,9 @@ begin
           last_error = coalesce(last_error, 'retry budget exhausted')
       where id = p_job;
     update public.course_assessment_attempts set state = 'grading_error' where id = v_job.attempt_id;
-    return jsonb_build_object('outcome', 'exhausted');
+    return jsonb_build_object(
+      'outcome', 'exhausted', 'attempt_id', v_job.attempt_id, 'attempts', v_job.attempts,
+      'last_error', coalesce(v_job.last_error, 'retry budget exhausted'));
   end if;
   v_token := gen_random_uuid();
   update public.course_grading_jobs

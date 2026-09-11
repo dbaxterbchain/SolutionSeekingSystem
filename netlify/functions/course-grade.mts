@@ -15,11 +15,24 @@ import { supabaseJobStore } from '../../src/lib/server/course/jobStore';
  * (Functions scope): PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
  * ANTHROPIC_API_KEY, COURSE_WORKER_SECRET, COURSE_AWARDS_ENABLED,
  * COURSE_GRADER_MODEL, and (for the failure alert it sends itself when a job
- * fails for good) RESEND_API_KEY, EMAIL_FROM, ALERTS_TO (or TEAM_ENQUIRY_TO)
- * and URL.
+ * fails for good) RESEND_API_KEY, EMAIL_FROM, ALERTS_TO (or TEAM_ENQUIRY_TO),
+ * URL, DEPLOY_PRIME_URL and CONTEXT.
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const env = (name: string): string => Netlify.env.get(name) ?? '';
+
+/**
+ * Where the alert's "retry it here" link points. Same preference as
+ * workerOrigin() in workerTrigger.ts: on anything but production, the deploy
+ * that is running, so an alert from a deploy preview links to that preview's
+ * admin area rather than sending an operator to production for a job that
+ * exists only on the preview's stack.
+ */
+function adminOrigin(): string {
+  const context = env('CONTEXT');
+  const ownDeploy = context && context !== 'production' ? env('DEPLOY_PRIME_URL') : '';
+  return ownDeploy || env('URL');
+}
 
 function secretMatches(given: string, expected: string): boolean {
   if (!expected) return false;
@@ -57,10 +70,19 @@ export default async (req: Request) => {
     settings: { model, awardsEnabled: env('COURSE_AWARDS_ENABLED') === 'true' },
   });
   console.log(`course-grade: job ${jobId} ${outcome.outcome}`);
-  if (outcome.outcome === 'failed') {
+  // Exhausted is a failure too: the claim retired the job without grading it, so
+  // the learner is on grading_error and nobody has been told yet.
+  if (outcome.outcome === 'failed' || outcome.outcome === 'exhausted') {
     await sendGradingFailureAlert(
       { apiKey: env('RESEND_API_KEY'), from: env('EMAIL_FROM'), to: env('ALERTS_TO') || env('TEAM_ENQUIRY_TO') || env('EMAIL_FROM') },
-      { jobId, attemptId: outcome.attemptId, category: outcome.category, error: outcome.error, adminUrl: `${env('URL')}/admin/` }
+      {
+        jobId,
+        attemptId: outcome.attemptId,
+        category: outcome.outcome === 'failed' ? outcome.category : 'retry_budget_exhausted',
+        error: outcome.error,
+        attempts: outcome.attempts,
+        adminUrl: `${adminOrigin()}/admin/`,
+      }
     );
   }
   return new Response(null, { status: 202 });

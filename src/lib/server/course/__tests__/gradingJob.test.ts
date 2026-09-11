@@ -98,14 +98,25 @@ describe('runGradingJob', () => {
     expect(seen.ctx.allowedLessonIds).toEqual(['v04']);
   });
 
-  it('does nothing when the claim is unavailable or exhausted', async () => {
-    for (const outcome of ['unavailable', 'exhausted'] as const) {
-      const { calls, store } = fakeStore({ claim: { outcome } });
-      const g = grader(okOutcome);
-      expect(await runGradingJob({ jobId: 'job-1', worker: 'w1', store, grade: g.grade, settings, log: () => {} })).toEqual({ outcome });
-      expect(calls.map((c) => c.name)).toEqual(['claim']);
-      expect(g.seen).toHaveLength(0);
-    }
+  it('does nothing when the claim is unavailable', async () => {
+    const { calls, store } = fakeStore({ claim: { outcome: 'unavailable' } });
+    const g = grader(okOutcome);
+    expect(await runGradingJob({ jobId: 'job-1', worker: 'w1', store, grade: g.grade, settings, log: () => {} })).toEqual({ outcome: 'unavailable' });
+    expect(calls.map((c) => c.name)).toEqual(['claim']);
+    expect(g.seen).toHaveLength(0);
+  });
+
+  it('hands an exhausted claim back whole, so the caller can alert an operator', async () => {
+    const { calls, store } = fakeStore({ claim: { outcome: 'exhausted', attemptId: 'att-1', error: 'upstream said no', attempts: 3 } });
+    const g = grader(okOutcome);
+    expect(await runGradingJob({ jobId: 'job-1', worker: 'w1', store, grade: g.grade, settings, log: () => {} })).toEqual({
+      outcome: 'exhausted',
+      attemptId: 'att-1',
+      error: 'upstream said no',
+      attempts: 3,
+    });
+    expect(calls.map((c) => c.name)).toEqual(['claim']);
+    expect(g.seen).toHaveLength(0);
   });
 
   it('fails with integrity, not retryable, when the stored hash does not match', async () => {

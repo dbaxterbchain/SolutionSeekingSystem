@@ -36,7 +36,9 @@ export interface JobContext {
 }
 export type ClaimResult =
   | { outcome: 'claimed'; lockToken: string; attemptId: string; generation: number; attempts: number }
-  | { outcome: 'unavailable' | 'exhausted' };
+  /** The budget was already spent, so the claim retired the job. A real failure: an alert follows. */
+  | { outcome: 'exhausted'; attemptId: string; error: string; attempts: number }
+  | { outcome: 'unavailable' };
 export interface GradingJobStore {
   claim(jobId: string, worker: string, leaseSeconds: number): Promise<ClaimResult>;
   loadContext(attemptId: string): Promise<JobContext | null>;
@@ -62,8 +64,9 @@ export interface RunSettings {
 export type Grader = (input: GradingInput, ctx: ValidationContext) => Promise<GradeOutcome>;
 export type RunOutcome =
   | { outcome: 'finalized'; passed: boolean }
-  | { outcome: 'unavailable' | 'exhausted' | 'stale' }
-  | { outcome: 'requeued' | 'failed'; category: ErrorCategory; attemptId: string; error: string };
+  | { outcome: 'unavailable' | 'stale' }
+  | { outcome: 'exhausted'; attemptId: string; error: string; attempts: number }
+  | { outcome: 'requeued' | 'failed'; category: ErrorCategory; attemptId: string; error: string; attempts: number };
 /**
  * Longer than the grader's own budget (GRADER_BUDGET_MS, 720 seconds) and
  * shorter than the Netlify background limit of 900 seconds, so a worker still
@@ -84,6 +87,13 @@ export async function runGradingJob(args: {
   const log = args.log ?? ((message: string, extra?: unknown) => console.log(message, extra ?? ''));
 
   const claim = await store.claim(jobId, worker, settings.leaseSeconds ?? DEFAULT_LEASE_SECONDS);
+  // Exhausted is handed back whole rather than as a bare outcome: the claim has
+  // just retired the job and left the learner on grading_error, so the caller
+  // needs the attempt and the last error to alert an operator.
+  if (claim.outcome === 'exhausted') {
+    log(`grading job ${jobId}: exhausted`, claim.error);
+    return { outcome: 'exhausted', attemptId: claim.attemptId, error: claim.error, attempts: claim.attempts };
+  }
   if (claim.outcome !== 'claimed') {
     log(`grading job ${jobId}: ${claim.outcome}`);
     return { outcome: claim.outcome };
@@ -91,7 +101,9 @@ export async function runGradingJob(args: {
   const fail = async (category: ErrorCategory, error: string, retryable: boolean): Promise<RunOutcome> => {
     const result = await store.fail({ jobId, lockToken: claim.lockToken, category, error, retryable });
     log(`grading job ${jobId}: ${category} (${result})`, error);
-    return result === 'stale' ? { outcome: 'stale' } : { outcome: result, category, attemptId: claim.attemptId, error };
+    return result === 'stale'
+      ? { outcome: 'stale' }
+      : { outcome: result, category, attemptId: claim.attemptId, error, attempts: claim.attempts };
   };
 
   let ctx: JobContext | null;

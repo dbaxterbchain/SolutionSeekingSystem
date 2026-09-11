@@ -12,6 +12,8 @@ export interface GradingFailure {
   attemptId: string;
   category: string;
   error: string;
+  /** Which try this was. It goes into the idempotency key, so a retry alerts again. */
+  attempts: number;
   adminUrl: string;
 }
 
@@ -38,7 +40,12 @@ export interface AlertConfig {
   to: string;
 }
 
-/** Send the alert once per job (an idempotency key keeps a retried worker from sending it twice). Never throws. */
+/**
+ * Send the alert once per try. The idempotency key carries the attempt count as
+ * well as the job id, so a worker that runs the same try twice still sends one
+ * email, while a job an admin retried and that failed again sends its own alert
+ * rather than being swallowed as a duplicate of the first. Never throws.
+ */
 export async function sendGradingFailureAlert(config: AlertConfig, f: GradingFailure): Promise<boolean> {
   if (!config.apiKey || !config.from || !config.to) {
     console.error(`grading job ${f.jobId}: failure alert not sent (RESEND_API_KEY, EMAIL_FROM or ALERTS_TO unset)`);
@@ -48,7 +55,7 @@ export async function sendGradingFailureAlert(config: AlertConfig, f: GradingFai
     const mail = gradingFailureEmail(f);
     const { error } = await new Resend(config.apiKey).emails.send(
       { from: config.from, to: config.to, subject: mail.subject, text: mail.text },
-      { idempotencyKey: `course-grading-failed/${f.jobId}` }
+      { idempotencyKey: `course-grading-failed/${f.jobId}/${f.attempts}` }
     );
     if (error) {
       console.error(`grading job ${f.jobId}: failure alert rejected`, error);
