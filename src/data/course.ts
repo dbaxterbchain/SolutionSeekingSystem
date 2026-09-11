@@ -21,6 +21,8 @@ export const COURSE = {
   navLabel: 'Video course',
   presenter: 'David Baxter',
   learnerHours: '10-12',
+  /** The top of that range, on its own because the JSON-LD workload reads a number. */
+  learnerHoursMax: 12,
   suggestedWeeks: 6,
   /** Asserted against the content collections at build time. */
   plan: { modules: 9, lessons: 40 },

@@ -6,7 +6,7 @@ import { PLANS } from '../../data/pricing';
 import { getCourseCatalog } from '../../lib/course/catalog';
 import { hasShell } from '../../lib/course/visibility';
 import { COURSE, COURSE_STATUS } from '../../data/course';
-import { CERTIFICATION_TITLE } from '../../data/certification';
+import { CERTIFICATION_TITLE, CRITERIA_COUNT_WORD } from '../../data/certification';
 
 /**
  * Generated 1200×630 social-share cards, one per page. Route keys mirror page
@@ -133,7 +133,7 @@ const pages: Record<string, OgPage> = {
         },
         'course/certification': {
           title: CERTIFICATION_TITLE,
-          description: 'The six criteria, their weights, the score anchors and the pass rule.',
+          description: `The ${CRITERIA_COUNT_WORD} criteria, their weights, the score anchors and the pass rule.`,
         },
       }
     : {}),

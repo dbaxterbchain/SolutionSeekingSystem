@@ -72,7 +72,7 @@ const schemas = [
     name: COURSE.title,
     description,
     presenter: COURSE.presenter,
-    workloadHours: Number(COURSE.learnerHours.split('-').pop()),
+    workloadHours: COURSE.learnerHoursMax,
     sections: curriculum.modules.map((m) => ({ name: m.title, lessons: m.lessons.map((l) => l.title) })),
     credential: CERTIFICATION_TITLE,
     offer: COURSE_STATUS === 'open' && COURSE_PRICE ? { price: String(COURSE_PRICE.priceAmount), currency: COURSE_PRICE.currency } : null,

@@ -10,6 +10,7 @@ import {
   PASS_TOTAL,
   SCORE_ANCHORS,
 } from '../data/certification';
+import { COVERAGE_CAP, MISCONCEPTION_CAP } from './server/course/rubric';
 import type { PublicCurriculum } from './course/curriculum';
 
 /**
@@ -267,7 +268,7 @@ export function certificationToMarkdown(site: URL | undefined): string {
     '',
     '## Passing',
     '',
-    `A weighted total of at least ${PASS_TOTAL} out of 100 with every criterion at ${PASS_MIN_CRITERION} or more. A missing or misapplied Wisdom Principle or Leadership Tool caps its criterion at 2, as does a material misconception.`,
+    `A weighted total of at least ${PASS_TOTAL} out of 100 with every criterion at ${PASS_MIN_CRITERION} or more. A missing or misapplied Wisdom Principle or Leadership Tool caps its criterion at ${COVERAGE_CAP}, and a material misconception caps the criterion it names at ${MISCONCEPTION_CAP}.`,
     '',
     `Course page: ${link('/course')}`,
   ].join('\n');

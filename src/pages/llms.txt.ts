@@ -4,6 +4,7 @@ import { protocolSteps, systemDefinition } from '../data/concepts';
 import { MODES } from '../data/modes';
 import { PLANS, FREE_ANON_MESSAGES, FREE_ACCOUNT_MESSAGES } from '../data/pricing';
 import { COURSE_STATUS } from '../data/course';
+import { CRITERIA_COUNT_WORD } from '../data/certification';
 
 export const prerender = true;
 
@@ -65,7 +66,7 @@ export const GET: APIRoute = async ({ site }) => {
           '## Video course (paid)',
           '',
           `- [The Complete Solution Seeking course](${abs('/course.md')}): syllabus and access`,
-          `- [The certification rubric](${abs('/course/certification.md')}): the six criteria, their weights, the score anchors and the pass rule`,
+          `- [The certification rubric](${abs('/course/certification.md')}): the ${CRITERIA_COUNT_WORD} criteria, their weights, the score anchors and the pass rule`,
           '',
         ]
       : []),

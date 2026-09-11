@@ -8,10 +8,12 @@ import {
   CERTIFICATION_TITLE,
   CERTIFICATION_VERSION,
   CRITERIA,
+  CRITERIA_COUNT_WORD,
   PASS_MIN_CRITERION,
   PASS_TOTAL,
   SCORE_ANCHORS,
 } from '../../data/certification';
+import { COVERAGE_CAP, MISCONCEPTION_CAP } from '../../lib/server/course/rubric';
 
 /**
  * The public certification rubric. Prerendered like the sales page; there is
@@ -36,7 +38,7 @@ const schemas = [
 
 <BaseLayout
   title={CERTIFICATION_TITLE}
-  description="How the Solution Seeking System Certification is assessed: the six criteria, their weights, the score anchors and the pass rule."
+  description={`How the Solution Seeking System Certification is assessed: the ${CRITERIA_COUNT_WORD} criteria, their weights, the score anchors and the pass rule.`}
   schemas={schemas}
   markdownAlt="/course/certification.md"
 >
@@ -108,8 +110,9 @@ const schemas = [
       <h2 class="text-3xl font-bold text-ink-800">What it takes to pass</h2>
       <p class="mt-4 text-slate-600">
         A weighted total of at least {PASS_TOTAL} out of 100, with every criterion at {PASS_MIN_CRITERION} or
-        more. A Wisdom Principle or a Leadership Tool that is missing or misapplied caps its criterion at 2,
-        and so does a material misconception, so a strong total cannot carry a weak criterion.
+        more. A Wisdom Principle or a Leadership Tool that is missing or misapplied caps its
+        criterion at {COVERAGE_CAP}, and a material misconception caps the criterion it names
+        at {MISCONCEPTION_CAP}, so a strong total cannot carry a weak criterion.
       </p>
     </section>
 
