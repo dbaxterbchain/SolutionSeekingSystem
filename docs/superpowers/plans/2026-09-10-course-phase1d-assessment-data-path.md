@@ -5285,6 +5285,30 @@ Run by the controller, not a subagent: it spends real API money (about $0.30 per
 
 Clean up: delete every test attempt; keep the learner's enrollment; restore `.env.local` to `ADMIN_EMAILS=course-admin@example.com` and remove the grader lines; stop the dev server by PID.
 
+## Execution record (2026-09-10)
+
+Executed with subagent-driven development: ten build tasks in eleven commits from `0037a82` to `36237f1`, every task reviewed and approved, two fix rounds on the assessment island (`643b367`, `23e407a`), a whole-branch review that found no Critical issue, and one fix wave of five commits (`fcddddf` to `83d5d9d`). Amendments the reviews forced on this plan, now in the code:
+
+- The island's grading poll is an interval cleared on cleanup (the plan's single re-armed timeout stopped once the state stopped changing), and the save machinery keeps its truth in synchronous refs (the latest server revision, the dirty text and the pending save per prompt) so a flush cannot proceed on a stale snapshot and a save that settles never overwrites newer typing. Textareas are disabled while an advance or a submit is in flight.
+- The time budgets nest: one model call is at most 300 s with no SDK retries, a grade makes at most two calls inside a 720 s budget with a deadline check before any extra call, the lease is 840 s (code, SQL default and sweeper), and the Netlify background budget is 900 s.
+- `submit` validates only prompts the learner can still edit; a locked response is scored as it stands, and the island shows an `incomplete` problem on read-only prompts too.
+- The worker is called at the running deploy's own address (`DEPLOY_PRIME_URL` outside the production context, else `URL`, else `PUBLIC_CANONICAL_ORIGIN`), never at the request's origin outside `astro dev`.
+- The grading_error panel leads with course support; the operator alert on a failed job is with 1e.
+- The rate limit is charged after the open-attempt and same-key short-circuits; `decide` records the rubric version the attempt was graded against; a capped criterion says why; `retry_course_grading_job` clears the failed run's fields; a missing source pack fails with its own message.
+
+Live verification (Task 11) on 2026-09-10: a real pass (100) and a real not-yet (0) from claude-opus-5 with verbatim quotes and lesson titles, a prompt-cache hit on the second grade (25917 tokens read), the dead-worker recovery with `attempts = 2`, one grade and a stale refusal for the old token, a failed job retried from the admin tab, two parallel submits producing one job with the same-key replay answering 200 and the other key 409, cross-account 404s, and a full browser walk (autosave, reload, the lock dialog, the reveals only after their advance, live polling to the result, `assessment_submitted` and `grade_ready` once each) at 1280 and 390. Screenshots are in `.playwright-mcp/` for 1e to curate.
+
+Carried forward:
+
+1. Operator alert email when a grading job ends `failed`, and the grading runbook (retry, kick, the lease and sweeper story) in `deployment.md` (1e).
+2. The retake gap during the pilot: one sample form and `MAX_EXPOSURES_PER_FORM = 1` mean a not-yet learner who starts again gets `no_forms_available`; support needs to know until Phase 3 adds Forms A and B.
+3. `content-guide.md` needs the assessment form format (the one content type an author cannot see rendered); the Zod and `checkForm` messages are the only reference today (1e).
+4. `docs/features/course/` screenshots and README (1e).
+5. Server-side refusal fallbacks and per-call spend logging for the grader, decided with the Phase 3 benchmark.
+6. The `revisions` ref is not advanced inside the conflict branch (an autosave retry re-conflicts until the learner chooses), the conflict buttons are not busy-gated, and the island's refs are never pruned; none loses text.
+7. The closure lint follows relative specifiers only; worker-shared code must not use the `@/` alias.
+8. `chooseForm`'s tie-break and `store.fail` returning `stale` are untested; `jobStore.ts` is exercised live only.
+
 ## Handoff
 
 Sub-plan 1e consumes: the hosted push of `0030` and `0031` with the advisors run (the twelve `rls_enabled_no_policy` findings are the accepted pattern) and the publishable-key probes on every new table; the Netlify env vars `COURSE_WORKER_SECRET` (Functions and Builds), `COURSE_GRADER_MODE=worker`, `COURSE_GRADER_MODEL`, `COURSE_AWARDS_ENABLED=false`, `COURSE_SAMPLE_FORMS` (`true` only on the course-beta context) plus `ANTHROPIC_API_KEY`, `PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in Functions scope; the deploy-preview check of the worker (a POST without the secret leaves the job untouched and logs `course-grade: refused`; with the secret the job finalizes) and of the sweeper; `/api/admin/course` for the enrollment actions; the docs (`deployment.md` env table and the grading runbook with retry and kick, `content-guide.md` "Assessment forms" for David's Forms A and B, `status.md`); the GTM and GA4 registration of `assessment_submitted`, `grade_ready` and `grading_error`. Phase 3 consumes: the `list` and `review` actions, certificates and `issue_pending`, the result emails keyed `course-result/<job>-<generation>`, the benchmark script against `grader.ts`, `decision.ts` and `gradeValidation.ts`, and the review queue's single `snapshot_private` read.
