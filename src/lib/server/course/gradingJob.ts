@@ -63,7 +63,7 @@ export type Grader = (input: GradingInput, ctx: ValidationContext) => Promise<Gr
 export type RunOutcome =
   | { outcome: 'finalized'; passed: boolean }
   | { outcome: 'unavailable' | 'exhausted' | 'stale' }
-  | { outcome: 'requeued' | 'failed'; category: ErrorCategory };
+  | { outcome: 'requeued' | 'failed'; category: ErrorCategory; attemptId: string; error: string };
 /**
  * Longer than the grader's own budget (GRADER_BUDGET_MS, 720 seconds) and
  * shorter than the Netlify background limit of 900 seconds, so a worker still
@@ -91,7 +91,7 @@ export async function runGradingJob(args: {
   const fail = async (category: ErrorCategory, error: string, retryable: boolean): Promise<RunOutcome> => {
     const result = await store.fail({ jobId, lockToken: claim.lockToken, category, error, retryable });
     log(`grading job ${jobId}: ${category} (${result})`, error);
-    return result === 'stale' ? { outcome: 'stale' } : { outcome: result, category };
+    return result === 'stale' ? { outcome: 'stale' } : { outcome: result, category, attemptId: claim.attemptId, error };
   };
 
   let ctx: JobContext | null;

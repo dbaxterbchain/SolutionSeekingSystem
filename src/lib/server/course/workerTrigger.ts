@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { serverEnv } from '../env';
 import { supabaseAdmin } from '../supabaseAdmin';
+import { sendGradingFailureAlert } from './gradingAlert';
 import { GRADER_CALL_TIMEOUT_MS, gradeAttempt } from './grader';
 import { runGradingJob } from './gradingJob';
 import { supabaseJobStore } from './jobStore';
@@ -68,7 +69,15 @@ export async function triggerGradingWorker(args: { origin: string; jobId: string
       store: supabaseJobStore(supabaseAdmin),
       grade: (input, ctx) => gradeAttempt({ anthropic: getAnthropic(), input, ctx, settings: { model: settings.model } }),
       settings,
-    }).catch((err) => console.error(`grading job ${args.jobId}: inline run failed`, err));
+    })
+      .then((outcome) => {
+        if (outcome.outcome === 'failed')
+          return sendGradingFailureAlert(
+            { apiKey: serverEnv('RESEND_API_KEY'), from: serverEnv('EMAIL_FROM'), to: serverEnv('ALERTS_TO') || serverEnv('TEAM_ENQUIRY_TO') || serverEnv('EMAIL_FROM') },
+            { jobId: args.jobId, attemptId: outcome.attemptId, category: outcome.category, error: outcome.error, adminUrl: `${workerOrigin(args.origin) || args.origin}/admin/` }
+          );
+      })
+      .catch((err) => console.error(`grading job ${args.jobId}: inline run failed`, err));
     return;
   }
   const secret = serverEnv('COURSE_WORKER_SECRET');

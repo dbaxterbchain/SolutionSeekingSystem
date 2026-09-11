@@ -112,7 +112,7 @@ describe('runGradingJob', () => {
     const { calls, store } = fakeStore({ context: context({ submission_hash: 'deadbeef' }) });
     const g = grader(okOutcome);
     const r = await runGradingJob({ jobId: 'job-1', worker: 'w1', store, grade: g.grade, settings, log: () => {} });
-    expect(r).toEqual({ outcome: 'failed', category: 'integrity' });
+    expect(r).toMatchObject({ outcome: 'failed', category: 'integrity', attemptId: 'att-1' });
     expect(calls[2]).toMatchObject({ name: 'fail', args: { category: 'integrity', retryable: false, lockToken: 'tok-1' } });
     expect(g.seen).toHaveLength(0);
   });
@@ -121,14 +121,14 @@ describe('runGradingJob', () => {
     const { calls, store } = fakeStore();
     const g = grader({ ok: false, category: 'rate_limited', retryable: true, message: 'slow down', raw: null, usage: okOutcome.ok ? okOutcome.usage : (undefined as never) });
     const r = await runGradingJob({ jobId: 'job-1', worker: 'w1', store, grade: g.grade, settings, log: () => {} });
-    expect(r).toEqual({ outcome: 'requeued', category: 'rate_limited' });
+    expect(r).toMatchObject({ outcome: 'requeued', category: 'rate_limited' });
     expect(calls[2]).toMatchObject({ name: 'fail', args: { category: 'rate_limited', retryable: true, error: 'slow down' } });
   });
 
   it('turns a thrown grader into internal, not retryable', async () => {
     const { store } = fakeStore();
     const g = grader(new Error('kaboom'));
-    expect(await runGradingJob({ jobId: 'job-1', worker: 'w1', store, grade: g.grade, settings, log: () => {} })).toEqual({ outcome: 'failed', category: 'internal' });
+    expect(await runGradingJob({ jobId: 'job-1', worker: 'w1', store, grade: g.grade, settings, log: () => {} })).toMatchObject({ outcome: 'failed', category: 'internal' });
   });
 
   it('reports stale when another worker finished first', async () => {
@@ -140,7 +140,7 @@ describe('runGradingJob', () => {
   it('fails internal, not retryable, when the attempt context is missing', async () => {
     const { calls, store } = fakeStore({ context: null });
     const g = grader(okOutcome);
-    expect(await runGradingJob({ jobId: 'job-1', worker: 'w1', store, grade: g.grade, settings, log: () => {} })).toEqual({ outcome: 'failed', category: 'internal' });
+    expect(await runGradingJob({ jobId: 'job-1', worker: 'w1', store, grade: g.grade, settings, log: () => {} })).toMatchObject({ outcome: 'failed', category: 'internal' });
     expect(calls[2]).toMatchObject({ name: 'fail', args: { retryable: false } });
   });
 });

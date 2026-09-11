@@ -3,6 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { GRADER_CALL_TIMEOUT_MS, gradeAttempt } from '../../src/lib/server/course/grader';
+import { sendGradingFailureAlert } from '../../src/lib/server/course/gradingAlert';
 import { runGradingJob } from '../../src/lib/server/course/gradingJob';
 import { supabaseJobStore } from '../../src/lib/server/course/jobStore';
 
@@ -13,7 +14,9 @@ import { supabaseJobStore } from '../../src/lib/server/course/jobStore';
  * as a status code the caller sees. Reads its configuration from Netlify.env
  * (Functions scope): PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
  * ANTHROPIC_API_KEY, COURSE_WORKER_SECRET, COURSE_AWARDS_ENABLED,
- * COURSE_GRADER_MODEL.
+ * COURSE_GRADER_MODEL, and (for the failure alert it sends itself when a job
+ * fails for good) RESEND_API_KEY, EMAIL_FROM, ALERTS_TO (or TEAM_ENQUIRY_TO)
+ * and URL.
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const env = (name: string): string => Netlify.env.get(name) ?? '';
@@ -54,6 +57,12 @@ export default async (req: Request) => {
     settings: { model, awardsEnabled: env('COURSE_AWARDS_ENABLED') === 'true' },
   });
   console.log(`course-grade: job ${jobId} ${outcome.outcome}`);
+  if (outcome.outcome === 'failed') {
+    await sendGradingFailureAlert(
+      { apiKey: env('RESEND_API_KEY'), from: env('EMAIL_FROM'), to: env('ALERTS_TO') || env('TEAM_ENQUIRY_TO') || env('EMAIL_FROM') },
+      { jobId, attemptId: outcome.attemptId, category: outcome.category, error: outcome.error, adminUrl: `${env('URL')}/admin/` }
+    );
+  }
   return new Response(null, { status: 202 });
 };
 
