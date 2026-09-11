@@ -165,6 +165,62 @@ grant select, insert, update, delete on public.course_progress          to servi
 grant select, insert                 on public.course_check_attempts    to service_role;
 grant select, insert, update, delete on public.course_stream_tokens     to service_role;
 
+/*
+ * Access changes made from /admin. The row update and the ledger row commit
+ * together, so an audit row can never be missing for a change that took
+ * effect. p_action is grant, revoke, refund or reinstate; the outcome names
+ * the ledger kind that was written, or why nothing was.
+ */
+create or replace function public.admin_change_course_access(
+  p_user uuid, p_course text, p_admin uuid, p_action text, p_note text
+) returns jsonb
+language plpgsql security invoker set search_path = '' as $$
+declare
+  v_row public.course_enrollments%rowtype;
+  v_kind text;
+begin
+  if p_action not in ('grant', 'revoke', 'refund', 'reinstate') then
+    return jsonb_build_object('outcome', 'invalid');
+  end if;
+  select * into v_row from public.course_enrollments
+    where user_id = p_user and course_id = p_course for update;
+  if p_action = 'grant' then
+    if found and v_row.status = 'enrolled' then
+      return jsonb_build_object('outcome', 'already_enrolled');
+    end if;
+    if found then
+      update public.course_enrollments
+        set status = 'enrolled', access_starts_at = now(), access_ends_at = null
+        where id = v_row.id returning * into v_row;
+      v_kind := 'reinstated';
+    else
+      insert into public.course_enrollments (user_id, course_id, status, source, access_starts_at)
+        values (p_user, p_course, 'enrolled', 'admin', now()) returning * into v_row;
+      v_kind := 'admin_granted';
+    end if;
+  elsif p_action in ('revoke', 'refund') then
+    if not found or v_row.status <> 'enrolled' then
+      return jsonb_build_object('outcome', 'not_enrolled');
+    end if;
+    v_kind := case when p_action = 'revoke' then 'revoked' else 'refunded' end;
+    update public.course_enrollments set status = v_kind, access_ends_at = now()
+      where id = v_row.id returning * into v_row;
+  else
+    if not found or v_row.status = 'enrolled' then
+      return jsonb_build_object('outcome', 'not_inactive');
+    end if;
+    update public.course_enrollments set status = 'enrolled', access_ends_at = null
+      where id = v_row.id returning * into v_row;
+    v_kind := 'reinstated';
+  end if;
+  insert into public.course_enrollment_events
+    (enrollment_id, user_id, course_id, kind, actor, actor_user_id, note)
+    values (v_row.id, v_row.user_id, v_row.course_id, v_kind, 'admin', p_admin, p_note);
+  return jsonb_build_object('outcome', v_kind, 'enrollment', to_jsonb(v_row));
+end $$;
+revoke execute on function public.admin_change_course_access(uuid, text, uuid, text, text) from public, anon, authenticated;
+grant  execute on function public.admin_change_course_access(uuid, text, uuid, text, text) to service_role;
+
 -- Each `generated always as identity` column above (course_enrollment_events.id,
 -- course_check_attempts.id) creates a sequence in `public`. Migration 0010's
 -- revoke and default-privileges change covered tables only, and 0030 is the

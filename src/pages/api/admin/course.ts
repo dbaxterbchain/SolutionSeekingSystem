@@ -2,13 +2,7 @@ import type { APIRoute } from 'astro';
 import { adminJson, requireAdmin } from '../../../lib/server/adminAuth';
 import { supabaseAdmin } from '../../../lib/server/supabaseAdmin';
 import { triggerGradingWorker } from '../../../lib/server/course/workerTrigger';
-import {
-  findUserByEmail,
-  grantEnrollment,
-  listEnrollments,
-  reinstateEnrollment,
-  setEnrollmentStatus,
-} from '../../../lib/server/course/adminEnrollment';
+import { changeCourseAccess, findUserByEmail, listEnrollments } from '../../../lib/server/course/adminEnrollment';
 
 export const prerender = false;
 
@@ -129,7 +123,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     let outcome;
     try {
-      outcome = await grantEnrollment(account.id, admin, note);
+      outcome = await changeCourseAccess(account.id, 'grant', admin, note);
     } catch (err) {
       console.error('admin grant failed', err);
       return adminJson({ error: 'server_error' }, 500);
@@ -152,7 +146,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     let outcome;
     try {
-      outcome = await setEnrollmentStatus(userId, action === 'revoke' ? 'revoked' : 'refunded', admin, note);
+      outcome = await changeCourseAccess(userId, action, admin, note);
     } catch (err) {
       console.error(`admin ${action} failed`, err);
       return adminJson({ error: 'server_error' }, 500);
@@ -173,7 +167,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     let outcome;
     try {
-      outcome = await reinstateEnrollment(userId, admin, note);
+      outcome = await changeCourseAccess(userId, 'reinstate', admin, note);
     } catch (err) {
       console.error('admin reinstate failed', err);
       return adminJson({ error: 'server_error' }, 500);
