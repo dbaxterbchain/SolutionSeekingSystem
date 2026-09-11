@@ -170,6 +170,11 @@ grant select, insert, update, delete on public.course_stream_tokens     to servi
  * together, so an audit row can never be missing for a change that took
  * effect. p_action is grant, revoke, refund or reinstate; the outcome names
  * the ledger kind that was written, or why nothing was.
+ *
+ * Revoke needs an enrolled row, because there is nothing to take away twice.
+ * Refund accepts a revoked row as well: ending access and moving the money
+ * back are two separate acts, often days apart, and the usual order is the
+ * revoke first. Only a row already recorded as refunded refuses.
  */
 create or replace function public.admin_change_course_access(
   p_user uuid, p_course text, p_admin uuid, p_action text, p_note text
@@ -198,13 +203,26 @@ begin
         values (p_user, p_course, 'enrolled', 'admin', now()) returning * into v_row;
       v_kind := 'admin_granted';
     end if;
-  elsif p_action in ('revoke', 'refund') then
+  elsif p_action = 'revoke' then
     if not found or v_row.status <> 'enrolled' then
       return jsonb_build_object('outcome', 'not_enrolled');
     end if;
-    v_kind := case when p_action = 'revoke' then 'revoked' else 'refunded' end;
-    update public.course_enrollments set status = v_kind, access_ends_at = now()
+    update public.course_enrollments set status = 'revoked', access_ends_at = now()
       where id = v_row.id returning * into v_row;
+    v_kind := 'revoked';
+  elsif p_action = 'refund' then
+    if not found then
+      return jsonb_build_object('outcome', 'not_enrolled');
+    end if;
+    if v_row.status = 'refunded' then
+      return jsonb_build_object('outcome', 'already_refunded');
+    end if;
+    -- A refund after a revoke keeps the date access actually ended, rather than
+    -- restamping it with the day the money moved.
+    update public.course_enrollments
+      set status = 'refunded', access_ends_at = coalesce(access_ends_at, now())
+      where id = v_row.id returning * into v_row;
+    v_kind := 'refunded';
   else
     if not found or v_row.status = 'enrolled' then
       return jsonb_build_object('outcome', 'not_inactive');

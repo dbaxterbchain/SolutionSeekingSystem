@@ -18,6 +18,22 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const JOB_COLUMNS =
   'id, attempt_id, generation, state, reason, attempts, max_attempts, error_category, last_error, model, locked_by, locked_at, created_at, updated_at' as const;
 
+/**
+ * What the operator reads when an action is refused. A code with no message
+ * reaches the admin view as "Something went wrong", which is true and useless,
+ * so every refusal this route can answer has a sentence of its own here.
+ */
+const MESSAGES: Record<string, string> = {
+  invalid: 'That request was not understood.',
+  anonymous_account: 'That account has no email address yet, so it cannot be granted access.',
+  user_not_found: 'No account with that email. The learner creates the account first; then you grant access.',
+  already_enrolled: 'That account already has access.',
+  not_enrolled: 'That account does not have access right now.',
+  not_inactive: 'That account already has access.',
+  already_refunded: 'That account is already recorded as refunded.',
+};
+const deny = (error: string, status: number): Response => adminJson({ error, message: MESSAGES[error] }, status);
+
 export const GET: APIRoute = async ({ request }) => {
   const admin = await requireAdmin(request);
   if (!admin) return adminJson({ error: 'forbidden' }, 403);
@@ -31,7 +47,7 @@ export const GET: APIRoute = async ({ request }) => {
       return adminJson({ error: 'server_error' }, 500);
     }
   }
-  if (view !== 'grading') return adminJson({ error: 'invalid' }, 400);
+  if (view !== 'grading') return deny('invalid', 400);
 
   const { data: jobs, error } = await supabaseAdmin.from('course_grading_jobs').select(JOB_COLUMNS).order('updated_at', { ascending: false }).limit(100);
   if (error) {
@@ -72,7 +88,7 @@ export const POST: APIRoute = async ({ request }) => {
   // reinstate each key off a different field, and none of them carries job_id.
   if (action === 'retry_job' || action === 'kick_job') {
     const jobId = typeof body?.job_id === 'string' ? body.job_id : '';
-    if (!UUID_RE.test(jobId)) return adminJson({ error: 'invalid' }, 400);
+    if (!UUID_RE.test(jobId)) return deny('invalid', 400);
 
     if (action === 'retry_job') {
       const { data, error } = await supabaseAdmin.rpc('retry_course_grading_job', { p_job: jobId, p_admin: admin.id });
@@ -94,10 +110,10 @@ export const POST: APIRoute = async ({ request }) => {
 
   if (action === 'grant') {
     const email = typeof body?.email === 'string' ? body.email : '';
-    if (!EMAIL_RE.test(email)) return adminJson({ error: 'invalid' }, 400);
+    if (!EMAIL_RE.test(email)) return deny('invalid', 400);
     const rawNote = body?.note;
     if (rawNote !== undefined && rawNote !== null && (typeof rawNote !== 'string' || rawNote.length > 500)) {
-      return adminJson({ error: 'invalid' }, 400);
+      return deny('invalid', 400);
     }
     const note = typeof rawNote === 'string' ? rawNote : null;
 
@@ -108,18 +124,8 @@ export const POST: APIRoute = async ({ request }) => {
       console.error('admin grant lookup failed', err);
       return adminJson({ error: 'server_error' }, 500);
     }
-    if (!account) {
-      return adminJson(
-        {
-          error: 'user_not_found',
-          message: 'No account with that email. The learner creates the account first; then you grant access.',
-        },
-        404
-      );
-    }
-    if (account.is_anonymous === true || !account.email) {
-      return adminJson({ error: 'anonymous_account' }, 400);
-    }
+    if (!account) return deny('user_not_found', 404);
+    if (account.is_anonymous === true || !account.email) return deny('anonymous_account', 400);
 
     let outcome;
     try {
@@ -128,19 +134,17 @@ export const POST: APIRoute = async ({ request }) => {
       console.error('admin grant failed', err);
       return adminJson({ error: 'server_error' }, 500);
     }
-    if (!outcome.ok) {
-      return adminJson({ error: 'already_enrolled', message: 'That account already has access.' }, 409);
-    }
+    if (!outcome.ok) return deny(outcome.error, 409);
     console.log('admin action', admin.email, action, account.id, note ?? '');
     return adminJson({ ok: true, enrollment: outcome.enrollment });
   }
 
-  if (action === 'revoke' || action === 'refund') {
+  if (action === 'revoke' || action === 'refund' || action === 'reinstate') {
     const userId = typeof body?.user_id === 'string' ? body.user_id : '';
-    if (!UUID_RE.test(userId)) return adminJson({ error: 'invalid' }, 400);
+    if (!UUID_RE.test(userId)) return deny('invalid', 400);
     const rawNote = body?.note;
     if (rawNote !== undefined && rawNote !== null && (typeof rawNote !== 'string' || rawNote.length > 500)) {
-      return adminJson({ error: 'invalid' }, 400);
+      return deny('invalid', 400);
     }
     const note = typeof rawNote === 'string' ? rawNote : null;
 
@@ -151,31 +155,12 @@ export const POST: APIRoute = async ({ request }) => {
       console.error(`admin ${action} failed`, err);
       return adminJson({ error: 'server_error' }, 500);
     }
-    if (!outcome.ok) return adminJson({ error: 'not_enrolled' }, 409);
+    // The function decides which statuses each action accepts, so the refusal
+    // it names is the one the operator is told about.
+    if (!outcome.ok) return deny(outcome.error, 409);
     console.log('admin action', admin.email, action, userId, note ?? '');
     return adminJson({ ok: true, enrollment: outcome.enrollment });
   }
 
-  if (action === 'reinstate') {
-    const userId = typeof body?.user_id === 'string' ? body.user_id : '';
-    if (!UUID_RE.test(userId)) return adminJson({ error: 'invalid' }, 400);
-    const rawNote = body?.note;
-    if (rawNote !== undefined && rawNote !== null && (typeof rawNote !== 'string' || rawNote.length > 500)) {
-      return adminJson({ error: 'invalid' }, 400);
-    }
-    const note = typeof rawNote === 'string' ? rawNote : null;
-
-    let outcome;
-    try {
-      outcome = await changeCourseAccess(userId, 'reinstate', admin, note);
-    } catch (err) {
-      console.error('admin reinstate failed', err);
-      return adminJson({ error: 'server_error' }, 500);
-    }
-    if (!outcome.ok) return adminJson({ error: 'not_inactive' }, 409);
-    console.log('admin action', admin.email, action, userId, note ?? '');
-    return adminJson({ ok: true, enrollment: outcome.enrollment });
-  }
-
-  return adminJson({ error: 'invalid' }, 400);
+  return deny('invalid', 400);
 };

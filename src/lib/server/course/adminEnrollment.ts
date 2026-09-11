@@ -65,12 +65,14 @@ export async function listEnrollments(): Promise<EnrollmentListRow[]> {
 
 export type AdminOutcome =
   | { ok: true; enrollment: EnrollmentRow; kind: EventKind }
-  | { ok: false; error: 'already_enrolled' | 'not_enrolled' | 'not_inactive' };
+  | { ok: false; error: 'already_enrolled' | 'not_enrolled' | 'not_inactive' | 'already_refunded' };
 
 /**
  * Grant, revoke, refund or reinstate. Calls admin_change_course_access()
  * (migration 0030), which locks the row, applies the change and writes the
- * ledger row in one transaction, so the two can never come apart.
+ * ledger row in one transaction, so the two can never come apart. The
+ * function also owns which statuses each action accepts: a refund may follow
+ * a revoke, and only a row already refunded refuses one.
  */
 export async function changeCourseAccess(
   userId: string,
@@ -88,7 +90,7 @@ export async function changeCourseAccess(
   if (error) throw new Error(`enrollment access change failed: ${error.message}`);
   const outcome = data as { outcome: string; enrollment?: unknown };
   const kind = outcome.outcome;
-  if (kind === 'already_enrolled' || kind === 'not_enrolled' || kind === 'not_inactive') {
+  if (kind === 'already_enrolled' || kind === 'not_enrolled' || kind === 'not_inactive' || kind === 'already_refunded') {
     return { ok: false, error: kind };
   }
   if (kind === 'admin_granted' || kind === 'reinstated' || kind === 'revoked' || kind === 'refunded') {

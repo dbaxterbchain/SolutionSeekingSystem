@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSession } from '../../lib/useSession';
-import { useDialog, type ConfirmOptions } from './Dialog';
+import { useDialog, type PromptOptions } from './Dialog';
 
 /**
  * The operator's console.
@@ -124,7 +124,7 @@ export default function AdminView() {
   const [enquiries, setEnquiries] = useState<EnquiryRow[] | null>(null);
   const [grading, setGrading] = useState<GradingRow[] | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentRow[] | null>(null);
-  const { confirm, dialog } = useDialog();
+  const { confirm, prompt, dialog } = useDialog();
 
   const call = async (path: string, body?: unknown) => {
     if (!session) return null;
@@ -302,7 +302,7 @@ export default function AdminView() {
           call={call}
           reload={() => loadTab('enrollments')}
           setNotice={setNotice}
-          confirm={confirm}
+          prompt={prompt}
         />
       )}
       {dialog}
@@ -886,18 +886,20 @@ function GradingTab({
 
 /* ----------------------------------------------------------- Enrollments */
 
+const NOTE_MAX = 500;
+
 function EnrollmentsTab({
   rows,
   call,
   reload,
   setNotice,
-  confirm,
+  prompt,
 }: {
   rows: EnrollmentRow[] | null;
   call: (path: string, body?: unknown) => Promise<any>;
   reload: () => void;
   setNotice: (notice: string | null) => void;
-  confirm: (opts: ConfirmOptions) => Promise<boolean>;
+  prompt: (opts: PromptOptions) => Promise<string | null>;
 }) {
   const [email, setEmail] = useState('');
   const [note, setNote] = useState('');
@@ -914,25 +916,30 @@ function EnrollmentsTab({
       setEmail('');
       setNote('');
       setNotice('Access granted.');
-      reload();
     }
+    // Reload either way. A refusal usually means this list is behind what the
+    // database says, and the fix the operator needs is the current row.
+    reload();
   };
 
+  /**
+   * Each access change asks for a note, which lands in the ledger beside the
+   * admin's id. The note is optional; cancelling the dialog returns null and
+   * nothing happens.
+   */
   const act = async (
     action: 'revoke' | 'refund' | 'reinstate',
     row: EnrollmentRow,
-    opts: ConfirmOptions,
+    opts: PromptOptions,
     successNotice: string
   ) => {
-    const ok = await confirm(opts);
-    if (!ok) return;
+    const note = await prompt({ label: 'Note for the ledger (optional)', maxLength: NOTE_MAX, ...opts });
+    if (note === null) return;
     setBusyId(row.id);
-    const d = await call('course', { action, user_id: row.user_id });
+    const d = await call('course', { action, user_id: row.user_id, note: note.trim() || undefined });
     setBusyId(null);
-    if (d?.ok) {
-      setNotice(successNotice);
-      reload();
-    }
+    if (d?.ok) setNotice(successNotice);
+    reload();
   };
 
   const statusBadge: Record<EnrollmentRow['status'], string> = {
@@ -962,6 +969,7 @@ function EnrollmentsTab({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Why, for the ledger (optional)"
+              maxLength={NOTE_MAX}
               className="mt-1 block w-64 rounded-xl border border-slate-200 px-3 py-2 text-sm"
             />
           </label>
@@ -1006,49 +1014,51 @@ function EnrollmentsTab({
                     <td className="px-5 py-2.5">
                       <div className="flex flex-wrap gap-2">
                         {r.status === 'enrolled' && (
-                          <>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() =>
-                                act(
-                                  'revoke',
-                                  r,
-                                  {
-                                    title: `Revoke access for ${label}?`,
-                                    message:
-                                      'The learner keeps their progress but cannot open lessons until access is reinstated.',
-                                    confirmLabel: 'Revoke',
-                                    tone: 'danger',
-                                  },
-                                  'Access revoked.'
-                                )
-                              }
-                              className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
-                            >
-                              Revoke
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() =>
-                                act(
-                                  'refund',
-                                  r,
-                                  {
-                                    title: `Record a refund for ${label}?`,
-                                    message:
-                                      'This ends access and writes the ledger. Move the money in the Stripe dashboard.',
-                                    confirmLabel: 'Record refund',
-                                  },
-                                  'Refund recorded. Move the money in the Stripe dashboard.'
-                                )
-                              }
-                              className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
-                            >
-                              Record refund
-                            </button>
-                          </>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              act(
+                                'revoke',
+                                r,
+                                {
+                                  title: `Revoke access for ${label}?`,
+                                  message:
+                                    'The learner keeps their progress but cannot open lessons until access is reinstated.',
+                                  confirmLabel: 'Revoke',
+                                },
+                                'Access revoked.'
+                              )
+                            }
+                            className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
+                          >
+                            Revoke
+                          </button>
+                        )}
+                        {/* A refund often follows a revoke days later, when the money actually moves. */}
+                        {(r.status === 'enrolled' || r.status === 'revoked') && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() =>
+                              act(
+                                'refund',
+                                r,
+                                {
+                                  title: `Record a refund for ${label}?`,
+                                  message:
+                                    r.status === 'enrolled'
+                                      ? 'This ends access and writes the ledger. Move the money in the Stripe dashboard.'
+                                      : 'Access has already ended. This records the refund beside it. Move the money in the Stripe dashboard.',
+                                  confirmLabel: 'Record refund',
+                                },
+                                'Refund recorded. Move the money in the Stripe dashboard.'
+                              )
+                            }
+                            className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
+                          >
+                            Record refund
+                          </button>
                         )}
                         {(r.status === 'revoked' || r.status === 'refunded') && (
                           <button

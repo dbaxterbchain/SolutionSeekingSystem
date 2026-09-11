@@ -27,6 +27,8 @@ export interface PromptOptions {
   label?: string;
   defaultValue?: string;
   placeholder?: string;
+  /** Match whatever the receiving column or route accepts, so nothing is typed that cannot be saved. */
+  maxLength?: number;
   confirmLabel?: string;
   cancelLabel?: string;
 }
@@ -140,6 +142,7 @@ function DialogHost({
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder={(active.opts as PromptOptions).placeholder}
+                maxLength={(active.opts as PromptOptions).maxLength}
                 className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
               />
             </div>
