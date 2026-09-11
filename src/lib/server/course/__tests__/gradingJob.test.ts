@@ -136,10 +136,16 @@ describe('runGradingJob', () => {
     expect(calls[2]).toMatchObject({ name: 'fail', args: { category: 'rate_limited', retryable: true, error: 'slow down' } });
   });
 
-  it('turns a thrown grader into internal, not retryable', async () => {
+  it('turns a thrown grader into internal, not retryable, and carries the message', async () => {
     const { store } = fakeStore();
     const g = grader(new Error('kaboom'));
-    expect(await runGradingJob({ jobId: 'job-1', worker: 'w1', store, grade: g.grade, settings, log: () => {} })).toMatchObject({ outcome: 'failed', category: 'internal' });
+    // The alert email quotes this, so a failed outcome that dropped the message
+    // would leave an operator with a job id and nothing to act on.
+    expect(await runGradingJob({ jobId: 'job-1', worker: 'w1', store, grade: g.grade, settings, log: () => {} })).toMatchObject({
+      outcome: 'failed',
+      category: 'internal',
+      error: 'grader threw: kaboom',
+    });
   });
 
   it('reports stale when another worker finished first', async () => {

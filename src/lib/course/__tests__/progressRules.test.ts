@@ -142,6 +142,14 @@ describe('complete', () => {
   });
   it('plan needs studied, a written response and acknowledge', () => {
     expect(missingForComplete(fresh(), 'plan')).toEqual(['studied', 'response', 'acknowledge']);
+    const row = run('plan', [
+      ['studied'],
+      ['save_response', { text: 'My continuing practice, week by week.', expected_revision: 0 }],
+      ['acknowledge'],
+      ['complete'],
+    ]);
+    expect(missingForComplete(row, 'plan')).toEqual([]);
+    expect(row.completed_at).toBe(T1.toISOString());
   });
   it('completing twice keeps the first timestamp and reports no change', () => {
     const row = run('orientation', [['studied'], ['acknowledge'], ['complete']], false);
