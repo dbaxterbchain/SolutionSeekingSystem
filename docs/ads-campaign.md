@@ -371,6 +371,13 @@ Free"; blocking `free` fought our own value prop and suppressed volume. Do not a
 `reddit`, `chatgpt`, `open source`, `download`. (B2B searchers hunting a free course or a download
 are not buyers of a seated product.)
 
+> **`course` and `certification` come off this list at launch.** They were negatives because the
+> site had nothing to sell those searchers. The paid video course does, and it ends in a
+> certification, so blocking those terms would be blocking the buyers of a real product. Take
+> both out when `PUBLIC_COURSE_STATUS` flips to `open`, not before: while the course is hidden or
+> in preview, a click on either term still lands on nothing purchasable. The launch checklist in
+> [deployment.md](deployment.md#ready-to-open-checklist) is where this is remembered.
+
 ---
 
 ## 4. Extensions (assets)

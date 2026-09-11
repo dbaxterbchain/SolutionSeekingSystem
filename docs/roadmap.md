@@ -113,3 +113,32 @@ need. Delivered in four shippable phases:
 
 **Phases A-D shipped.** Out of scope for now: OCR, spreadsheets, self-serve org billing, and
 wildcard subdomains on our own domain.
+
+## Phase 6: Paid video course _(in progress)_
+
+The first thing on this site somebody buys once rather than subscribes to. David presents the
+whole system on video, module by module, each module closing with a printable worksheet and two
+checks; the course ends with a staged written assessment that an AI grader marks against a
+published rubric, and a pass earns a certificate. Sold from `/course`, delivered at
+`/course/learn/`, and deliberately independent of the chat subscription in both directions.
+
+Everything is behind one launch flag, `PUBLIC_COURSE_STATUS`, which defaults to `hidden`. That
+is what lets the work merge and the pilots run while the public site says nothing about a course
+that is not finished. Four phases:
+
+- **Phase 1: first lesson journey and assessment data path** _(built, pending the ship step)_.
+  The content collections and their validator, the one-time Stripe purchase and the enrollment
+  ledger, the learner dashboard, one real lesson with video and autosaved practice, the printable
+  worksheet, the staged assessment with a background grading worker, and the admin controls for
+  granting and revoking access. What remains is not code: the hosted migrations, the Netlify
+  environment, the Stripe webhook events, and a pilot. See
+  [status.md](status.md#paid-video-course-in-progress-4-phases).
+- **Phase 2: content system.** Every lesson through the status ladder to published, the module
+  checks with their workbook explanations, a finished worksheet for every module, and the free
+  preview lesson as a public page.
+- **Phase 3: certification journey.** David's real assessment forms, certificates and their
+  verification page, the result and certificate emails, the human review queue, and the grader
+  benchmark that decides whether certificates can be issued automatically.
+- **Phase 4: paid course release.** A full-course beta, then the ready-to-open checklist in
+  [deployment.md](deployment.md#ready-to-open-checklist) and `PUBLIC_COURSE_STATUS=open` in
+  production.
