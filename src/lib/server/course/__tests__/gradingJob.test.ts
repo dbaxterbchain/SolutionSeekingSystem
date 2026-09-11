@@ -123,7 +123,8 @@ describe('runGradingJob', () => {
     const { calls, store } = fakeStore({ context: context({ submission_hash: 'deadbeef' }) });
     const g = grader(okOutcome);
     const r = await runGradingJob({ jobId: 'job-1', worker: 'w1', store, grade: g.grade, settings, log: () => {} });
-    expect(r).toMatchObject({ outcome: 'failed', category: 'integrity', attemptId: 'att-1' });
+    // The lock token rides along because the failure alert keys on it.
+    expect(r).toMatchObject({ outcome: 'failed', category: 'integrity', attemptId: 'att-1', lockToken: 'tok-1' });
     expect(calls[2]).toMatchObject({ name: 'fail', args: { category: 'integrity', retryable: false, lockToken: 'tok-1' } });
     expect(g.seen).toHaveLength(0);
   });

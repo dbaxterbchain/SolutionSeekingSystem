@@ -81,6 +81,10 @@ export default async (req: Request) => {
         category: outcome.outcome === 'failed' ? outcome.category : 'retry_budget_exhausted',
         error: outcome.error,
         attempts: outcome.attempts,
+        // The failing run's lock token is unique to that run. A retirement holds
+        // no token, and happens once per budget cycle, so the day is enough:
+        // a repeat within the day is the same retirement, a later one is new.
+        runKey: outcome.outcome === 'failed' ? outcome.lockToken : `exhausted-${new Date().toISOString().slice(0, 10)}`,
         adminUrl: `${adminOrigin()}/admin/`,
       }
     );

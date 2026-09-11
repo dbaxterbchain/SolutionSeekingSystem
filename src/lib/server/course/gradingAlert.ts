@@ -12,8 +12,14 @@ export interface GradingFailure {
   attemptId: string;
   category: string;
   error: string;
-  /** Which try this was. It goes into the idempotency key, so a retry alerts again. */
+  /** How much of the budget was spent. Shown to the operator, not part of the key. */
   attempts: number;
+  /**
+   * What makes this failure different from the last one of the same job. The
+   * caller passes the lock token of the run that failed, which no other run
+   * shares. It is the idempotency key's discriminator and nothing else.
+   */
+  runKey: string;
   adminUrl: string;
 }
 
@@ -26,6 +32,7 @@ export function gradingFailureEmail(f: GradingFailure): { subject: string; text:
       `Job: ${f.jobId}`,
       `Attempt: ${f.attemptId}`,
       `Category: ${f.category}`,
+      `Tries used: ${f.attempts}`,
       `Error: ${f.error.slice(0, 500)}`,
       '',
       `Retry it from the admin area: ${f.adminUrl}`,
@@ -41,10 +48,10 @@ export interface AlertConfig {
 }
 
 /**
- * Send the alert once per try. The idempotency key carries the attempt count as
- * well as the job id, so a worker that runs the same try twice still sends one
+ * Send the alert once per failing run. The idempotency key is the job id and
+ * the caller's run key, so a worker that reports the same run twice sends one
  * email, while a job an admin retried and that failed again sends its own alert
- * rather than being swallowed as a duplicate of the first. Never throws.
+ * instead of being swallowed as a duplicate of the first. Never throws.
  */
 export async function sendGradingFailureAlert(config: AlertConfig, f: GradingFailure): Promise<boolean> {
   if (!config.apiKey || !config.from || !config.to) {
@@ -55,7 +62,7 @@ export async function sendGradingFailureAlert(config: AlertConfig, f: GradingFai
     const mail = gradingFailureEmail(f);
     const { error } = await new Resend(config.apiKey).emails.send(
       { from: config.from, to: config.to, subject: mail.subject, text: mail.text },
-      { idempotencyKey: `course-grading-failed/${f.jobId}/${f.attempts}` }
+      { idempotencyKey: `course-grading-failed/${f.jobId}/${f.runKey}` }
     );
     if (error) {
       console.error(`grading job ${f.jobId}: failure alert rejected`, error);

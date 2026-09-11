@@ -66,7 +66,21 @@ export type RunOutcome =
   | { outcome: 'finalized'; passed: boolean }
   | { outcome: 'unavailable' | 'stale' }
   | { outcome: 'exhausted'; attemptId: string; error: string; attempts: number }
-  | { outcome: 'requeued' | 'failed'; category: ErrorCategory; attemptId: string; error: string; attempts: number };
+  /**
+   * `lockToken` is the token this run held, spent by the time the outcome is
+   * read (fail_course_grading_job clears it). It is carried because it is the
+   * one value that differs for every run of a job, which is what the failure
+   * alert needs to key on: `attempts` restarts at zero when an admin retries,
+   * so two failures of the same job would otherwise look like one.
+   */
+  | {
+      outcome: 'requeued' | 'failed';
+      category: ErrorCategory;
+      attemptId: string;
+      error: string;
+      attempts: number;
+      lockToken: string;
+    };
 /**
  * Longer than the grader's own budget (GRADER_BUDGET_MS, 720 seconds) and
  * shorter than the Netlify background limit of 900 seconds, so a worker still
@@ -103,7 +117,7 @@ export async function runGradingJob(args: {
     log(`grading job ${jobId}: ${category} (${result})`, error);
     return result === 'stale'
       ? { outcome: 'stale' }
-      : { outcome: result, category, attemptId: claim.attemptId, error, attempts: claim.attempts };
+      : { outcome: result, category, attemptId: claim.attemptId, error, attempts: claim.attempts, lockToken: claim.lockToken };
   };
 
   let ctx: JobContext | null;

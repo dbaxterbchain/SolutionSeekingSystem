@@ -82,6 +82,9 @@ export async function triggerGradingWorker(args: { origin: string; jobId: string
               category: outcome.outcome === 'failed' ? outcome.category : 'retry_budget_exhausted',
               error: outcome.error,
               attempts: outcome.attempts,
+              // Unique per failing run, so an admin's retry that fails again
+              // alerts rather than looking like a duplicate of the first.
+              runKey: outcome.outcome === 'failed' ? outcome.lockToken : `exhausted-${new Date().toISOString().slice(0, 10)}`,
               adminUrl: `${workerOrigin(args.origin) || args.origin}/admin/`,
             }
           );
