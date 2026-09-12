@@ -5,6 +5,7 @@ import { MODES } from '../../data/modes';
 import { PLANS } from '../../data/pricing';
 import { getCourseCatalog } from '../../lib/course/catalog';
 import { hasShell } from '../../lib/course/visibility';
+import { previewPageAvailable } from '../../lib/course/previewPage';
 import { COURSE, COURSE_STATUS } from '../../data/course';
 import { CERTIFICATION_TITLE, CRITERIA_COUNT_WORD } from '../../data/certification';
 
@@ -34,6 +35,11 @@ const courseLessonPages = Object.fromEntries(
 );
 const courseWorksheetPages = Object.fromEntries(
   courseCatalog.worksheets.map((w) => [`course/learn/worksheets/${w.id}`, { title: w.title, description: 'A printable worksheet from the Complete Solution Seeking course.' }])
+);
+const courseModulePages = Object.fromEntries(
+  courseCatalog.modules
+    .filter((m) => m.checks.length > 0)
+    .map((m) => [`course/learn/modules/${m.id}`, { title: `Module ${m.order}: ${m.title}`, description: m.summary }])
 );
 
 const pages: Record<string, OgPage> = {
@@ -135,6 +141,14 @@ const pages: Record<string, OgPage> = {
           title: CERTIFICATION_TITLE,
           description: `The ${CRITERIA_COUNT_WORD} criteria, their weights, the score anchors and the pass rule.`,
         },
+        ...(previewPageAvailable(COURSE_STATUS, courseCatalog.byId[COURSE.previewLessonId])
+          ? {
+              'course/preview': {
+                title: 'A free lesson from the Complete Solution Seeking course',
+                description: `Watch one lesson with ${COURSE.presenter} and try the exercise, free.`,
+              },
+            }
+          : {}),
       }
     : {}),
   'course/learn': {
@@ -144,6 +158,10 @@ const pages: Record<string, OgPage> = {
   'course/learn/assessment': {
     title: 'Final assessment',
     description: 'The staged final assessment for the Complete Solution Seeking course.',
+  },
+  'course/learn/resources': {
+    title: 'Course resources',
+    description: 'Worksheets, the guide and support for the Complete Solution Seeking course.',
   },
   account: {
     title: 'Your Account',
@@ -184,6 +202,7 @@ const pages: Record<string, OgPage> = {
   ),
   ...courseLessonPages,
   ...courseWorksheetPages,
+  ...courseModulePages,
   ...Object.fromEntries(
     MODES.map((m) => [
       `practice/modes/${m.id}`,

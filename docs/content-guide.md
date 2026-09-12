@@ -361,10 +361,40 @@ checks:
 **`answer` never reaches the browser.** It is a developer field: a check is served as its
 question and two choices, the learner's pick is graded on the server, and the explanation comes
 back with the verdict. So do not render a check from a page or an island, and never put `answer`
-in an API response. The endpoint that serves them arrives with Phase 2; the answer key living
-only on the server is the rule it is being built to. The explanations are currently interim
-wording from the course brief, and David replaces each one with the matching expected-answer
-text from that module's workbook.
+in an API response. `GET /api/course/check?module_id=` serves a module's checks without the
+key, `POST /api/course/check` grades one pick and returns the explanation with the verdict, and
+`src/lib/server/course/content.ts` is the only place the key is read. The explanations are
+currently interim wording from the course brief, and David replaces each one with the matching
+expected-answer text from that module's workbook.
+
+### Where the checks appear
+
+Each module with checks has a page at `/course/learn/modules/<id>` (`m01` to `m08`; module 9
+has no checks and no page) listing its lessons, its worksheet and the two questions. The
+dashboard card, the lesson drawer and the last step of every lesson in the module link there.
+Every answer is recorded, a wrong answer shows the explanation and allows another try, and the
+module counts as complete once every published lesson is done and both questions have a correct
+answer. Nothing in the module's shell carries a question; the island fetches them.
+
+### Moving a lesson up
+
+Three tools help the ladder along, all built on the same catalog the build validates:
+
+- **The Content tab in `/admin`** lists every lesson in chain order with its status, its next
+  rung and what that rung still needs, in the validator's own words. It runs the same gate
+  function the build runs (`gatesMissing` in `src/lib/course/validate.ts`), so if the tab says a
+  lesson is ready to move up, the build will agree.
+- **An admin can read a staged lesson in place** by adding `?preview=1` to its URL. The lesson
+  API opens staged lessons to admins only; the island shows a banner naming the status and
+  records nothing, since the progress route refuses unpublished lessons by design. A learner on
+  the same URL gets a 404.
+- **The free lesson page** at `/course/preview` renders the one `preview: true` lesson at build
+  time, and only when the course is public and that lesson is published. Until then it is a 404
+  that writes nothing. A preview lesson still on the stand-in clip renders without a player,
+  because the clip is signed and the free page embeds without a token, so the free lesson needs
+  its own recording before the page is worth linking. The page has no line in `llms.txt` and no
+  `.md` variant: the spec keeps lesson prose out of the machine-readable surfaces, and the free
+  lesson is still lesson prose.
 
 ### A worksheet file
 

@@ -95,7 +95,13 @@ stale docs, no orphaned pages, no broken prompt cache.
       `dist/`. If one of those guards fires, the fix is the import, never the guard.
 - [ ] **A change to a public course surface needs two builds**, one with
       `PUBLIC_COURSE_STATUS` unset or `hidden` and one with `preview`. They produce different
-      page sets, and production serves the hidden one today.
+      page sets, and production serves the hidden one today. The free lesson page has no line in
+      `llms.txt` and no `.md` variant: the spec keeps lesson prose out of the machine-readable
+      surfaces, and the free lesson is still lesson prose.
+- [ ] **A new learner page needs an OG entry** in `src/pages/og/[...route].ts` even though it is
+      `noindex`, because a shared link still fetches the card. The lesson, worksheet and module
+      pages are registered from the catalog; a page with one URL is registered by hand beside
+      `course/learn/assessment`.
 - [ ] **A new course event follows the four-place rule** like every other event (the union in
       `analytics.ts`, the GTM trigger regex, GA4 key events and dimensions, the Ads import).
       See [Registering the course events](deployment.md#registering-the-course-events).

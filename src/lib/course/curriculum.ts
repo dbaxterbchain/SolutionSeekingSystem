@@ -55,3 +55,7 @@ export function publicCurriculum(catalog: Catalog): PublicCurriculum {
     totalMinutes: modules.reduce((sum, m) => sum + m.minutes, 0),
   };
 }
+
+/** Modules 1 to 8 carry a check; the module holding the orientation lesson does not. */
+export const moduleHasCheck = (module: { lessons: { id: string }[] }, orientationLessonId: string): boolean =>
+  !module.lessons.some((l) => l.id === orientationLessonId);

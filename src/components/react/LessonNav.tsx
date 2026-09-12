@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PublicCurriculum } from '../../lib/course/curriculum';
+import { moduleHasCheck, type PublicCurriculum } from '../../lib/course/curriculum';
 import type { CourseStateView } from '../../lib/courseClient';
+import { COURSE } from '../../data/course';
 
 interface Props {
   curriculum: PublicCurriculum;
@@ -108,6 +109,19 @@ export default function LessonNav({ curriculum, currentId, state }: Props) {
                         </li>
                       );
                     })}
+                    {moduleHasCheck(m, COURSE.orientationLessonId) && (
+                      <li className="flex items-baseline justify-between gap-3 border-t border-slate-100 pt-1.5">
+                        <a
+                          href={`/course/learn/modules/${m.id}`}
+                          className="font-medium text-brand-700 hover:underline"
+                        >
+                          Module check
+                        </a>
+                        <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          {state?.modules[m.id]?.checks_complete ? 'Done' : ''}
+                        </span>
+                      </li>
+                    )}
                   </ul>
                 </li>
               ))}

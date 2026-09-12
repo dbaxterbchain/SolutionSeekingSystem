@@ -842,6 +842,11 @@ One video per lesson. The media baseline and the upload clicks are Bradley's, in
   because the customer code is the host the embed itself is loaded from
   ([`streamUrls.ts`](../src/lib/course/streamUrls.ts)). Check the embed URL in the page source
   against the code in the Stream dashboard before looking anywhere else.
+- **The customer code is also a constant**, `COURSE.streamCustomerCode` in
+  [`src/data/course.ts`](../src/data/course.ts). The free lesson page always uses this constant,
+  because it embeds the preview video at build time and Builds scope has no reason to carry the
+  variable; only the enrolled-lesson server path prefers `CLOUDFLARE_STREAM_CUSTOMER_CODE` when
+  that is set. If the code ever changes, change both.
 
 ### Course migrations and advisors
 

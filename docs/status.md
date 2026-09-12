@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-09-10 (paid video course, Phase 1 built on branch `course`; before that, icons
+_Last updated: 2026-09-11 (paid video course, Phase 1 built on branch `course`; before that, icons
 for the 12 Wisdom Principles and the gold ramp meaning "the solution")_
 
 ## At a glance
@@ -95,8 +95,15 @@ the remaining worksheet bodies) and Bradley's (the real recordings, captions and
 the videos exist an `open` build is refused by design, which is the intended behaviour and not
 a bug to route around.
 
-**Phases 2 to 4.** Phase 2 is the content system: every lesson published through the ladder,
-the module checks, a finished worksheet per module, the free preview lesson page. Phase 3 is the
+**Phase 2, the content system: code complete 2026-09-11**
+([plan](superpowers/plans/2026-09-11-course-phase2-content-system.md)). Module checks on a
+module page with their API, an admin preview of staged lessons in place, a Content tab in
+`/admin` that names each lesson's next rung and what it still needs, the free lesson page that
+builds once the preview lesson is published, and a resources page. What remains of Phase 2 is
+content rather than code: every lesson published through the ladder and a finished worksheet
+per module, David's copy and Bradley's recordings, module by module.
+
+**Phases 3 and 4.** Phase 3 is the
 certification journey: Forms A and B, certificates and verification, the result and certificate
 emails, the review queue, and the grader benchmark that decides whether
 `COURSE_AWARDS_ENABLED` can be turned on. Phase 4 is the release itself, gated on the

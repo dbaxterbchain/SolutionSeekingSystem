@@ -12,6 +12,7 @@ import { parseLessonSections, type LessonSections } from './lessonSections';
 import type { CourseStatus } from './status';
 import {
   LESSON_STATUSES,
+  type LessonApprovals,
   type LessonInput,
   type LessonKind,
   type LessonStatus,
@@ -69,6 +70,67 @@ export interface Catalog {
 }
 
 const rank = (status: LessonStatus): number => LESSON_STATUSES.indexOf(status);
+
+export interface GateLesson {
+  kind: LessonKind;
+  streamUid: string | null;
+  durationMin: number;
+  videoPlaceholder: boolean;
+  preview: boolean;
+  approvals: LessonApprovals;
+  sections: LessonSections;
+}
+
+/**
+ * The status ladder's gates. What `target` requires that `lesson` does not
+ * yet have, in the order a reader would fix them, cumulative from the bottom
+ * of the ladder. Used by the validator against a lesson's own status and by
+ * the ladder report against the next status up.
+ */
+export function gatesMissing(lesson: GateLesson, target: LessonStatus, ctx: { courseStatus: CourseStatus }): string[] {
+  const missing: string[] = [];
+  const need = (condition: boolean, message: string) => {
+    if (!condition) missing.push(message);
+  };
+  const r = rank(target);
+  const s = lesson.sections;
+  if (r >= rank('approved')) {
+    need(s.outcome.length > 0, 'Outcome is empty');
+    need(s.keyPoints.length > 0, 'Key points is empty');
+    if (lesson.kind !== 'orientation') need(s.exercise.length > 0, 'Exercise is empty');
+    if (lesson.kind === 'standard') {
+      need(s.modelResponse.length > 0, 'Model response is empty');
+      need(s.selfReview.length > 0, 'Self-review is empty');
+    }
+    need(Boolean(lesson.approvals.copy), 'approvals.copy is required');
+  }
+  if (r >= rank('edited')) {
+    // A placeholder-video lesson has no video of its own yet: it plays
+    // COURSE.placeholderStreamUid instead (src/lib/course/lessonView.ts),
+    // so it is exempt here the same way it is from approvals.edit below.
+    if (!lesson.videoPlaceholder) need(lesson.streamUid !== null, 'streamUid is required');
+    need(lesson.durationMin >= 1, 'durationMin must be at least 1');
+    if (!lesson.videoPlaceholder) need(Boolean(lesson.approvals.edit), 'approvals.edit is required');
+  }
+  if (r >= rank('captioned') && !lesson.videoPlaceholder) {
+    need(s.transcript.length > 0, 'Transcript is empty');
+    need(Boolean(lesson.approvals.captions), 'approvals.captions is required');
+  }
+  if (lesson.videoPlaceholder && ctx.courseStatus === 'open' && r >= rank('staged')) {
+    missing.push('a placeholder video cannot ship while the course is open for sale');
+  }
+  // The free lesson has to exist before anything is sold. A preview build
+  // only shows the course as coming soon, so it may run before V05 is filmed.
+  // This block has no rank floor (no `r >= rank(...)` guard) on purpose: the
+  // validator has to flag a draft preview lesson in an `open` build, whatever
+  // its own status. Called from the ladder's direction instead, a floor would
+  // only ever matter for a catalog that would already fail every other rule.
+  if (lesson.preview && ctx.courseStatus === 'open') {
+    need(r >= rank('published'), 'the preview lesson must be published once the course is open');
+    need(!lesson.videoPlaceholder, 'the preview lesson cannot use a placeholder video once the course is open');
+  }
+  return missing;
+}
 
 export function validateCatalog(input: CatalogInput): Catalog {
   const errors: string[] = [];
@@ -229,43 +291,8 @@ export function validateCatalog(input: CatalogInput): Catalog {
     parsed.set(l.id, result.sections);
 
     const s = result.sections;
-    const r = rank(l.status);
-    const need = (condition: boolean, message: string) => {
-      if (!condition) err(`${where} (${l.status}): ${message}`);
-    };
-    if (r >= rank('approved')) {
-      need(s.outcome.length > 0, 'Outcome is empty');
-      need(s.keyPoints.length > 0, 'Key points is empty');
-      if (l.kind !== 'orientation') need(s.exercise.length > 0, 'Exercise is empty');
-      if (l.kind === 'standard') {
-        need(s.modelResponse.length > 0, 'Model response is empty');
-        need(s.selfReview.length > 0, 'Self-review is empty');
-      }
-      need(Boolean(l.approvals.copy), 'approvals.copy is required');
-    }
-    if (r >= rank('edited')) {
-      // A placeholder-video lesson has no video of its own yet: it plays
-      // COURSE.placeholderStreamUid instead (src/lib/course/lessonView.ts),
-      // so it is exempt here the same way it is from approvals.edit below.
-      if (!l.videoPlaceholder) need(l.streamUid !== null, 'streamUid is required');
-      need(l.durationMin >= 1, 'durationMin must be at least 1');
-      if (!l.videoPlaceholder) need(Boolean(l.approvals.edit), 'approvals.edit is required');
-    }
-    if (r >= rank('captioned') && !l.videoPlaceholder) {
-      need(s.transcript.length > 0, 'Transcript is empty');
-      need(Boolean(l.approvals.captions), 'approvals.captions is required');
-    }
-    if (l.videoPlaceholder && input.courseStatus === 'open' && r >= rank('staged')) {
-      err(`${where}: a placeholder video cannot ship while the course is open for sale`);
-    }
-    // The free lesson has to exist before anything is sold. A preview build
-    // only shows the course as coming soon, so it may run before V05 is filmed.
-    if (l.preview && input.courseStatus === 'open') {
-      need(l.status === 'published', 'the preview lesson must be published once the course is open');
-      need(
-        !l.videoPlaceholder,
-        'the preview lesson cannot use a placeholder video once the course is open'
-      );
+    for (const message of gatesMissing({ ...l, sections: s }, l.status, { courseStatus: input.courseStatus })) {
+      err(`${where} (${l.status}): ${message}`);
     }
   }
 

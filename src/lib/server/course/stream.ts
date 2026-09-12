@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../supabaseAdmin';
 import { serverEnv } from '../env';
 import { resolvePlayback, type Playback, type TokenStore } from '../../course/streamPlayback';
+import { COURSE } from '../../../data/course';
 
 /** The shared-token store on course_stream_tokens (service role only). */
 const store: TokenStore = {
@@ -32,7 +33,7 @@ export function getPlayback(uid: string): Promise<Playback | null> {
       fetch,
       store,
       now: () => new Date(),
-      customerCode: serverEnv('CLOUDFLARE_STREAM_CUSTOMER_CODE'),
+      customerCode: serverEnv('CLOUDFLARE_STREAM_CUSTOMER_CODE') || COURSE.streamCustomerCode,
       accountId: serverEnv('CLOUDFLARE_ACCOUNT_ID'),
       apiToken: serverEnv('CLOUDFLARE_STREAM_API_TOKEN'),
       memo,

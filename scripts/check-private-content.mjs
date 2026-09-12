@@ -1,12 +1,17 @@
 #!/usr/bin/env node
 /**
- * Two rules that keep the assessment forms private. Runs inside `npm run check`.
+ * Rules that keep private course content from leaking into the wrong file.
+ * Runs inside `npm run check`.
  *
  *  1. The collection `assessmentForms` is referenced by exactly two files:
  *     src/content/config.ts (its definition) and src/lib/server/course/forms.ts
  *     (its single reader). Any other reference under src/ fails, and no page
  *     or component may reach into the forms directory.
- *  2. Every module reachable from netlify/functions/*.mts and from
+ *  2. `getModuleForLearner` (the module-check reader, key included) is called by
+ *     exactly two files: src/lib/server/course/content.ts (its definition) and
+ *     src/pages/api/course/check.ts (the only route allowed to call it). Any
+ *     other reference under src/ fails.
+ *  3. Every module reachable from netlify/functions/*.mts and from
  *     src/lib/server/course/gradingJob.ts is bundler-clean: no astro:content,
  *     no import.meta.env, no env.ts, supabaseAdmin.ts, rateLimit.ts and no
  *     src/data/course.ts. The Netlify function bundle is built by esbuild
@@ -47,7 +52,20 @@ for (const file of walk(join(ROOT, 'src'))) {
   }
 }
 
-// Rule 2: the worker's import closure.
+// Rule 2: getModuleForLearner has one definition and one caller.
+const GET_MODULE_FOR_LEARNER_ALLOWED = new Set([
+  'src/lib/server/course/content.ts',
+  'src/pages/api/course/check.ts',
+]);
+for (const file of walk(join(ROOT, 'src'))) {
+  const r = rel(file);
+  const text = readFileSync(file, 'utf8');
+  if (text.includes('getModuleForLearner') && !GET_MODULE_FOR_LEARNER_ALLOWED.has(r)) {
+    problems.push(`${r}: references getModuleForLearner (only content.ts and check.ts may)`);
+  }
+}
+
+// Rule 3: the worker's import closure.
 const FORBIDDEN = [
   { re: /from\s+['"]astro:content['"]/, why: 'imports astro:content' },
   { re: /import\.meta\.env/, why: 'reads import.meta.env' },

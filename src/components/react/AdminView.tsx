@@ -13,7 +13,7 @@ import { useDialog, type PromptOptions } from './Dialog';
  * false sense of where the boundary is. The boundary is the API.
  */
 
-type Tab = 'feedback' | 'orgs' | 'subscribers' | 'enquiries' | 'grading' | 'enrollments';
+type Tab = 'feedback' | 'orgs' | 'subscribers' | 'enquiries' | 'grading' | 'enrollments' | 'content';
 
 interface FeedbackRow {
   id: string;
@@ -104,6 +104,17 @@ interface EnrollmentRow {
   updated_at: string;
 }
 
+interface LadderRow {
+  id: string;
+  seq: number;
+  module: string;
+  title: string;
+  status: string;
+  next: string | null;
+  missing: string[];
+  videoPlaceholder: boolean;
+}
+
 const date = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
 const time = (iso: string | null) =>
@@ -124,6 +135,7 @@ export default function AdminView() {
   const [enquiries, setEnquiries] = useState<EnquiryRow[] | null>(null);
   const [grading, setGrading] = useState<GradingRow[] | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentRow[] | null>(null);
+  const [content, setContent] = useState<{ rows: LadderRow[]; summary: string } | null>(null);
   const { confirm, prompt, dialog } = useDialog();
 
   const call = async (path: string, body?: unknown) => {
@@ -168,6 +180,9 @@ export default function AdminView() {
     } else if (which === 'enrollments') {
       const d = await call('course?view=enrollments');
       if (d) setEnrollments(d.rows);
+    } else if (which === 'content') {
+      const d = await call('course?view=content');
+      if (d) setContent({ rows: d.rows, summary: d.summary });
     } else {
       const d = await call('enquiries');
       if (d) setEnquiries(d.rows);
@@ -225,6 +240,7 @@ export default function AdminView() {
     { id: 'enquiries', label: 'Enquiries', count: enquiries?.filter((e) => !e.handled).length },
     { id: 'grading', label: 'Grading' },
     { id: 'enrollments', label: 'Enrollments', count: enrollments?.filter((e) => e.status === 'enrolled').length },
+    { id: 'content', label: 'Content' },
   ];
 
   return (
@@ -305,6 +321,7 @@ export default function AdminView() {
           prompt={prompt}
         />
       )}
+      {tab === 'content' && <ContentTab data={content} />}
       {dialog}
     </div>
   );
@@ -1086,6 +1103,59 @@ function EnrollmentsTab({
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ Content */
+
+function ContentTab({ data }: { data: { rows: LadderRow[]; summary: string } | null }) {
+  if (!data) return <p className="text-sm text-slate-400">Loading…</p>;
+  const { rows, summary } = data;
+  if (rows.length === 0) {
+    return <Empty>No lessons found.</Empty>;
+  }
+
+  const stillNeeds = (r: LadderRow) => {
+    if (r.missing.length > 0) return r.missing.join('; ');
+    if (r.next !== null) return 'ready to move up';
+    return '';
+  };
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-500">{summary}</p>
+      <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-card">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">
+            <tr>
+              <th className="px-5 py-3">Lesson</th>
+              <th className="px-5 py-3">Module</th>
+              <th className="px-5 py-3">Status</th>
+              <th className="px-5 py-3">Next</th>
+              <th className="px-5 py-3">Still needs</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className="border-b border-slate-50 last:border-0">
+                <td className="px-5 py-2.5 text-slate-700">
+                  {r.seq}. {r.id} {r.title}
+                </td>
+                <td className="px-5 py-2.5 text-slate-500">{r.module}</td>
+                <td className="px-5 py-2.5">
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                    {r.status}
+                  </span>
+                  {r.videoPlaceholder && <p className="mt-0.5 text-xs text-slate-400">stand-in clip</p>}
+                </td>
+                <td className="px-5 py-2.5 text-slate-500">{r.next ?? ''}</td>
+                <td className="px-5 py-2.5 text-slate-500">{stillNeeds(r)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

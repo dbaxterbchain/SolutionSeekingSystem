@@ -47,6 +47,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
   const { session, user, loading: sessionLoading } = useSession();
   const [payload, setPayload] = useState<LessonPayload | null>(null);
   const [loadError, setLoadError] = useState<CourseActionError | null>(null);
+  const [preview, setPreview] = useState(false);
   const [state, setState] = useState<CourseStateView | null>(null);
   const [progress, setProgress] = useState<ProgressView | null>(null);
   const [modelResponse, setModelResponse] = useState<string | null>(null);
@@ -64,6 +65,12 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
   const lastSavedText = useRef('');
   const lastSavedAt = useRef<Date | null>(null);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
+  /**
+   * The read-only-preview flag, mirrored into a ref so `load` (called again
+   * later by the video's refresh button) always reads the value the URL had
+   * on mount instead of a stale closure over the `preview` state.
+   */
+  const previewRef = useRef(false);
   textRef.current = text;
 
   const token = session?.access_token ?? null;
@@ -75,19 +82,30 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
     return run;
   }, []);
 
-  const load = useCallback(async () => {
-    if (!token) return;
+  /**
+   * Fetches the lesson and returns whether it turned out to be a locked
+   * preview (an admin previewing a lesson that is not published): that can
+   * only be known once the payload is in hand, never from the URL flag
+   * alone, since a preview of an already-published lesson is not locked.
+   * Returns null on a failed fetch, so callers can skip anything that
+   * depends on the lesson's status.
+   */
+  const load = useCallback(async (): Promise<boolean | null> => {
+    if (!token) return null;
     try {
-      const data = await fetchLesson(token, lessonId);
+      const data = await fetchLesson(token, lessonId, previewRef.current);
       setPayload(data);
       setLoadError(null);
+      const locked = previewRef.current && data.lesson.status !== 'published';
       if (data.progress) {
         setProgress(data.progress);
         revision.current = data.progress.revision;
       }
       // Coming back to a lesson already revealed: the text is never in the
       // lesson payload, so ask for it again. reveal_model is idempotent.
-      if (data.progress?.model_revealed && modelResponse === null) {
+      // Skipped in a locked preview: its banner promises nothing is recorded,
+      // and this is a progress write.
+      if (!locked && data.progress?.model_revealed && modelResponse === null) {
         try {
           const again = await enqueue(() => postProgress(token, { lesson_id: lessonId, action: 'reveal_model' }));
           if (again.model_response !== undefined) setModelResponse(again.model_response);
@@ -95,23 +113,41 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
           // The button under the model response is the fallback.
         }
       }
+      return locked;
     } catch (err) {
       setLoadError(err instanceof CourseActionError ? err : new CourseActionError('request_failed', 0));
+      return null;
     }
   }, [token, lessonId, modelResponse, enqueue]);
 
   // First load, the open action, the drawer's state, and the local draft.
   useEffect(() => {
     if (sessionLoading || !token || !user) return;
-    void load();
+    // The shell is prerendered and this island renders once on the server,
+    // so the flag is read here, in the effect, and never during render.
+    const wantsPreview = new URLSearchParams(window.location.search).get('preview') === '1';
+    previewRef.current = wantsPreview;
+    setPreview(wantsPreview);
     void fetchCourseState(token).then(setState).catch(() => setState(null));
-    void enqueue(() => postProgress(token, { lesson_id: lessonId, action: 'open' })).catch(() => {});
+    // A locked preview (an unpublished lesson) is read-only: it never opens
+    // progress, which the progress route would refuse anyway. Whether this
+    // lesson is locked is only known once the fetch resolves, so the open
+    // action waits on it rather than firing from the URL flag alone.
+    void load().then((locked) => {
+      if (locked === false) {
+        void enqueue(() => postProgress(token, { lesson_id: lessonId, action: 'open' })).catch(() => {});
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionLoading, user?.id, lessonId]);
 
   // Seed the editor: the local draft wins over the server copy if it is newer than the last save.
+  // Skipped for a locked preview: the textarea is read-only there, so there is no draft to seed
+  // or save. A preview of an already-published lesson (its neighbour, say) is not locked and
+  // seeds normally.
   useEffect(() => {
     if (!payload || !user) return;
+    if (preview && payload.lesson.status !== 'published') return;
     const server = payload.progress?.response_text ?? '';
     let draft: { text: string; revision: number } | null = null;
     try {
@@ -269,6 +305,16 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
         </Note>
       );
     }
+    if (loadError.code === 'forbidden') {
+      return (
+        <Note>
+          This preview link is for the course team. Open the lesson from your course.{' '}
+          <a href="/course/learn/" className="font-semibold text-brand-700 underline">
+            Go to your course
+          </a>
+        </Note>
+      );
+    }
     return (
       <Note>
         {courseErrorMessage(loadError.code)}{' '}
@@ -283,6 +329,9 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
   const { lesson } = payload;
   const p = progress;
   const done = Boolean(p?.completed);
+  // An admin previewing a lesson that is not published yet: read-only, every
+  // action hidden. A preview of an already-published lesson behaves normally.
+  const previewLocked = preview && lesson.status !== 'published';
   const hasPractice = (p?.practice_state ?? 'none') !== 'none' || text.trim() !== '';
   const stepClass = (ok: boolean) =>
     `flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
@@ -307,6 +356,12 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
         </p>
       )}
 
+      {previewLocked && (
+        <p className="mb-6 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Admin preview of a {lesson.status} lesson. Nothing you do here is recorded.
+        </p>
+      )}
+
       <StreamPlayer
         video={payload.video}
         unavailable={payload.video_unavailable}
@@ -316,13 +371,15 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
         onRefresh={load}
       />
 
-      <section aria-labelledby="studied-title">
-        <h2 id="studied-title" className="sr-only">Study</h2>
-        <button type="button" onClick={() => void act({ action: 'studied' })} disabled={busy !== null || Boolean(p?.studied)} className={stepClass(Boolean(p?.studied))}>
-          {mark(Boolean(p?.studied))}
-          I watched the video or studied this lesson
-        </button>
-      </section>
+      {!previewLocked && (
+        <section aria-labelledby="studied-title">
+          <h2 id="studied-title" className="sr-only">Study</h2>
+          <button type="button" onClick={() => void act({ action: 'studied' })} disabled={busy !== null || Boolean(p?.studied)} className={stepClass(Boolean(p?.studied))}>
+            {mark(Boolean(p?.studied))}
+            I watched the video or studied this lesson
+          </button>
+        </section>
+      )}
 
       <LessonSections sections={[{ id: 'key-points', title: 'Key points', markdown: lesson.sections.key_points }]} />
 
@@ -335,19 +392,24 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
           <textarea
             id="response"
             value={text}
-            onChange={(e) => onType(e.target.value)}
+            onChange={(e) => {
+              if (!previewLocked) onType(e.target.value);
+            }}
+            readOnly={previewLocked}
             rows={8}
             maxLength={20000}
             className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
             placeholder="Write here. Your work saves as you type."
           />
-          <p aria-live="polite" className="text-sm text-slate-500">
-            {save.kind === 'saving' && 'Saving your response…'}
-            {save.kind === 'saved' && `Saved ${clock(save.at)}`}
-            {save.kind === 'failed' &&
-              (save.keptFrom ? `Could not save. Your last saved version from ${clock(save.keptFrom)} is kept.` : 'Could not save. Your draft is kept on this device.')}
-          </p>
-          {save.kind === 'conflict' && (
+          {!previewLocked && (
+            <p aria-live="polite" className="text-sm text-slate-500">
+              {save.kind === 'saving' && 'Saving your response…'}
+              {save.kind === 'saved' && `Saved ${clock(save.at)}`}
+              {save.kind === 'failed' &&
+                (save.keptFrom ? `Could not save. Your last saved version from ${clock(save.keptFrom)} is kept.` : 'Could not save. Your draft is kept on this device.')}
+            </p>
+          )}
+          {!previewLocked && save.kind === 'conflict' && (
             <div role="alert" className="rounded-xl border border-amber-100 bg-amber-50 p-4 text-sm text-amber-900">
               <p className="font-semibold">This response was changed somewhere else, probably in another tab.</p>
               <p className="mt-2 whitespace-pre-wrap rounded-lg bg-white/70 p-3 text-slate-700">{save.server.text}</p>
@@ -371,22 +433,26 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
               </div>
             </div>
           )}
-          <button
-            type="button"
-            onClick={() => void act({ action: 'practiced_offline' })}
-            disabled={busy !== null || (p?.practice_state ?? 'none') !== 'none'}
-            className={stepClass((p?.practice_state ?? 'none') !== 'none')}
-          >
-            {mark((p?.practice_state ?? 'none') !== 'none')}
-            I did this exercise on paper or out loud
-          </button>
+          {!previewLocked && (
+            <button
+              type="button"
+              onClick={() => void act({ action: 'practiced_offline' })}
+              disabled={busy !== null || (p?.practice_state ?? 'none') !== 'none'}
+              className={stepClass((p?.practice_state ?? 'none') !== 'none')}
+            >
+              {mark((p?.practice_state ?? 'none') !== 'none')}
+              I did this exercise on paper or out loud
+            </button>
+          )}
         </section>
       )}
 
       {lesson.has_model_response && (
         <section aria-labelledby="model-title">
           <h2 id="model-title" className="font-heading text-2xl font-bold text-ink-800">Model response</h2>
-          {modelResponse === null ? (
+          {previewLocked ? (
+            <p className="mt-4 text-sm text-slate-600">The model response is shown to learners after they practise.</p>
+          ) : modelResponse === null ? (
             <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <p className="text-sm text-slate-600">Try the exercise first. The model response is here when you are ready to compare.</p>
               <button type="button" onClick={() => void reveal()} disabled={busy !== null || !hasPractice} className="btn-primary mt-4 disabled:opacity-60">
@@ -411,7 +477,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
         </section>
       )}
 
-      {!lesson.has_model_response && (
+      {!lesson.has_model_response && !previewLocked && (
         <button type="button" onClick={() => void act({ action: 'acknowledge' })} disabled={busy !== null || Boolean(p?.acknowledged)} className={stepClass(Boolean(p?.acknowledged))}>
           {mark(Boolean(p?.acknowledged))}
           I have taken this in
@@ -431,7 +497,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
         <h2 id="complete-title" className="font-heading text-xl font-bold text-ink-800">
           {done ? 'Lesson complete' : 'Finish this lesson'}
         </h2>
-        {!done && (
+        {!done && !previewLocked && (
           <button type="button" onClick={() => void complete()} disabled={busy !== null} className="btn-primary mt-4 disabled:opacity-60">
             Mark this lesson complete
           </button>
@@ -451,17 +517,22 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
         {(done || completedNow) && (
           <div className="mt-4 flex flex-wrap gap-3">
             {lesson.prev && lesson.prev.available && (
-              <a href={`/course/learn/lessons/${lesson.prev.id}`} className="btn-secondary">
+              <a href={`/course/learn/lessons/${lesson.prev.id}${preview ? '?preview=1' : ''}`} className="btn-secondary">
                 Previous: {lesson.prev.title}
               </a>
             )}
             {lesson.next && lesson.next.available ? (
-              <a href={`/course/learn/lessons/${lesson.next.id}`} className="btn-primary">
+              <a href={`/course/learn/lessons/${lesson.next.id}${preview ? '?preview=1' : ''}`} className="btn-primary">
                 Next: {lesson.next.title}
               </a>
             ) : lesson.next ? (
               <p className="text-sm text-slate-600">Next up, coming soon: {lesson.next.title}</p>
             ) : null}
+            {!previewLocked && lesson.module_order <= 8 && (
+              <a href={`/course/learn/modules/${lesson.module_id}`} className="btn-secondary">
+                Module {lesson.module_order} check
+              </a>
+            )}
             <a href="/course/learn/" className="btn-secondary">
               Back to your course
             </a>

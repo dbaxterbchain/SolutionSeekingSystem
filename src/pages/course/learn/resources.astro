@@ -1,0 +1,99 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { getCourseCatalog } from '../../../lib/course/catalog';
+import { COURSE_STATUS } from '../../../data/course';
+import { courseCopy } from '../../../lib/course/copy';
+
+// Prerendered public shell, like the rest of /course/learn: worksheet and
+// module titles only, drawn from the catalog. No worksheet body, no lesson
+// prose, no island. The worksheet pages gate themselves through the API, so
+// this page has nothing to check access for.
+const catalog = await getCourseCatalog();
+const worksheets = catalog.modules.map((m) => {
+  const worksheet = catalog.worksheets.find((w) => w.id === m.worksheet);
+  return { id: m.worksheet, moduleOrder: m.order, moduleTitle: m.title, title: worksheet?.title ?? '' };
+});
+const supportContact = courseCopy('{{support_contact}}');
+---
+
+<BaseLayout
+  title="Worksheets and resources"
+  description="Worksheets, the guide and support for the Complete Solution Seeking course."
+  noindex
+>
+  <div class="container-page py-10">
+    <p class="eyebrow no-print">Video course</p>
+    <h1 class="mt-3 text-3xl font-extrabold tracking-tight text-ink-800 sm:text-4xl">Worksheets and resources</h1>
+    <p class="mt-4 max-w-prose text-slate-600">
+      Everything outside the lessons themselves lives on this page: a worksheet for each module, the free guide and
+      practice tools, and how to reach us if something needs fixing.
+    </p>
+
+    <section class="mt-10">
+      <h2 class="font-heading text-xl font-bold text-ink-800">Worksheets</h2>
+      <p class="mt-2 max-w-prose text-slate-600">
+        Print one before its module, or fill it in on screen as you go.
+      </p>
+      <ul class="mt-4 space-y-2">
+        {
+          worksheets.map((w) => (
+            <li>
+              <a href={`/course/learn/worksheets/${w.id}`} class="font-medium text-brand-700 hover:underline">
+                Module {w.moduleOrder}, {w.moduleTitle}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section class="mt-10">
+      <h2 class="font-heading text-xl font-bold text-ink-800">The guide</h2>
+      <p class="mt-2 max-w-prose text-slate-600">
+        The whole system in one place, free: read it at{' '}
+        <a href="/guide" class="font-medium text-brand-700 hover:underline">/guide</a>, or keep the{' '}
+        <a href="/solution-seeking-complete-guide.pdf" class="font-medium text-brand-700 hover:underline">PDF</a>.
+      </p>
+    </section>
+
+    <section class="mt-10">
+      <h2 class="font-heading text-xl font-bold text-ink-800">Practice tools</h2>
+      <p class="mt-2 max-w-prose text-slate-600">Three free tools apply the protocol on their own, outside any lesson.</p>
+      <ul class="mt-4 space-y-2">
+        <li>
+          <a href="/practice/introspection" class="font-medium text-brand-700 hover:underline">Guided Introspection</a>
+        </li>
+        <li>
+          <a href="/practice/conversation-planner" class="font-medium text-brand-700 hover:underline">Conversation Planner</a>
+        </li>
+        <li>
+          <a href="/practice/solution-builder" class="font-medium text-brand-700 hover:underline">Solution Builder</a>
+        </li>
+      </ul>
+    </section>
+
+    <section class="mt-10">
+      <h2 class="font-heading text-xl font-bold text-ink-800">The certification</h2>
+      {
+        COURSE_STATUS !== 'hidden' ? (
+          <p class="mt-2 max-w-prose text-slate-600">
+            What it takes to pass is public: see{' '}
+            <a href="/course/certification" class="font-medium text-brand-700 hover:underline">/course/certification</a>.
+          </p>
+        ) : (
+          <p class="mt-2 max-w-prose text-slate-600">
+            The final assessment opens from the dashboard once modules 1 to 8 and the orientation lesson are complete.
+          </p>
+        )
+      }
+    </section>
+
+    <section class="mt-10">
+      <h2 class="font-heading text-xl font-bold text-ink-800">Support</h2>
+      <p class="mt-2 max-w-prose text-slate-600">
+        Stuck on something, or found a mistake? Write to{' '}
+        <a href={`mailto:${supportContact}`} class="font-medium text-brand-700 hover:underline">{supportContact}</a>.
+      </p>
+    </section>
+  </div>
+</BaseLayout>

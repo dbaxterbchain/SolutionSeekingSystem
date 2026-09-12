@@ -1,0 +1,80 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PageHero from '../../components/PageHero.astro';
+import LessonSections from '../../components/react/LessonSections.tsx';
+import PreviewLesson from '../../components/react/PreviewLesson.tsx';
+import { breadcrumbs } from '../../lib/schema';
+import { COURSE, COURSE_STATUS } from '../../data/course';
+import { getCourseCatalog } from '../../lib/course/catalog';
+import { previewPageAvailable, previewPlayback } from '../../lib/course/previewPage';
+
+/**
+ * The one free lesson, rendered at build time. This is the only page where
+ * lesson prose is in HTML, and it is the lesson David chose for exactly that.
+ * It is a 404 that writes nothing while the course is hidden or the lesson
+ * is not yet published.
+ */
+const catalog = await getCourseCatalog();
+const lesson = catalog.byId[COURSE.previewLessonId];
+if (!previewPageAvailable(COURSE_STATUS, lesson)) return new Response(null, { status: 404 });
+const module = catalog.modules[lesson.moduleOrder - 1];
+const playback = previewPlayback(lesson, COURSE.streamCustomerCode);
+const s = lesson.sections;
+const title = `Free lesson: ${lesson.title}`;
+const site = Astro.site ?? Astro.url;
+const schemas = [
+  breadcrumbs(site, [
+    { name: 'Video course', path: '/course' },
+    { name: 'Free lesson', path: '/course/preview' },
+  ]),
+];
+---
+
+<BaseLayout title={title} description={s.outcome} schemas={schemas}>
+  <PageHero eyebrow={`From module ${module.order}, ${module.title}`} title={lesson.title} intro={s.outcome} />
+  <div class="container-page py-10">
+    <div class="max-w-3xl">
+      {
+        playback ? (
+          <div class="overflow-hidden rounded-2xl bg-ink-900 shadow-card" style="aspect-ratio: 16 / 9;">
+            <iframe
+              src={playback.embedUrl}
+              title={lesson.title}
+              allow="accelerometer; gyroscope; encrypted-media; picture-in-picture"
+              allowfullscreen
+              class="h-full w-full"
+            />
+          </div>
+        ) : (
+          <p class="rounded-2xl border border-slate-100 bg-white px-6 py-5 text-slate-600 shadow-card">
+            This lesson's video is being filmed. The lesson itself is ready to read and practise now.
+          </p>
+        )
+      }
+      <div class="mt-10">
+        <LessonSections
+          sections={[
+            { id: 'key-points', title: 'Key points', markdown: s.keyPoints },
+            { id: 'exercise', title: 'Exercise', markdown: s.exercise },
+          ]}
+        />
+        <PreviewLesson client:load lessonId={lesson.id} modelResponse={s.modelResponse} />
+        <LessonSections sections={[{ id: 'self-review', title: 'Self-review', markdown: s.selfReview }]} />
+        {
+          s.transcript.trim() !== '' && (
+            <details class="mt-8">
+              <summary class="cursor-pointer font-semibold text-ink-800">Transcript</summary>
+              <LessonSections sections={[{ id: 'transcript', title: '', markdown: s.transcript }]} />
+            </details>
+          )
+        }
+      </div>
+      <div class="mt-12 rounded-2xl border border-brand-100 bg-brand-50 p-8">
+        <h2 class="font-heading text-xl font-bold text-ink-800">This is one lesson of the full course.</h2>
+        <a href="/course" class="btn-primary mt-4" data-track-cta="course_preview">
+          About the full course
+        </a>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
