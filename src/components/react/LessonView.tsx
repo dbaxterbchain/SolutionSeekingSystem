@@ -462,6 +462,11 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
             ) : lesson.next ? (
               <p className="text-sm text-slate-600">Next up, coming soon: {lesson.next.title}</p>
             ) : null}
+            {lesson.module_order <= 8 && (
+              <a href={`/course/learn/modules/${lesson.module_id}`} className="btn-secondary">
+                Module {lesson.module_order} check
+              </a>
+            )}
             <a href="/course/learn/" className="btn-secondary">
               Back to your course
             </a>

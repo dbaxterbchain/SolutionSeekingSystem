@@ -1,0 +1,58 @@
+---
+// src/pages/course/learn/modules/[id].astro
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import ModuleCheck from '../../../../components/react/ModuleCheck.tsx';
+import { getCourseCatalog } from '../../../../lib/course/catalog';
+import { publicCurriculum } from '../../../../lib/course/curriculum';
+
+/**
+ * One module's page: its lessons, its worksheet, and the module check. The
+ * shell carries public metadata only; the questions come from /api/course/check
+ * inside the island. Module 9 has no checks and no page.
+ */
+export async function getStaticPaths() {
+  const catalog = await getCourseCatalog();
+  const curriculum = publicCurriculum(catalog);
+  return catalog.modules
+    .filter((m) => m.checks.length > 0)
+    .map((m) => ({
+      params: { id: m.id },
+      props: { module: curriculum.modules.find((c) => c.id === m.id)!, worksheetId: m.worksheet },
+    }));
+}
+
+const { module, worksheetId } = Astro.props;
+---
+
+<BaseLayout title={`Module ${module.order}: ${module.title}`} description={module.summary} noindex>
+  <div class="container-page py-10">
+    <p class="eyebrow">Module {module.order}</p>
+    <h1 class="mt-3 text-3xl font-extrabold tracking-tight text-ink-800 sm:text-4xl">{module.title}</h1>
+    <p class="mt-4 max-w-prose text-lg leading-relaxed text-slate-600">{module.summary}</p>
+    <section class="mt-8 max-w-2xl">
+      <h2 class="font-heading text-lg font-bold text-ink-800">Lessons</h2>
+      <ul class="mt-3 space-y-1.5 text-sm">
+        {module.lessons.map((l) => (
+          <li class="flex items-baseline justify-between gap-3">
+            {l.status === 'published' ? (
+              <a href={`/course/learn/lessons/${l.id}`} class="font-medium text-brand-700 hover:underline">{l.title}</a>
+            ) : (
+              <span class="text-slate-500">{l.title}</span>
+            )}
+            {l.status !== 'published' && <span class="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">Coming soon</span>}
+          </li>
+        ))}
+      </ul>
+      <p class="mt-4 text-sm">
+        <a href={`/course/learn/worksheets/${worksheetId}`} class="font-semibold text-brand-700 hover:underline">Module {module.order} worksheet</a>
+      </p>
+    </section>
+    <section class="mt-10 max-w-2xl">
+      <h2 class="font-heading text-lg font-bold text-ink-800">Module check</h2>
+      <p class="mt-2 text-slate-600">Two quick questions. The module counts as complete once every lesson is done and both are answered correctly. You can try again.</p>
+      <div class="mt-5">
+        <ModuleCheck client:load moduleId={module.id} />
+      </div>
+    </section>
+  </div>
+</BaseLayout>

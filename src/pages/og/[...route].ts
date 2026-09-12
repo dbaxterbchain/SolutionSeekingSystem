@@ -35,6 +35,11 @@ const courseLessonPages = Object.fromEntries(
 const courseWorksheetPages = Object.fromEntries(
   courseCatalog.worksheets.map((w) => [`course/learn/worksheets/${w.id}`, { title: w.title, description: 'A printable worksheet from the Complete Solution Seeking course.' }])
 );
+const courseModulePages = Object.fromEntries(
+  courseCatalog.modules
+    .filter((m) => m.checks.length > 0)
+    .map((m) => [`course/learn/modules/${m.id}`, { title: `Module ${m.order}: ${m.title}`, description: m.summary }])
+);
 
 const pages: Record<string, OgPage> = {
   index: {
@@ -184,6 +189,7 @@ const pages: Record<string, OgPage> = {
   ),
   ...courseLessonPages,
   ...courseWorksheetPages,
+  ...courseModulePages,
   ...Object.fromEntries(
     MODES.map((m) => [
       `practice/modes/${m.id}`,
