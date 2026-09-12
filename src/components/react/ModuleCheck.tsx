@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSession } from '../../lib/useSession';
 import { accountLink } from '../../lib/accountLink';
 import { track } from '../../lib/analytics';
@@ -23,11 +23,21 @@ export default function ModuleCheck({ moduleId }: { moduleId: string }) {
   const [picks, setPicks] = useState<Record<string, 1 | 2>>({});
   const [verdicts, setVerdicts] = useState<Record<string, CheckAnswerResponse>>({});
   const [busy, setBusy] = useState<string | null>(null);
+  const [submitErrors, setSubmitErrors] = useState<Record<string, string>>({});
+  // A ref, not the closed-over data: two submits can race (nothing stops a
+  // learner from answering both questions before either response lands), and
+  // only a ref reads the true latest value at the moment each one resolves.
+  // Set once the module is already complete on load, so a later re-answer of
+  // an already-correct question never re-fires the event.
+  const moduleCompleteTracked = useRef(false);
 
   useEffect(() => {
     if (loading || !session) return;
     fetchModuleChecks(session.access_token, moduleId)
-      .then(setData)
+      .then((payload) => {
+        setData(payload);
+        moduleCompleteTracked.current = payload.module_complete;
+      })
       .catch((err) => setError(err instanceof CourseActionError ? err : new CourseActionError('request_failed', 0)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user?.id, moduleId]);
@@ -65,6 +75,12 @@ export default function ModuleCheck({ moduleId }: { moduleId: string }) {
     const choice = picks[checkId];
     if (!choice || !session) return;
     setBusy(checkId);
+    setSubmitErrors((e) => {
+      if (!(checkId in e)) return e;
+      const next = { ...e };
+      delete next[checkId];
+      return next;
+    });
     try {
       const res = await answerCheck(session.access_token, { module_id: moduleId, check_id: checkId, choice });
       setVerdicts((v) => ({ ...v, [checkId]: res }));
@@ -77,9 +93,19 @@ export default function ModuleCheck({ moduleId }: { moduleId: string }) {
           module_complete: res.module_complete,
         }
       );
-      if (res.module_complete && !data.module_complete) track({ event: 'module_completed', module_id: moduleId });
+      if (res.module_complete && !moduleCompleteTracked.current) {
+        moduleCompleteTracked.current = true;
+        track({ event: 'module_completed', module_id: moduleId });
+      }
     } catch (err) {
-      setError(err instanceof CourseActionError ? err : new CourseActionError('request_failed', 0));
+      const courseErr = err instanceof CourseActionError ? err : new CourseActionError('request_failed', 0);
+      // A session problem is not retryable in place; everything else keeps
+      // the questions on screen, with the failure shown beside this one.
+      if (courseErr.code === 'enrollment_required' || courseErr.code === 'unauthorized') {
+        setError(courseErr);
+      } else {
+        setSubmitErrors((e) => ({ ...e, [checkId]: courseErrorMessage(courseErr.code) }));
+      }
     } finally {
       setBusy(null);
     }
@@ -121,6 +147,9 @@ export default function ModuleCheck({ moduleId }: { moduleId: string }) {
             >
               {busy === c.id ? 'Checking…' : verdict && !verdict.correct ? 'Try again' : 'Check my answer'}
             </button>
+            {submitErrors[c.id] && (
+              <p role="alert" className="mt-3 text-sm text-red-600">{submitErrors[c.id]}</p>
+            )}
             {verdict && (
               <div
                 role="status"
