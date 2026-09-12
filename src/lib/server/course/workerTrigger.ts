@@ -100,7 +100,11 @@ export async function triggerGradingWorker(args: { origin: string; jobId: string
               assessmentUrl: `${workerOrigin(args.origin) || args.origin}/course/learn/assessment/`,
             },
             {
-              emailFor: async (userId) => (await supabaseAdmin.auth.admin.getUserById(userId)).data.user?.email ?? null,
+              emailFor: async (userId) => {
+                const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+                if (error) console.error(`grading job ${args.jobId}: learner lookup failed`, error);
+                return data.user?.email ?? null;
+              },
               markSent: (id) => store.markResultEmailSent(id),
             }
           );

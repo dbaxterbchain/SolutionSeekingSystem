@@ -96,7 +96,11 @@ export default async (req: Request) => {
       { apiKey: env('RESEND_API_KEY'), from: env('EMAIL_FROM') },
       { jobId, generation: outcome.generation, userId: outcome.userId, assessmentUrl: `${deployOrigin()}/course/learn/assessment/` },
       {
-        emailFor: async (userId) => (await supabase.auth.admin.getUserById(userId)).data.user?.email ?? null,
+        emailFor: async (userId) => {
+          const { data, error } = await supabase.auth.admin.getUserById(userId);
+          if (error) console.error(`grading job ${jobId}: learner lookup failed`, error);
+          return data.user?.email ?? null;
+        },
         markSent: (id) => store.markResultEmailSent(id),
       }
     );

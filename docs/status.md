@@ -1,13 +1,14 @@
 # Project Status
 
-_Last updated: 2026-09-12 (paid video course, Phase 1 built on branch `course`; before that, icons
-for the 12 Wisdom Principles and the gold ramp meaning "the solution")_
+_Last updated: 2026-09-12 (paid video course, Phase 2 and 3a code complete on their branches and
+the pilot running on the `course-beta` deploy; before that, icons for the 12 Wisdom Principles and
+the gold ramp meaning "the solution")_
 
 ## At a glance
 
 | | |
 |---|---|
-| **Current phase** | Growth plan P1-P5 shipped (measurement, anonymous trial, pricing, email capture, social proof + testimonial collector). In progress: the **paid video course**, whose Phase 1 is built on branch `course` and not yet deployed. Next: SEO/community channels, then a small paid test. |
+| **Current phase** | Growth plan P1-P5 shipped (measurement, anonymous trial, pricing, email capture, social proof + testimonial collector). In progress: the **paid video course**, whose Phase 2 and 3a are code complete on their branches and the pilot runs on the `course-beta` deploy. Next: SEO/community channels, then a small paid test. |
 | **Live URL** | https://solutionseeking.com (apex is primary; www and the netlify.app subdomain 301 to it) |
 | **Build health** | `npm run build` ✅ · `npm run check` ✅ (0 errors) |
 | **Hosting** | Netlify (Beanchain team), site `solution-seeking-system` |

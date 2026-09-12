@@ -219,6 +219,9 @@ export async function loadAttemptHistory(userId: string): Promise<HistoryRow[]> 
     .eq('user_id', userId)
     .eq('course_id', COURSE.id)
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    // Far above what one exposure per form allows: a ceiling against a runaway
+    // account, not a limit this history is ever expected to reach.
     .limit(50);
   if (error) throw new Error(`attempt history failed: ${error.message}`);
   const rows = data ?? [];

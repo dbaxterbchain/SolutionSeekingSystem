@@ -127,7 +127,7 @@ export interface HistoryRow {
 
 /** Newest first, numbered from the oldest, so "Attempt 2" stays "Attempt 2" after a third one starts. */
 export function summarizeAttempts(rows: HistoryRow[]): AttemptSummary[] {
-  const oldestFirst = [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const oldestFirst = [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
   return oldestFirst
     .map((r, i) => ({
       id: r.id,
@@ -141,6 +141,11 @@ export function summarizeAttempts(rows: HistoryRow[]): AttemptSummary[] {
       total: r.grade ? r.grade.total : null,
     }))
     .reverse();
+}
+
+/** Whether an attempt has reached an outcome the learner can act on: a grade, or a technical grading failure. */
+export function isAttemptFinished(state: AttemptState): boolean {
+  return state === 'passed' || state === 'needs_revision' || state === 'grading_error';
 }
 
 export function certificationStatus(latest: AttemptState | null): CertificationStatus {

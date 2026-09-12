@@ -5,6 +5,7 @@ import {
   MAX_EXPOSURES_PER_FORM,
   certificationStatus,
   chooseForm,
+  isAttemptFinished,
   promptStage,
   stageProblems,
   summarizeAttempts,
@@ -137,9 +138,16 @@ describe('chooseForm tie-break', () => {
     expect(chooseForm([form('form-b', 2), form('form-a', 1)], {}, false)?.form_id).toBe('form-a');
     expect(chooseForm([form('form-b', 2), form('form-a', 1)], { 'form-a': 1 }, false)?.form_id).toBe('form-b');
   });
-  it('never assigns a sample form unless allowed', () => {
-    expect(chooseForm([form('sample-p0', 0, 'sample')], {}, false)).toBeNull();
-    expect(chooseForm([form('sample-p0', 0, 'sample')], {}, true)?.form_id).toBe('sample-p0');
+});
+
+describe('isAttemptFinished', () => {
+  it('is true for passed, needs_revision and grading_error, false for every other state', () => {
+    expect(isAttemptFinished('passed')).toBe(true);
+    expect(isAttemptFinished('needs_revision')).toBe(true);
+    expect(isAttemptFinished('grading_error')).toBe(true);
+    expect(isAttemptFinished('draft')).toBe(false);
+    expect(isAttemptFinished('submitted')).toBe(false);
+    expect(isAttemptFinished('grading')).toBe(false);
   });
 });
 

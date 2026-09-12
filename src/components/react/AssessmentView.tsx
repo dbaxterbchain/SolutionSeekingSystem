@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSession } from '../../lib/useSession';
 import { accountLink } from '../../lib/accountLink';
 import { track } from '../../lib/analytics';
+import { isAttemptFinished } from '../../lib/course/assessmentRules';
 import {
   CourseActionError,
   advanceAssessment,
@@ -84,6 +85,8 @@ export default function AssessmentView(props: Props) {
   /** Text typed since the last successful save, per prompt: read at save time, never from render-derived state. */
   const dirtyText = useRef<Record<string, string>>({});
   const pending = useRef<Record<string, Promise<boolean>>>({});
+  /** The attempt id the per-prompt state above was last seeded for: prompt ids repeat across forms, so a retake must reset that state rather than merge into it. */
+  const seededFor = useRef<string | null>(null);
   /** The one-time event already fired, as `${attempt id}:${event}`: after a grading_error, an admin retry must still fire grade_ready once. */
   const firedFor = useRef<string | null>(null);
   /** Set by the polling effect: which attempt this page itself watched through submitted/grading. */
@@ -94,6 +97,22 @@ export default function AssessmentView(props: Props) {
   // Seed the drafts from the server view whenever the attempt changes shape.
   useEffect(() => {
     if (!attempt) return;
+    // Prompt ids repeat across forms (a1, a2, a3, b1, b2, c1, c2 in every
+    // form), so a new attempt must not inherit the previous attempt's
+    // revisions or drafts. Reset every per-prompt ref and state before
+    // seeding, gated on the attempt id changing so a poll of the same
+    // attempt still only merges newer revisions in rather than re-seeding
+    // on every tick.
+    if (attempt.id !== seededFor.current) {
+      revisions.current = {};
+      dirtyText.current = {};
+      pending.current = {};
+      for (const id of Object.keys(timers.current)) clearTimeout(timers.current[id]);
+      timers.current = {};
+      setProblems({});
+      setDrafts({});
+      seededFor.current = attempt.id;
+    }
     for (const stage of attempt.stages) {
       for (const p of stage.prompts) {
         if ((revisions.current[p.prompt_id] ?? -1) < p.response.revision) {
@@ -130,13 +149,12 @@ export default function AssessmentView(props: Props) {
       setStatus(await fetchAssessmentStatus(token, viewingRef.current ?? undefined));
       setLoadError(null);
       setNotAvailable(false);
-      void refreshHistory();
     } catch (err) {
       const code = err instanceof CourseActionError ? err.code : 'request_failed';
       if (code === 'not_found') setNotAvailable(true);
       else setLoadError(courseErrorMessage(code));
     }
-  }, [token, refreshHistory]);
+  }, [token]);
 
   useEffect(() => {
     if (loading || !token) return;
@@ -147,6 +165,13 @@ export default function AssessmentView(props: Props) {
     setViewingId(id);
     void load();
   }, [loading, token, load]);
+
+  // The history only changes at attempt state transitions (a new attempt, a
+  // submit, a grade landing), not on every five-second poll tick, so it is
+  // driven from its own effect rather than from load() itself.
+  useEffect(() => {
+    void refreshHistory();
+  }, [attempt?.id, attempt?.state, token]);
 
   // Poll while grading. An interval, not a timeout re-armed by this effect's
   // own deps: a `grading` reading twice in a row would otherwise not re-run
@@ -287,7 +312,6 @@ export default function AssessmentView(props: Props) {
     setActionError(null);
     try {
       setStatus(await startAssessment(token));
-      void refreshHistory();
     } catch (err) {
       if (err instanceof CourseActionError && err.code === 'not_eligible') setActionError(notEligibleMessage(err.extra.reason));
       else setActionError(courseErrorMessage(err instanceof CourseActionError ? err.code : 'request_failed'));
@@ -303,7 +327,6 @@ export default function AssessmentView(props: Props) {
     setRetakeError(null);
     try {
       setStatus(await startAssessment(token));
-      void refreshHistory();
     } catch (err) {
       if (err instanceof CourseActionError && err.code === 'no_forms_available') setRetakeError(err.message);
       else setRetakeError(courseErrorMessage(err instanceof CourseActionError ? err.code : 'request_failed'));
@@ -370,7 +393,6 @@ export default function AssessmentView(props: Props) {
       const next = await submitAssessment(token, attempt.id, submitKeyFor(attempt.id));
       setStatus(next);
       setProblems({});
-      void refreshHistory();
       track({ event: 'assessment_submitted', attempt_id: attempt.id, form_id: attempt.form_id });
     } catch (err) {
       if (err instanceof CourseActionError && err.code === 'incomplete') {
@@ -412,7 +434,7 @@ export default function AssessmentView(props: Props) {
   if (!status) return <p className="text-slate-600">Loading your assessment…</p>;
 
   const showRetake = !viewingId && attempt?.state === 'needs_revision' && status.eligibility.eligible;
-  const showHistory = !!history && (history.length > 1 || ['passed', 'needs_revision', 'grading_error'].includes(history[0]?.state ?? ''));
+  const showHistory = !!history && (history.length > 1 || isAttemptFinished(history[0]?.state ?? 'draft'));
 
   return (
     <div className="max-w-3xl">
@@ -456,13 +478,13 @@ export default function AssessmentView(props: Props) {
               </div>
             </section>
           )}
-          {attempt && (attempt.state === 'passed' || attempt.state === 'needs_revision') && status.result && (
+          {attempt && isAttemptFinished(attempt.state) && status.result && (
             <Result result={status.result} awardsEnabled={status.awards_enabled} />
           )}
           {showRetake && <Retake busy={busy} error={retakeError} onRetake={onRetake} />}
         </>
       )}
-      {showHistory && <AttemptHistory attempts={history ?? []} currentId={attempt?.id ?? null} />}
+      {showHistory && <AttemptHistory attempts={history ?? []} currentId={history?.[0]?.id ?? null} />}
       {dialog}
     </div>
   );
@@ -485,7 +507,7 @@ function ReadOnlyAttempt({
         You are looking at an earlier attempt.{' '}
         <a href="/course/learn/assessment/" className="font-semibold text-brand-700 underline">Back to your assessment</a>
       </p>
-      {attempt && (attempt.state === 'passed' || attempt.state === 'needs_revision') && status.result && (
+      {attempt && isAttemptFinished(attempt.state) && status.result && (
         <Result result={status.result} awardsEnabled={status.awards_enabled} />
       )}
       {attempt && attempt.state === 'grading_error' && (
@@ -503,7 +525,7 @@ function ReadOnlyAttempt({
         <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
           <h2 className="font-heading text-xl font-bold text-ink-800">Grading in progress</h2>
           <p className="mt-2 text-slate-700">
-            Your responses are with the grader. Results usually take a few minutes. Refresh this page to check, or open your assessment.{' '}
+            Your responses are with the grader. Results usually take a few minutes. Refresh this page to check.{' '}
             <a href="/course/learn/assessment/" className="font-semibold text-brand-700 underline">Back to your assessment</a>
           </p>
         </section>
@@ -532,7 +554,7 @@ function Retake({ busy, error, onRetake }: { busy: boolean; error: string | null
 function AttemptHistory({ attempts, currentId }: { attempts: AttemptSummary[]; currentId: string | null }) {
   const outcome = (a: AttemptSummary): string =>
     a.state === 'passed' ? 'Passed' : a.state === 'needs_revision' ? 'Not yet' : a.state === 'grading_error' ? 'Grading problem' : a.state === 'draft' ? 'In progress' : 'Being graded';
-  const finished = (a: AttemptSummary) => a.state === 'passed' || a.state === 'needs_revision' || a.state === 'grading_error';
+  const finished = (a: AttemptSummary) => isAttemptFinished(a.state);
   return (
     <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
       <h2 className="font-heading text-xl font-bold text-ink-800">Your attempts</h2>

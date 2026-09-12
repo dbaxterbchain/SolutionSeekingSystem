@@ -935,7 +935,8 @@ worker first sets `result_email_sent_at` on the job row where it is null, and on
 that set it sends, under the Resend idempotency key `course-result/<job>-<generation>`. A send
 that fails after that claim is logged and not retried, because the result is already on the
 page and the dashboard says it is ready. When a learner writes in that no email came, read the
-job row: an empty `result_email_sent_at` means the grade never finalized (look at the queue);
+job row: an empty `result_email_sent_at` means the grade never finalized (look at the queue), or
+the function had no `RESEND_API_KEY` or `EMAIL_FROM`, which returns before the claim;
 a set one means the send was attempted, so the next places to look are the Resend log and the
 address on the account. Pressing Kick on a succeeded job sends nothing, since the claim answers
 `unavailable` before any email code runs. `RESEND_API_KEY` and `EMAIL_FROM` already carry

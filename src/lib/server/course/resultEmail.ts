@@ -45,7 +45,7 @@ export function resultReadyEmail(opts: { assessmentUrl: string }): { subject: st
 <h1 style="margin:0 0 12px;font-size:22px;color:${INK};">${subject}</h1>
 <p style="margin:0 0 20px;">The grader has finished with your final assessment. Sign in to read the feedback and the lessons it points to.</p>
 <p style="margin:0 0 24px;"><a href="${opts.assessmentUrl}" style="display:inline-block;padding:12px 20px;border-radius:999px;background:${BRAND};color:#ffffff;font-weight:600;text-decoration:none;">Open your assessment</a></p>
-<p style="margin:0;font-size:13px;color:#64748b;">Sent because this address took the final assessment on solutionseeking.com.</p>
+<p style="margin:0;font-size:13px;color:#64748b;">Sent because this address took the final assessment on solutionseeking.com.<br>Beanchain Coffee LLC</p>
 </body></html>`;
   return { subject, text, html };
 }
