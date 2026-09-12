@@ -7,11 +7,13 @@ import {
   advanceAssessment,
   courseErrorMessage,
   fetchAssessmentStatus,
+  listAttempts,
   notEligibleMessage,
   saveAssessmentResponse,
   startAssessment,
   submitAssessment,
   type AssessmentStatus,
+  type AttemptSummary,
   type CapApplied,
   type CriterionFeedback,
   type PromptView,
@@ -64,6 +66,18 @@ export default function AssessmentView(props: Props) {
   const [busy, setBusy] = useState(false);
   const [problems, setProblems] = useState<Record<string, string>>({});
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [history, setHistory] = useState<AttemptSummary[] | null>(null);
+  /** The `?attempt=` id this page is showing read-only, or null for the learner's own current attempt. */
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const [notAvailable, setNotAvailable] = useState(false);
+  const [retakeError, setRetakeError] = useState<string | null>(null);
+  /**
+   * Mirrors `viewingId` for `load` to read: the shell is prerendered and this
+   * island renders once on the server, so the URL is read in an effect, and a
+   * ref keeps `load` reading the value that effect found rather than a stale
+   * closure over the `viewingId` state.
+   */
+  const viewingRef = useRef<string | null>(null);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   /** The latest revision the server has told us about, per prompt: the source of truth for `expected_revision`. */
   const revisions = useRef<Record<string, number>>({});
@@ -100,31 +114,53 @@ export default function AssessmentView(props: Props) {
     });
   }, [attempt?.id, attempt?.current_stage, attempt?.state]);
 
-  const load = useCallback(async () => {
+  /** The attempt list is supplementary: a failure here leaves whatever list was last loaded rather than blocking the page on it. */
+  const refreshHistory = useCallback(async () => {
     if (!token) return;
     try {
-      setStatus(await fetchAssessmentStatus(token));
-      setLoadError(null);
-    } catch (err) {
-      setLoadError(courseErrorMessage(err instanceof CourseActionError ? err.code : 'request_failed'));
+      setHistory((await listAttempts(token)).attempts);
+    } catch {
+      // ignore; the history section simply keeps its last known list
     }
   }, [token]);
 
+  const load = useCallback(async () => {
+    if (!token) return;
+    try {
+      setStatus(await fetchAssessmentStatus(token, viewingRef.current ?? undefined));
+      setLoadError(null);
+      setNotAvailable(false);
+      void refreshHistory();
+    } catch (err) {
+      const code = err instanceof CourseActionError ? err.code : 'request_failed';
+      if (code === 'not_found') setNotAvailable(true);
+      else setLoadError(courseErrorMessage(code));
+    }
+  }, [token, refreshHistory]);
+
   useEffect(() => {
-    if (!loading && token) void load();
+    if (loading || !token) return;
+    // The shell is prerendered and this island renders once on the server,
+    // so the flag is read here, in the effect, and never during render.
+    const id = new URLSearchParams(window.location.search).get('attempt');
+    viewingRef.current = id;
+    setViewingId(id);
+    void load();
   }, [loading, token, load]);
 
   // Poll while grading. An interval, not a timeout re-armed by this effect's
   // own deps: a `grading` reading twice in a row would otherwise not re-run
   // the effect at all, and the poll would silently stop. Once started, the
-  // interval keeps firing on its own until the cleanup below runs.
+  // interval keeps firing on its own until the cleanup below runs. Never for
+  // a read-only view of an earlier attempt: it never sets sawOpenFor either,
+  // so the one-time events below stay tied to attempts this page itself watched.
   useEffect(() => {
-    if (!attempt) return;
+    if (!attempt || viewingId) return;
     if (attempt.state !== 'submitted' && attempt.state !== 'grading') return;
     sawOpenFor.current = attempt.id;
     const id = setInterval(() => void load(), POLL_MS);
     return () => clearInterval(id);
-  }, [attempt?.id, attempt?.state, load]);
+  }, [attempt?.id, attempt?.state, load, viewingId]);
 
   // Fire the one-time events when the outcome lands, but only for an attempt
   // this page itself watched through submitted/grading: never on a plain
@@ -251,9 +287,26 @@ export default function AssessmentView(props: Props) {
     setActionError(null);
     try {
       setStatus(await startAssessment(token));
+      void refreshHistory();
     } catch (err) {
       if (err instanceof CourseActionError && err.code === 'not_eligible') setActionError(notEligibleMessage(err.extra.reason));
       else setActionError(courseErrorMessage(err instanceof CourseActionError ? err.code : 'request_failed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Starting again after a `needs_revision` result: the retake panel's only action. */
+  const onRetake = async () => {
+    if (!token) return;
+    setBusy(true);
+    setRetakeError(null);
+    try {
+      setStatus(await startAssessment(token));
+      void refreshHistory();
+    } catch (err) {
+      if (err instanceof CourseActionError && err.code === 'no_forms_available') setRetakeError(err.message);
+      else setRetakeError(courseErrorMessage(err instanceof CourseActionError ? err.code : 'request_failed'));
     } finally {
       setBusy(false);
     }
@@ -317,6 +370,7 @@ export default function AssessmentView(props: Props) {
       const next = await submitAssessment(token, attempt.id, submitKeyFor(attempt.id));
       setStatus(next);
       setProblems({});
+      void refreshHistory();
       track({ event: 'assessment_submitted', attempt_id: attempt.id, form_id: attempt.form_id });
     } catch (err) {
       if (err instanceof CourseActionError && err.code === 'incomplete') {
@@ -340,8 +394,25 @@ export default function AssessmentView(props: Props) {
       </p>
     );
   }
+  if (notAvailable) {
+    return (
+      <div className="max-w-3xl">
+        <header>
+          <p className="eyebrow">{props.certificationTitle}</p>
+          <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-ink-800 sm:text-4xl">Final assessment</h1>
+        </header>
+        <p className="mt-8 text-slate-700">
+          That attempt is not available.{' '}
+          <a href="/course/learn/assessment/" className="font-semibold text-brand-700 underline">Back to your assessment</a>
+        </p>
+      </div>
+    );
+  }
   if (loadError && !status) return <ErrorLine text={loadError} />;
   if (!status) return <p className="text-slate-600">Loading your assessment…</p>;
+
+  const showRetake = !viewingId && attempt?.state === 'needs_revision' && status.eligibility.eligible;
+  const showHistory = !!history && (history.length > 1 || ['passed', 'needs_revision', 'grading_error'].includes(history[0]?.state ?? ''));
 
   return (
     <div className="max-w-3xl">
@@ -350,25 +421,72 @@ export default function AssessmentView(props: Props) {
         <p className="eyebrow">{props.certificationTitle}</p>
         <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-ink-800 sm:text-4xl">Final assessment</h1>
       </header>
-      {!attempt && <Intro status={status} busy={busy} error={actionError} onStart={start} />}
-      {attempt && attempt.state === 'draft' && (
-        <Stages
-          attempt={attempt}
-          drafts={drafts}
-          problems={problems}
-          busy={busy}
-          error={actionError}
-          onChange={onChange}
-          onResolve={resolveConflict}
-          onAdvance={advance}
-          onSubmit={submit}
-        />
+      {viewingId ? (
+        <ReadOnlyAttempt status={status} supportContact={props.supportContact} onCheckAgain={load} />
+      ) : (
+        <>
+          {!attempt && <Intro status={status} busy={busy} error={actionError} onStart={start} />}
+          {attempt && attempt.state === 'draft' && (
+            <Stages
+              attempt={attempt}
+              drafts={drafts}
+              problems={problems}
+              busy={busy}
+              error={actionError}
+              onChange={onChange}
+              onResolve={resolveConflict}
+              onAdvance={advance}
+              onSubmit={submit}
+            />
+          )}
+          {attempt && (attempt.state === 'submitted' || attempt.state === 'grading') && (
+            <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
+              <h2 className="font-heading text-xl font-bold text-ink-800">Grading in progress</h2>
+              <p className="mt-2 text-slate-700">Your responses are with the grader. Results usually take a few minutes, and this page checks every few seconds.</p>
+            </section>
+          )}
+          {attempt && attempt.state === 'grading_error' && (
+            <section className="mt-8 rounded-2xl border border-amber-100 bg-amber-50 p-6" role="alert">
+              <h2 className="font-heading text-xl font-bold text-ink-800">We could not finish grading</h2>
+              <p className="mt-2 text-amber-900">{GRADING_ERROR_COPY}</p>
+              <p className="mt-2 text-amber-900">Course support can re-run the grading for you.</p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <a className="btn-primary" href={`mailto:${props.supportContact}`}>Contact course support</a>
+                <button type="button" className="btn-secondary" onClick={() => void load()}>Check again</button>
+              </div>
+            </section>
+          )}
+          {attempt && (attempt.state === 'passed' || attempt.state === 'needs_revision') && status.result && (
+            <Result result={status.result} awardsEnabled={status.awards_enabled} />
+          )}
+          {showRetake && <Retake busy={busy} error={retakeError} onRetake={onRetake} />}
+        </>
       )}
-      {attempt && (attempt.state === 'submitted' || attempt.state === 'grading') && (
-        <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
-          <h2 className="font-heading text-xl font-bold text-ink-800">Grading in progress</h2>
-          <p className="mt-2 text-slate-700">Your responses are with the grader. Results usually take a few minutes, and this page checks every few seconds.</p>
-        </section>
+      {showHistory && <AttemptHistory attempts={history ?? []} currentId={attempt?.id ?? null} />}
+      {dialog}
+    </div>
+  );
+}
+
+/** A `?attempt=<id>` view of one earlier or in-progress attempt: read-only, no polling, never Stages or Intro. */
+function ReadOnlyAttempt({
+  status,
+  supportContact,
+  onCheckAgain,
+}: {
+  status: AssessmentStatus;
+  supportContact: string;
+  onCheckAgain: () => void;
+}) {
+  const attempt = status.attempt;
+  return (
+    <div className="mt-8">
+      <p className="text-slate-700">
+        You are looking at an earlier attempt.{' '}
+        <a href="/course/learn/assessment/" className="font-semibold text-brand-700 underline">Back to your assessment</a>
+      </p>
+      {attempt && (attempt.state === 'passed' || attempt.state === 'needs_revision') && status.result && (
+        <Result result={status.result} awardsEnabled={status.awards_enabled} />
       )}
       {attempt && attempt.state === 'grading_error' && (
         <section className="mt-8 rounded-2xl border border-amber-100 bg-amber-50 p-6" role="alert">
@@ -376,16 +494,63 @@ export default function AssessmentView(props: Props) {
           <p className="mt-2 text-amber-900">{GRADING_ERROR_COPY}</p>
           <p className="mt-2 text-amber-900">Course support can re-run the grading for you.</p>
           <div className="mt-4 flex flex-wrap gap-3">
-            <a className="btn-primary" href={`mailto:${props.supportContact}`}>Contact course support</a>
-            <button type="button" className="btn-secondary" onClick={() => void load()}>Check again</button>
+            <a className="btn-primary" href={`mailto:${supportContact}`}>Contact course support</a>
+            <button type="button" className="btn-secondary" onClick={onCheckAgain}>Check again</button>
           </div>
         </section>
       )}
-      {attempt && (attempt.state === 'passed' || attempt.state === 'needs_revision') && status.result && (
-        <Result result={status.result} awardsEnabled={status.awards_enabled} />
+      {attempt && (attempt.state === 'submitted' || attempt.state === 'grading') && (
+        <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
+          <h2 className="font-heading text-xl font-bold text-ink-800">Grading in progress</h2>
+          <p className="mt-2 text-slate-700">Your responses are with the grader. Results usually take a few minutes, and this page checks every few seconds.</p>
+        </section>
       )}
-      {dialog}
+      {attempt && attempt.state === 'draft' && (
+        <p className="mt-8 text-slate-700">
+          This attempt is still in progress.{' '}
+          <a href="/course/learn/assessment/" className="font-semibold text-brand-700 underline">Back to your assessment</a>
+        </p>
+      )}
     </div>
+  );
+}
+
+function Retake({ busy, error, onRetake }: { busy: boolean; error: string | null; onRetake: () => void }) {
+  return (
+    <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
+      <h2 className="font-heading text-xl font-bold text-ink-800">Start again when you are ready</h2>
+      <p className="mt-2 text-slate-700">A new attempt uses a different scenario where one is available. Your earlier result stays in your history, and the lessons named above are the ones worth revisiting first.</p>
+      <button type="button" className="btn-primary mt-4" disabled={busy} onClick={onRetake}>{busy ? 'Starting…' : 'Start a new attempt'}</button>
+      {error && <ErrorLine text={error} />}
+    </section>
+  );
+}
+
+function AttemptHistory({ attempts, currentId }: { attempts: AttemptSummary[]; currentId: string | null }) {
+  const outcome = (a: AttemptSummary): string =>
+    a.state === 'passed' ? 'Passed' : a.state === 'needs_revision' ? 'Not yet' : a.state === 'grading_error' ? 'Grading problem' : a.state === 'draft' ? 'In progress' : 'Being graded';
+  const finished = (a: AttemptSummary) => a.state === 'passed' || a.state === 'needs_revision' || a.state === 'grading_error';
+  return (
+    <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
+      <h2 className="font-heading text-xl font-bold text-ink-800">Your attempts</h2>
+      <ul className="mt-3 divide-y divide-slate-100">
+        {attempts.map((a) => (
+          <li key={a.id} className="flex items-baseline justify-between gap-3 py-2 text-sm">
+            <span>
+              {finished(a) && a.id !== currentId ? (
+                <a href={`/course/learn/assessment/?attempt=${a.id}`} className="font-medium text-brand-700 hover:underline">
+                  Attempt {a.sequence}
+                </a>
+              ) : (
+                <span className="font-medium text-ink-800">Attempt {a.sequence}</span>
+              )}
+              <span className="text-slate-500">, {new Date(a.created_at).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            </span>
+            <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-400">{outcome(a)}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -532,8 +697,8 @@ function Prompt(props: {
             <div className="mt-2 rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm text-amber-900" role="alert">
               <p>This response was also saved from another window. Which version do you want to keep?</p>
               <div className="mt-2 flex gap-2">
-                <button type="button" className="btn-secondary" onClick={() => props.onResolve(prompt.prompt_id, false)}>Use the other version</button>
-                <button type="button" className="btn-secondary" onClick={() => props.onResolve(prompt.prompt_id, true)}>Keep mine</button>
+                <button type="button" className="btn-secondary" disabled={props.busy} onClick={() => props.onResolve(prompt.prompt_id, false)}>Use the other version</button>
+                <button type="button" className="btn-secondary" disabled={props.busy} onClick={() => props.onResolve(prompt.prompt_id, true)}>Keep mine</button>
               </div>
             </div>
           )}
