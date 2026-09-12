@@ -82,19 +82,30 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
     return run;
   }, []);
 
-  const load = useCallback(async () => {
-    if (!token) return;
+  /**
+   * Fetches the lesson and returns whether it turned out to be a locked
+   * preview (an admin previewing a lesson that is not published): that can
+   * only be known once the payload is in hand, never from the URL flag
+   * alone, since a preview of an already-published lesson is not locked.
+   * Returns null on a failed fetch, so callers can skip anything that
+   * depends on the lesson's status.
+   */
+  const load = useCallback(async (): Promise<boolean | null> => {
+    if (!token) return null;
     try {
       const data = await fetchLesson(token, lessonId, previewRef.current);
       setPayload(data);
       setLoadError(null);
+      const locked = previewRef.current && data.lesson.status !== 'published';
       if (data.progress) {
         setProgress(data.progress);
         revision.current = data.progress.revision;
       }
       // Coming back to a lesson already revealed: the text is never in the
       // lesson payload, so ask for it again. reveal_model is idempotent.
-      if (data.progress?.model_revealed && modelResponse === null) {
+      // Skipped in a locked preview: its banner promises nothing is recorded,
+      // and this is a progress write.
+      if (!locked && data.progress?.model_revealed && modelResponse === null) {
         try {
           const again = await enqueue(() => postProgress(token, { lesson_id: lessonId, action: 'reveal_model' }));
           if (again.model_response !== undefined) setModelResponse(again.model_response);
@@ -102,8 +113,10 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
           // The button under the model response is the fallback.
         }
       }
+      return locked;
     } catch (err) {
       setLoadError(err instanceof CourseActionError ? err : new CourseActionError('request_failed', 0));
+      return null;
     }
   }, [token, lessonId, modelResponse, enqueue]);
 
@@ -115,20 +128,26 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
     const wantsPreview = new URLSearchParams(window.location.search).get('preview') === '1';
     previewRef.current = wantsPreview;
     setPreview(wantsPreview);
-    void load();
     void fetchCourseState(token).then(setState).catch(() => setState(null));
-    // A preview is read-only: it never opens progress for a lesson that
-    // is not published, which the progress route would refuse anyway.
-    if (!wantsPreview) {
-      void enqueue(() => postProgress(token, { lesson_id: lessonId, action: 'open' })).catch(() => {});
-    }
+    // A locked preview (an unpublished lesson) is read-only: it never opens
+    // progress, which the progress route would refuse anyway. Whether this
+    // lesson is locked is only known once the fetch resolves, so the open
+    // action waits on it rather than firing from the URL flag alone.
+    void load().then((locked) => {
+      if (locked === false) {
+        void enqueue(() => postProgress(token, { lesson_id: lessonId, action: 'open' })).catch(() => {});
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionLoading, user?.id, lessonId]);
 
   // Seed the editor: the local draft wins over the server copy if it is newer than the last save.
-  // Skipped in preview: the textarea is read-only there, so there is no draft to seed or save.
+  // Skipped for a locked preview: the textarea is read-only there, so there is no draft to seed
+  // or save. A preview of an already-published lesson (its neighbour, say) is not locked and
+  // seeds normally.
   useEffect(() => {
-    if (!payload || !user || preview) return;
+    if (!payload || !user) return;
+    if (preview && payload.lesson.status !== 'published') return;
     const server = payload.progress?.response_text ?? '';
     let draft: { text: string; revision: number } | null = null;
     try {
