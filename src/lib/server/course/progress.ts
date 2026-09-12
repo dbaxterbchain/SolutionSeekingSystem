@@ -51,3 +51,37 @@ export async function loadCheckAttempts(userId: string): Promise<CheckAttemptLit
   if (error) throw new Error(`course_check_attempts list failed: ${error.message}`);
   return (data as CheckAttemptLite[]) ?? [];
 }
+
+export interface CheckAttemptRow {
+  check_id: string;
+  choice: 1 | 2;
+  correct: boolean;
+  created_at: string;
+}
+
+/** Every attempt on one module, newest first. The island shows the count and whether a check is done. */
+export async function loadCheckHistory(userId: string, moduleId: string): Promise<CheckAttemptRow[]> {
+  const { data, error } = await supabaseAdmin
+    .from('course_check_attempts')
+    .select('check_id, choice, correct, created_at')
+    .eq('user_id', userId)
+    .eq('course_id', COURSE.id)
+    .eq('module_id', moduleId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(`course_check_attempts read failed: ${error.message}`);
+  return (data as CheckAttemptRow[]) ?? [];
+}
+
+/** Append-only. The table has no update grant for anyone, so a recorded answer is never rewritten. */
+export async function recordCheckAttempt(
+  userId: string,
+  moduleId: string,
+  checkId: string,
+  choice: 1 | 2,
+  correct: boolean
+): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('course_check_attempts')
+    .insert({ user_id: userId, course_id: COURSE.id, module_id: moduleId, check_id: checkId, choice, correct });
+  if (error) throw new Error(`course_check_attempts insert failed: ${error.message}`);
+}

@@ -234,6 +234,27 @@ export interface WorksheetPayload {
   markdown: string;
 }
 
+export interface CheckStandingView {
+  id: string;
+  question: string;
+  choices: [string, string];
+  attempts: number;
+  answered_correctly: boolean;
+  last_choice: 1 | 2 | null;
+}
+export interface ModuleChecksPayload {
+  module: { id: string; title: string; order: number };
+  checks: CheckStandingView[];
+  lessons_complete: boolean;
+  module_complete: boolean;
+}
+export interface CheckAnswerResponse {
+  correct: boolean;
+  explanation: string;
+  check_complete: boolean;
+  module_complete: boolean;
+}
+
 /** The rest of a failed response's JSON body, mapped to CourseActionError and thrown. Shared by getJson and postProgress. */
 function throwFor(res: Response, data: unknown): never {
   const { error, message, ...extra } = (data ?? {}) as Record<string, unknown>;
@@ -265,6 +286,30 @@ export const fetchCourseState = (accessToken: string): Promise<CourseStateView> 
 
 export const fetchWorksheet = (accessToken: string, id: string): Promise<WorksheetPayload> =>
   getJson(accessToken, `/api/course/worksheet?id=${encodeURIComponent(id)}`);
+
+/** POST JSON with the bearer; throws CourseActionError with the server's code (or network_error). */
+async function postJson<T>(accessToken: string, path: string, body: unknown): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new CourseActionError('network_error', 0);
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throwFor(res, data);
+  return data as T;
+}
+
+export const fetchModuleChecks = (accessToken: string, moduleId: string): Promise<ModuleChecksPayload> =>
+  getJson(accessToken, `/api/course/check?module_id=${encodeURIComponent(moduleId)}`);
+export const answerCheck = (
+  accessToken: string,
+  body: { module_id: string; check_id: string; choice: 1 | 2 }
+): Promise<CheckAnswerResponse> => postJson(accessToken, '/api/course/check', body);
 
 export interface ProgressBody {
   lesson_id: string;

@@ -5,8 +5,9 @@ import { isVisibleTo } from '../../course/visibility';
 
 /**
  * Server-side reads of the course catalog for the API routes. Astro-only:
- * the catalog reads astro:content. Checks and answer keys are read here too
- * when Phase 2 adds the module checks.
+ * the catalog reads astro:content. The module checks are read here too, key
+ * included; only the check route may call `getModuleForLearner`, and it
+ * strips the key before answering.
  */
 
 export interface LessonWithModule {
@@ -32,4 +33,17 @@ export async function getLessonForLearner(id: string, adminPreview: boolean): Pr
 export async function getWorksheet(id: string): Promise<WorksheetInput | null> {
   const catalog = await getCourseCatalog();
   return catalog.worksheets.find((w) => w.id === id) ?? null;
+}
+
+export interface ModuleWithLessons {
+  module: CatalogModule;
+  lessons: CatalogLesson[];
+}
+
+/** A module with checks, with its lessons in order, or null for an unknown id or module 9. */
+export async function getModuleForLearner(id: string): Promise<ModuleWithLessons | null> {
+  const catalog = await getCourseCatalog();
+  const module = catalog.modules.find((m) => m.id === id);
+  if (!module || module.checks.length === 0) return null;
+  return { module, lessons: module.lessonIds.map((lid) => catalog.byId[lid]) };
 }
