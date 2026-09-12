@@ -1331,6 +1331,30 @@ Write the captions in the README's existing voice (one row per shot, no two capt
 - No hosted step is needed for this plan. When the branch merges, production picks up the check route and the module pages while staying hidden; the `course-beta` branch deploy is where David can try the checks with his own enrollment.
 - The Stream customer code constant duplicates a Netlify value on purpose; the ruling above says why. If the code ever changes, both places change.
 
+## Execution record (2026-09-11 to 2026-09-12)
+
+Executed with subagent-driven development on branch `course-phase2` from `main` after PR #17: Tasks 1 to 7 in seven commits from `ef3f3a5` to `5467cd9` (Tasks 1 and 2 to one implementer, as the controller notes allowed), the controller's browser pass and docs (Task 8, `35491e0`), a whole-branch review and one fix wave (`9c20c21`). Task reviews were clean for Tasks 1, 2, 6 and 7; Task 3 took one fix round (a stale closure could track `module_completed` twice, and a failed answer replaced the whole island with the load-error dead end); Task 4 took one fix round (the seeding effect and the mount `open` action keyed on the URL flag rather than the fetched lesson's status, and the `reveal_model` refetch posted during a locked preview); Task 5's one finding was ruled rather than fixed. Amendments the reviews forced on this plan, now in the code:
+
+- `check_complete`, `attempts` and `last_choice` left the check payload: the island derives Done from the verdict and the module flag, so the fields and the second history read they needed were trimmed rather than surfaced, and `loadCheckHistory` is bounded to two hundred rows.
+- A check answered correctly is read-only afterwards. Retrying is for a wrong answer; an open button on a correct one was an unbounded write path into `course_check_attempts` that every state read would have paid for.
+- The check answers have a machine guard, as the assessment forms do: `check-private-content.mjs` allows `getModuleForLearner` in two files only, and `check-dist-leak.mjs` scans the built output for every module check's explanation.
+- The placeholder-while-open validator message now carries the status suffix every other gate message carries, since the loop that wraps them is uniform and nothing matched the old wording.
+- The free lesson page is deliberately absent from `llms.txt` and has no `.md` variant: the spec keeps lesson prose out of the machine-readable surfaces, and the free lesson is still lesson prose.
+- The 403 for a non-admin with `?preview=1` reads as a note about the preview link rather than a false claim about the lesson's status, and a locked preview does not link to the module check.
+- The module shell's intro no longer types a question count; the ladder's preview-lesson gate keeps no rank floor, with a comment saying why.
+
+Browser verification (Task 8) on the local stack as the enrolled admin account: a wrong answer with its explanation and the Try again button at 390px, both questions Done on the module page, the dashboard's Module check row marked Done and its resources link, the resources page at 390px, the Content tab listing V04 as published on the stand-in clip and V05 as a draft with its six gates, and V04 temporarily staged and opened with `?preview=1` (banner, read-only response box, no actions), then restored. Screenshots are in `docs/features/course/`. Gates on the final tree: `npm run check` clean, 230 tests, a preview build and a hidden build with the dist scan ok.
+
+Carried forward:
+
+1. `PublicCurriculum.modules[]` should carry `hasCheck`; today four places encode "module 9 has no check" and agree only because the validator pins two checks per study module.
+2. `LessonView.tsx` grew again and carries about ten preview conditionals; hoisting the preview mode into a hook or splitting the read-only render path should precede any Phase 3 change to that file.
+3. `CheckStanding` in the check route duplicates `CheckStandingView` in the client; a shared type would remove it.
+4. `loadCheckHistory` is bounded by module, so a learner who drives more than two hundred attempts into one module through the API after a correct answer could see that check unmarked on the module page; module completion itself reads the unbounded correct-only query and stays right. A per-check bound or a separate correct-only read closes it.
+5. Small copy and markup items left as they are: the Content tab's Lesson column runs the id into the title, `resources.astro` carries doubled spaces from the spacer pattern, the resources page's certification fallback says "orientation lesson", and `preview.astro` reads the catalog before its availability check (memoised, as the OG route does).
+6. Module completion counts published lessons only, so publishing a module's last lesson last keeps the assessment from unlocking early; the import loop says so.
+7. The free lesson page has no screenshot until V05 is published for real.
+
 ## Handoff
 
 Phase 3 (the certification journey) consumes the assessment data path as 1d and 1e left it, plus nothing from this plan except the module pages' `module_completed` event, which makes `assessment_eligible` reachable once every study module is published and completed. The content itself arrives through the import loop this plan documents: David's lesson copy and module check explanations, Bradley's masters and captions, published module by module with the Content tab naming each lesson's next gate. Phase 3's first task should read the "Certificates, verification, reviews, emails, admin" section of the spec and the 1e plan's handoff paragraph.
