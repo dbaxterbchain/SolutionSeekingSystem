@@ -8,8 +8,10 @@ against the local Supabase stack: a real Stripe test-mode purchase, real autosav
 grades from `claude-opus-5`. See [../../roadmap.md](../../roadmap.md) Phase 6 for the plan and
 [../../status.md](../../status.md) for what remains. Phase 2 added the module checks, the admin
 preview of a staged lesson, the content ladder, the free lesson page and the resources page; its
-shots are the last six rows. The free lesson page has no shot yet, because the preview lesson
-is still a draft and a page of placeholder copy would show nothing true.
+shots follow the Phase 1 rows. The free lesson page has no shot yet, because the preview lesson
+is still a draft and a page of placeholder copy would show nothing true. Phase 3a added the
+attempt history, the read-only earlier attempt and the retake path; its three shots close the
+table.
 
 The public pages were captured with `PUBLIC_COURSE_STATUS=preview`, because production stays
 `hidden` through the pilots. That is why the sales page and the pricing panel say "Opens soon"
@@ -49,6 +51,9 @@ rather than carrying a price.
 | ![Staged lesson, admin preview](staged-lesson-admin-preview-1280.png) | **`staged-lesson-admin-preview-1280.png`**: a staged lesson opened by an admin with `?preview=1`. The banner names the status, the response box is read-only and no progress action exists, so checking a lesson records nothing. A learner on the same URL gets a 404. |
 | ![Admin content ladder](admin-content-ladder-1280.png) | **`admin-content-ladder-1280.png`**: the Content tab in `/admin`. One row per lesson in chain order, with its status, its next rung and what that rung still needs, produced by the same gate function the build runs, so the tab and the validator cannot disagree. |
 | ![Resources page, phone](course-resources-390.png) | **`course-resources-390.png`**: every worksheet by module, the free guide, the practice tools and the support address, at 390px. Public data only, so it is a plain prerendered page with no island. |
+| ![Attempt history](assessment-history-1280.png) | **`assessment-history-1280.png`**: the history under a result. Attempts are numbered from the first and dated, never named by form; the current one is plain text and the earlier one is a link, so the list never points at the page it is on. |
+| ![Retake panel, phone](assessment-retake-390.png) | **`assessment-retake-390.png`**: what follows a not-yet result at 390px. Start a new attempt asks the server for the least-exposed form; when none is left, the server's own sentence about every form having been used appears in place of a new draft. |
+| ![Earlier attempt, read-only](assessment-earlier-attempt-1280.png) | **`assessment-earlier-attempt-1280.png`**: an earlier attempt opened from the history. One line says which it is and links back; the result renders with its own lower total, and nothing on the page can be edited or submitted. |
 
 _Captured with a headless Chromium session against the local Supabase stack. The dark pill at
 the bottom of some shots is the Astro dev toolbar, not part of the feature._
