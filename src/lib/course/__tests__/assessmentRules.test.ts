@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { SnapshotPublic } from '../assessmentForm';
+import type { AttemptState } from '../assessmentTypes';
 import {
   MAX_EXPOSURES_PER_FORM,
   certificationStatus,
   chooseForm,
   promptStage,
   stageProblems,
+  summarizeAttempts,
   viewForLearner,
   type AttemptRecord,
   type ResponseRecord,
@@ -99,6 +101,45 @@ describe('chooseForm', () => {
     expect(MAX_EXPOSURES_PER_FORM).toBe(1);
     expect(chooseForm(forms, { 'form-a': 1 }, false)?.form_id).toBe('form-b');
     expect(chooseForm(forms, { 'form-a': 1, 'form-b': 1 }, false)).toBeNull();
+  });
+});
+
+describe('summarizeAttempts', () => {
+  const row = (id: string, created: string, state: AttemptState, grade: { passed: boolean; total: number } | null, finalized: string | null) => ({
+    id,
+    state,
+    certification_version: '1',
+    created_at: created,
+    submitted_at: finalized ? created : null,
+    finalized_at: finalized,
+    grade,
+  });
+  it('numbers attempts from the oldest and lists them newest first', () => {
+    const out = summarizeAttempts([
+      row('b', '2026-09-12T10:00:00Z', 'needs_revision', { passed: false, total: 72.5 }, '2026-09-12T10:10:00Z'),
+      row('a', '2026-09-11T10:00:00Z', 'passed', { passed: true, total: 91 }, '2026-09-11T10:10:00Z'),
+      row('c', '2026-09-13T10:00:00Z', 'draft', null, null),
+    ]);
+    expect(out.map((a) => [a.id, a.sequence])).toEqual([['c', 3], ['b', 2], ['a', 1]]);
+    expect(out[1]).toMatchObject({ state: 'needs_revision', passed: false, total: 72.5 });
+    expect(out[2]).toMatchObject({ state: 'passed', passed: true, total: 91 });
+  });
+  it('carries no outcome for an attempt that has no grade yet', () => {
+    const [only] = summarizeAttempts([row('a', '2026-09-11T10:00:00Z', 'grading', null, null)]);
+    expect(only.passed).toBeNull();
+    expect(only.total).toBeNull();
+  });
+});
+
+describe('chooseForm tie-break', () => {
+  const form = (form_id: string, order: number, status: 'active' | 'sample' = 'active') => ({ form_id, order, status });
+  it('takes the lowest order among equally exposed forms', () => {
+    expect(chooseForm([form('form-b', 2), form('form-a', 1)], {}, false)?.form_id).toBe('form-a');
+    expect(chooseForm([form('form-b', 2), form('form-a', 1)], { 'form-a': 1 }, false)?.form_id).toBe('form-b');
+  });
+  it('never assigns a sample form unless allowed', () => {
+    expect(chooseForm([form('sample-p0', 0, 'sample')], {}, false)).toBeNull();
+    expect(chooseForm([form('sample-p0', 0, 'sample')], {}, true)?.form_id).toBe('sample-p0');
   });
 });
 

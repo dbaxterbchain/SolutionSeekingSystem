@@ -1,5 +1,5 @@
 import type { SnapshotPublic, SnapshotStage } from './assessmentForm';
-import type { AttemptState, AttemptView, CertificationStatus, StageView } from './assessmentTypes';
+import type { AttemptState, AttemptSummary, AttemptView, CertificationStatus, StageView } from './assessmentTypes';
 
 /**
  * Pure rules for an attempt: what the learner may see, when a stage is
@@ -113,6 +113,34 @@ export function chooseForm<F extends AssignableForm>(forms: F[], exposures: Reco
       .filter((f) => (exposures[f.form_id] ?? 0) < MAX_EXPOSURES_PER_FORM)
       .sort((a, b) => a.order - b.order || a.form_id.localeCompare(b.form_id))[0] ?? null
   );
+}
+
+export interface HistoryRow {
+  id: string;
+  state: AttemptState;
+  certification_version: string;
+  created_at: string;
+  submitted_at: string | null;
+  finalized_at: string | null;
+  grade: { passed: boolean; total: number } | null;
+}
+
+/** Newest first, numbered from the oldest, so "Attempt 2" stays "Attempt 2" after a third one starts. */
+export function summarizeAttempts(rows: HistoryRow[]): AttemptSummary[] {
+  const oldestFirst = [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  return oldestFirst
+    .map((r, i) => ({
+      id: r.id,
+      state: r.state,
+      certification_version: r.certification_version,
+      sequence: i + 1,
+      created_at: r.created_at,
+      submitted_at: r.submitted_at,
+      finalized_at: r.finalized_at,
+      passed: r.grade ? r.grade.passed : null,
+      total: r.grade ? r.grade.total : null,
+    }))
+    .reverse();
 }
 
 export function certificationStatus(latest: AttemptState | null): CertificationStatus {
