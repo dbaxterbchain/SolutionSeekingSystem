@@ -592,6 +592,25 @@ Before the pass, the controller creates what the screenshots need on the local s
 - Task 2's browser verification needs a `needs_revision` attempt on the local stack. If none exists when Task 2 is dispatched, the implementer verifies with curl and the controller finishes the check in Task 5.
 - The ship step for 3a is small: nothing new in the environment (Resend is already in Functions scope), no migration. After the merge, the controller proves the email once on the `course-beta` deploy.
 
+## Execution record (2026-09-12)
+
+Executed with subagent-driven development on branch `course-phase3a` from `main` after PR #18: Tasks 1 to 4 in five commits from `114069e` to `05a83fe`, the controller's screenshots and docs (Task 5, `948d7b2`), a whole-branch review and one fix wave (`746aac4`). Task reviews were clean for Tasks 1, 3 and 4; Task 2 took one fix round (the read-only grading-in-progress copy promised polling the view does not do). The whole-branch review found what no task review could: after a successful retake the island's per-prompt refs and drafts, keyed by prompt id, still held the previous attempt's values because prompt ids repeat across forms, so the new attempt showed the old answers and could not advance without a reload; the local walk had only ever reached the no-forms branch because both local forms were already exposed. Amendments the reviews and the run forced on this plan:
+
+- The island resets its per-prompt state whenever the attempt id changes, before seeding; polls of the same attempt keep the merge behaviour. The history passes its newest row as the current attempt in both modes, and refreshes on attempt transitions rather than on every poll tick. `isAttemptFinished` in `assessmentRules.ts` replaces three spellings of the finished states.
+- The result email's draft copy named a criterion while the plan's own test forbids the word; the copy was reworded and the test kept.
+- The Resend mock in the email test is `vi.fn().mockImplementation(function () {...})`, since an arrow-returning `vi.fn` is not constructible under this vitest.
+- A two-attempt history cannot exist locally with one sample form and one exposure per learner, so the controller used untracked local copies of the sample form (`sample-p1.json` and `sample-p2.json`, never committed, deleted at the end) to grade two not-yet attempts for the admin account and to walk a successful retake.
+
+Browser verification (Task 5) on the local stack as the enrolled admin account: the not-yet result with the retake panel and the history (the current attempt named, the earlier one linked), the earlier attempt opened read-only with its own lower total, the not-available line for an unknown id, the retake button answering with the no-forms sentence, and after the fix wave a successful retake into a fresh empty draft that saves and locks its first stage without a conflict. Screenshots are in `docs/features/course/`. Gates on the final tree: `npm run check` clean with the guard at sixteen worker-reachable modules, 238 tests, a hidden build with the dist scan ok. The real email is proven on the `course-beta` deploy after the merge.
+
+Carried forward:
+
+1. `AssessmentView.tsx` is about 820 lines; 3c adds the review request form there and should split the read-only branch or the result rendering first. The per-prompt refs could carry the attempt id in their keys, which is the structurally safe form of the reset the fix wave added.
+2. The grading-error and grading-in-progress blocks are duplicated between the live and read-only branches.
+3. The read-only status response reports `eligibility` for the viewed attempt, not the learner's latest; harmless while the retake gate keys on the view mode, and 3c's review form on that view must not read it.
+4. On a branch deploy the learner's email link points at the branch host, which the pilot needs; after launch, the learner link should come from `URL` while the admin link keeps `deployOrigin()`, so a Kick from the branch admin cannot email a real learner a preview address.
+5. `resultEmail.ts` interpolates the assessment URL without an escape helper (the URL is caller-built) and the already-sent short-circuit logs nothing by design. 3b's certificate email and 3c's review email should share one claim-then-send skeleton with this module rather than copy it; the spec names the module `courseEmail.ts`, and the split into `resultEmail.ts` is recorded here.
+
 ## Handoff
 
 3b (certificates and verification) consumes `AssessmentStatus.certificate` (still `null` here), the `finalized` outcome's `userId` and `attemptId` for the certificate-ready email in the same module shape, and the history list, which will link a passed attempt to its certificate. 3c (reviews and regrades) consumes the read-only attempt view, where the review request form will live. 3d (the benchmark) consumes nothing from 3a.
