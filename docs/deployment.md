@@ -842,6 +842,10 @@ One video per lesson. The media baseline and the upload clicks are Bradley's, in
   because the customer code is the host the embed itself is loaded from
   ([`streamUrls.ts`](../src/lib/course/streamUrls.ts)). Check the embed URL in the page source
   against the code in the Stream dashboard before looking anywhere else.
+- **The customer code is also a constant**, `COURSE.streamCustomerCode` in
+  [`src/data/course.ts`](../src/data/course.ts), because the free lesson page embeds the
+  preview video at build time and Builds scope has no reason to carry the variable. The
+  variable wins when it is set. If the code ever changes, change both.
 
 ### Course migrations and advisors
 

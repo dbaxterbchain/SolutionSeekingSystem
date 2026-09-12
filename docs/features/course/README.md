@@ -1,4 +1,4 @@
-# Paid video course (Phase 1)
+# Paid video course
 
 The purchase, the learner area, and the assessed certification path. Phase 1 was built across
 five sub-plans, 1a to 1e; the shots below come from the four that produced something to look at,
@@ -6,7 +6,10 @@ because 1a built the content collections, the catalog validator and the pure rul
 are proved by `npm test` rather than by a screenshot. Verified end to end in a real browser
 against the local Supabase stack: a real Stripe test-mode purchase, real autosaves, and two real
 grades from `claude-opus-5`. See [../../roadmap.md](../../roadmap.md) Phase 6 for the plan and
-[../../status.md](../../status.md) for what remains.
+[../../status.md](../../status.md) for what remains. Phase 2 added the module checks, the admin
+preview of a staged lesson, the content ladder, the free lesson page and the resources page; its
+shots are the last six rows. The free lesson page has no shot yet, because the preview lesson
+is still a draft and a page of placeholder copy would show nothing true.
 
 The public pages were captured with `PUBLIC_COURSE_STATUS=preview`, because production stays
 `hidden` through the pilots. That is why the sales page and the pricing panel say "Opens soon"
@@ -40,6 +43,12 @@ rather than carrying a price.
 | ![Pricing course panel](pricing-course-panel-1280.png) | **`pricing-course-panel-1280.png`**: the one-time course panel on `/pricing`, between the subscription plans and Teams, in preview mode so it reads "Opens soon". |
 | ![Certification page](certification-page-1280.png) | **`certification-page-1280.png`**: `/course/certification`. The criteria and their weights are rendered from `src/data/certification.ts`, the same file the grader reads, so the published rubric and the grade cannot disagree. |
 | ![Certification page, phone](certification-page-390.png) | **`certification-page-390.png`**: the rubric at 390px. The criteria table scrolls inside its own box rather than pushing the page sideways, so the weights stay legible next to the criterion they belong to. |
+| ![Dashboard with module checks](course-dashboard-modules-1280.png) | **`course-dashboard-modules-1280.png`**: where the dashboard stands after Phase 2. Every module card with a check ends in a Module check row, marked Done once both questions have a correct answer, and the header links to the resources page. Module 9 has no row because it has no check. |
+| ![Module check, wrong answer](module-check-explanation-390.png) | **`module-check-explanation-390.png`**: a wrong answer at 390px. The explanation the author wrote comes back with the verdict and the button turns into Try again. The correct choice is never sent to the browser, so a wrong pick reveals nothing about the key. |
+| ![Module page, both checks done](module-check-complete-1280.png) | **`module-check-complete-1280.png`**: both questions answered on the module page. The note underneath says why the module is not complete yet: its lesson still has to be finished, because completion is lessons and checks together. |
+| ![Staged lesson, admin preview](staged-lesson-admin-preview-1280.png) | **`staged-lesson-admin-preview-1280.png`**: a staged lesson opened by an admin with `?preview=1`. The banner names the status, the response box is read-only and no progress action exists, so checking a lesson records nothing. A learner on the same URL gets a 404. |
+| ![Admin content ladder](admin-content-ladder-1280.png) | **`admin-content-ladder-1280.png`**: the Content tab in `/admin`. One row per lesson in chain order, with its status, its next rung and what that rung still needs, produced by the same gate function the build runs, so the tab and the validator cannot disagree. |
+| ![Resources page, phone](course-resources-390.png) | **`course-resources-390.png`**: every worksheet by module, the free guide, the practice tools and the support address, at 390px. Public data only, so it is a plain prerendered page with no island. |
 
 _Captured with a headless Chromium session against the local Supabase stack. The dark pill at
 the bottom of some shots is the Astro dev toolbar, not part of the feature._
