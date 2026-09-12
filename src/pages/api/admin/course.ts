@@ -1,8 +1,11 @@
 import type { APIRoute } from 'astro';
+import { COURSE_STATUS } from '../../../data/course';
 import { adminJson, requireAdmin } from '../../../lib/server/adminAuth';
 import { supabaseAdmin } from '../../../lib/server/supabaseAdmin';
 import { triggerGradingWorker } from '../../../lib/server/course/workerTrigger';
 import { changeCourseAccess, findUserByEmail, listEnrollments } from '../../../lib/server/course/adminEnrollment';
+import { getCourseCatalog } from '../../../lib/course/catalog';
+import { ladderReport } from '../../../lib/course/ladder';
 
 export const prerender = false;
 
@@ -44,6 +47,15 @@ export const GET: APIRoute = async ({ request }) => {
       return adminJson({ rows: await listEnrollments() });
     } catch (err) {
       console.error('admin enrollment list failed', err);
+      return adminJson({ error: 'server_error' }, 500);
+    }
+  }
+  if (view === 'content') {
+    try {
+      const catalog = await getCourseCatalog();
+      return adminJson({ rows: ladderReport(catalog, COURSE_STATUS), summary: catalog.summary });
+    } catch (err) {
+      console.error('admin content ladder failed', err);
       return adminJson({ error: 'server_error' }, 500);
     }
   }
