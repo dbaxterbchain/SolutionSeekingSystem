@@ -5,6 +5,7 @@ import { MODES } from '../../data/modes';
 import { PLANS } from '../../data/pricing';
 import { getCourseCatalog } from '../../lib/course/catalog';
 import { hasShell } from '../../lib/course/visibility';
+import { previewPageAvailable } from '../../lib/course/previewPage';
 import { COURSE, COURSE_STATUS } from '../../data/course';
 import { CERTIFICATION_TITLE, CRITERIA_COUNT_WORD } from '../../data/certification';
 
@@ -140,6 +141,14 @@ const pages: Record<string, OgPage> = {
           title: CERTIFICATION_TITLE,
           description: `The ${CRITERIA_COUNT_WORD} criteria, their weights, the score anchors and the pass rule.`,
         },
+        ...(previewPageAvailable(COURSE_STATUS, courseCatalog.byId[COURSE.previewLessonId])
+          ? {
+              'course/preview': {
+                title: 'A free lesson from the Complete Solution Seeking course',
+                description: `Watch one lesson with ${COURSE.presenter} and try the exercise, free.`,
+              },
+            }
+          : {}),
       }
     : {}),
   'course/learn': {

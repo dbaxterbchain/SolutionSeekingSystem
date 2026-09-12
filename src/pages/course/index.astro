@@ -10,6 +10,7 @@ import { COURSE_PRICE } from '../../data/pricing';
 import { assertLaunchSettings, courseCopy } from '../../lib/course/copy';
 import { getCourseCatalog } from '../../lib/course/catalog';
 import { publicCurriculum } from '../../lib/course/curriculum';
+import { previewPageAvailable } from '../../lib/course/previewPage';
 
 /**
  * The public sales page. Prerendered from the catalog and the offer config.
@@ -23,7 +24,9 @@ if (COURSE_STATUS === 'hidden') return new Response(null, { status: 404 });
 // confirmation is missing. A no-op in preview.
 assertLaunchSettings();
 
-const curriculum = publicCurriculum(await getCourseCatalog());
+const catalog = await getCourseCatalog();
+const curriculum = publicCurriculum(catalog);
+const previewLessonAvailable = previewPageAvailable(COURSE_STATUS, catalog.byId[COURSE.previewLessonId]);
 
 /** A launch token once it is set, else the honest interim sentence. The price only once the course is open. */
 const tokenOr = (key: CourseToken, fallback: string): string => {
@@ -99,8 +102,15 @@ const cta = {
     title="Learn to turn difficult conversations into shared understanding and workable solutions"
     intro={`${curriculum.totalLessons} short video lessons with ${COURSE.presenter}, each with an exercise and a model response, a worksheet for every module, and an AI-assessed certification at the end.`}
   >
-    <div class="mt-8">
+    <div class="mt-8 flex flex-wrap items-center gap-4">
       <CourseSalesCta client:load location="course_hero" trackView {...cta} />
+      {
+        previewLessonAvailable && (
+          <a href="/course/preview" class="btn-secondary" data-track-cta="course_hero">
+            Watch a free lesson
+          </a>
+        )
+      }
     </div>
     <p class="mt-6 text-sm text-slate-500">{facts.join(' · ')}</p>
   </PageHero>

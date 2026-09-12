@@ -41,6 +41,12 @@ export const COURSE = {
    * Null until the clip is uploaded; the lesson then shows a "being filmed" note.
    */
   placeholderStreamUid: '07811cf467f0257738287c6a95a5ec10' as string | null,
+  /**
+   * The `<code>` in customer-<code>.cloudflarestream.com. Public (it is in
+   * every embed URL); the free preview page needs it at build time, and the
+   * server prefers CLOUDFLARE_STREAM_CUSTOMER_CODE when that is set.
+   */
+  streamCustomerCode: 'vpmefi3w70uzhyft',
 } as const;
 
 export type CourseToken =
