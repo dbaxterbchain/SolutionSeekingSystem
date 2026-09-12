@@ -502,7 +502,10 @@ function ReadOnlyAttempt({
       {attempt && (attempt.state === 'submitted' || attempt.state === 'grading') && (
         <section className="mt-8 rounded-2xl border border-slate-200 bg-white p-6">
           <h2 className="font-heading text-xl font-bold text-ink-800">Grading in progress</h2>
-          <p className="mt-2 text-slate-700">Your responses are with the grader. Results usually take a few minutes, and this page checks every few seconds.</p>
+          <p className="mt-2 text-slate-700">
+            Your responses are with the grader. Results usually take a few minutes. Refresh this page to check, or open your assessment.{' '}
+            <a href="/course/learn/assessment/" className="font-semibold text-brand-700 underline">Back to your assessment</a>
+          </p>
         </section>
       )}
       {attempt && attempt.state === 'draft' && (
