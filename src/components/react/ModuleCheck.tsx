@@ -88,7 +88,7 @@ export default function ModuleCheck({ moduleId }: { moduleId: string }) {
         d && {
           ...d,
           checks: d.checks.map((c) =>
-            c.id === checkId ? { ...c, attempts: c.attempts + 1, answered_correctly: c.answered_correctly || res.correct, last_choice: choice } : c
+            c.id === checkId ? { ...c, answered_correctly: c.answered_correctly || res.correct } : c
           ),
           module_complete: res.module_complete,
         }
@@ -142,7 +142,7 @@ export default function ModuleCheck({ moduleId }: { moduleId: string }) {
             <button
               type="button"
               onClick={() => void submit(c.id)}
-              disabled={!picks[c.id] || busy === c.id}
+              disabled={!picks[c.id] || busy === c.id || c.answered_correctly}
               className="btn-primary mt-4 disabled:opacity-60"
             >
               {busy === c.id ? 'Checking…' : verdict && !verdict.correct ? 'Try again' : 'Check my answer'}

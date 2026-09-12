@@ -25,5 +25,6 @@ describe('previewPlayback', () => {
   it('has no player while the lesson is on the stand-in clip or has no video', () => {
     expect(previewPlayback({ ...lesson, videoPlaceholder: true, streamUid: null }, 'code123')).toBeNull();
     expect(previewPlayback({ ...lesson, streamUid: null }, 'code123')).toBeNull();
+    expect(previewPlayback({ ...lesson, videoPlaceholder: true }, 'code123')).toBeNull();
   });
 });

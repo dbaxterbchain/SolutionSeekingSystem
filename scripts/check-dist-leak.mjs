@@ -1,15 +1,22 @@
 #!/usr/bin/env node
 /**
- * After `astro build`, nothing private from an assessment form may exist in
- * dist/ (the static output; the SSR bundle is written under .netlify/ and is
- * server-only by construction). Needles: the private marker, every note, every
- * reveal, every reference response, every scoring anchor, and every intro and
- * prompt of a stage after the first, each with its whitespace collapsed and cut
- * to its first 60 characters, and used only if 12 characters or more survive
- * that. Every file in dist/ with a text extension is searched three ways: as it
- * is, with the HTML entities for quotes and angle brackets decoded, and with
+ * After `astro build`, nothing private from an assessment form or a module
+ * check may exist in dist/ (the static output; the SSR bundle is written
+ * under .netlify/ and is server-only by construction). Needles: the private
+ * marker, every note, every reveal, every reference response, every scoring
+ * anchor, every intro and prompt of a stage after the first, and every module
+ * check's explanation, each with its whitespace collapsed and cut to its
+ * first 60 characters, and used only if 12 characters or more survive that.
+ * Every file in dist/ with a text extension is searched three ways: as it is,
+ * with the HTML entities for quotes and angle brackets decoded, and with
  * backslash escapes for quotes, newlines and \uXXXX code units decoded, so an
  * escaped quote cannot hide a leak. Runs inside `npm run build`.
+ *
+ * The module checks are YAML, not JSON, and this script stays dependency-free
+ * like check-private-content.mjs, so an explanation is read by hand instead
+ * of through a YAML parser: `explanation: >-` is a folded scalar, so every
+ * line indented deeper than the key is joined with spaces, the same shape a
+ * YAML loader would fold it to.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { extname, join, relative } from 'node:path';
@@ -17,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const FORMS_DIR = join(ROOT, 'src', 'content', 'course', 'assessment-forms');
+const MODULES_DIR = join(ROOT, 'src', 'content', 'course', 'modules');
 const DIST = join(ROOT, 'dist');
 const TEXT_EXT = new Set(['.html', '.js', '.mjs', '.css', '.json', '.txt', '.xml', '.md', '.svg', '.map']);
 const rel = (p) => relative(ROOT, p).split('\\').join('/');
@@ -48,6 +56,23 @@ for (const name of readdirSync(FORMS_DIR)) {
   });
   for (const r of form.reference_responses ?? []) add(`${id} reference ${r.prompt_id}`, r.text);
   for (const a of form.scoring_anchors ?? []) add(`${id} anchor ${a.criterion_id}`, a.note);
+}
+
+// Every `explanation: >-` folded scalar: the lines indented deeper than the
+// key, joined with spaces the way a YAML loader would fold them.
+const EXPLANATION_RE = /^([ \t]*)explanation:[ \t]*>-[ \t]*\r?\n((?:\1[ \t]+\S.*\r?\n?)+)/gm;
+if (existsSync(MODULES_DIR)) {
+  for (const name of readdirSync(MODULES_DIR)) {
+    if (!name.endsWith('.yaml')) continue;
+    const moduleId = name.replace(/\.yaml$/, '');
+    const text = readFileSync(join(MODULES_DIR, name), 'utf8');
+    let i = 0;
+    for (const m of text.matchAll(EXPLANATION_RE)) {
+      i += 1;
+      const joined = m[2].split(/\r?\n/).map((line) => line.trim()).filter(Boolean).join(' ');
+      add(`${moduleId} check ${i} explanation`, joined);
+    }
+  }
 }
 
 const decodeHtml = (s) =>
@@ -83,7 +108,7 @@ for (const file of walk(DIST)) {
 }
 
 if (leaks.length) {
-  console.error('check-dist-leak: FAILED, private assessment text is in the static output');
+  console.error('check-dist-leak: FAILED, private course text is in the static output');
   for (const l of leaks) console.error(`  ${l}`);
   process.exit(1);
 }

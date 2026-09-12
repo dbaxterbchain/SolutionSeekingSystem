@@ -6,8 +6,9 @@ import { isVisibleTo } from '../../course/visibility';
 /**
  * Server-side reads of the course catalog for the API routes. Astro-only:
  * the catalog reads astro:content. The module checks are read here too, key
- * included; only the check route may call `getModuleForLearner`, and it
- * strips the key before answering.
+ * included; `scripts/check-private-content.mjs` enforces that only the check
+ * route calls `getModuleForLearner`, and that route strips the key before
+ * answering.
  */
 
 export interface LessonWithModule {

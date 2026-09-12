@@ -121,6 +121,10 @@ export function gatesMissing(lesson: GateLesson, target: LessonStatus, ctx: { co
   }
   // The free lesson has to exist before anything is sold. A preview build
   // only shows the course as coming soon, so it may run before V05 is filmed.
+  // This block has no rank floor (no `r >= rank(...)` guard) on purpose: the
+  // validator has to flag a draft preview lesson in an `open` build, whatever
+  // its own status. Called from the ladder's direction instead, a floor would
+  // only ever matter for a catalog that would already fail every other rule.
   if (lesson.preview && ctx.courseStatus === 'open') {
     need(r >= rank('published'), 'the preview lesson must be published once the course is open');
     need(!lesson.videoPlaceholder, 'the preview lesson cannot use a placeholder video once the course is open');

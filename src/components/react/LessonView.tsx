@@ -308,7 +308,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
     if (loadError.code === 'forbidden') {
       return (
         <Note>
-          This lesson is not published yet.{' '}
+          This preview link is for the course team. Open the lesson from your course.{' '}
           <a href="/course/learn/" className="font-semibold text-brand-700 underline">
             Go to your course
           </a>
@@ -528,7 +528,7 @@ export default function LessonView({ lessonId, title, curriculum, supportContact
             ) : lesson.next ? (
               <p className="text-sm text-slate-600">Next up, coming soon: {lesson.next.title}</p>
             ) : null}
-            {lesson.module_order <= 8 && (
+            {!previewLocked && lesson.module_order <= 8 && (
               <a href={`/course/learn/modules/${lesson.module_id}`} className="btn-secondary">
                 Module {lesson.module_order} check
               </a>

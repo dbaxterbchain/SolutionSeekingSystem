@@ -100,8 +100,9 @@ while later ones are still in edit. For each lesson:
 1. David pastes the six sections into the lesson file and stamps `approvals.copy`, then sets
    `status: approved`. `npm run check` and `npm run build` locally before pushing; the build
    names anything missing.
-2. Your package arrives: the master goes to Stream with signed URLs on, the VTT goes on the
-   video, and the UID, `durationMin` and `approvals.edit` go into the file with
+2. Your package arrives: the master goes to Stream with signed URLs on (except the free preview
+   lesson, which stays unsigned, see above), the VTT goes on the video, and the UID,
+   `durationMin` and `approvals.edit` go into the file with
    `status: edited`. Once the transcript is in the file and `approvals.captions` is stamped,
    `status: captioned`.
 3. David sets `status: staged`, opens the lesson with `?preview=1` on the deployed site, and
@@ -113,6 +114,11 @@ The Content tab in `/admin` shows every lesson's status, its next rung and what 
 needs, in the same words the build would use, so "what is V07 waiting on" is one look rather
 than a build. When a module's last lesson is published, its check becomes reachable from the
 dashboard; the questions are in the module file and need no step of yours.
+
+Module completion counts published lessons only, so a module with a single lesson published
+counts as complete once that lesson and the check are done. Publish a module's last lesson last
+to keep its module, and the final assessment, from unlocking before the rest of the module's
+content is actually live.
 
 ## The stand-in clip
 

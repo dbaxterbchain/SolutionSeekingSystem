@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-09-10 (paid video course, Phase 1 built on branch `course`; before that, icons
+_Last updated: 2026-09-11 (paid video course, Phase 1 built on branch `course`; before that, icons
 for the 12 Wisdom Principles and the gold ramp meaning "the solution")_
 
 ## At a glance
@@ -95,7 +95,7 @@ the remaining worksheet bodies) and Bradley's (the real recordings, captions and
 the videos exist an `open` build is refused by design, which is the intended behaviour and not
 a bug to route around.
 
-**Phase 2, the content system: code complete 2026-09-12**
+**Phase 2, the content system: code complete 2026-09-11**
 ([plan](superpowers/plans/2026-09-11-course-phase2-content-system.md)). Module checks on a
 module page with their API, an admin preview of staged lessons in place, a Content tab in
 `/admin` that names each lesson's next rung and what it still needs, the free lesson page that

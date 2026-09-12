@@ -392,7 +392,9 @@ Three tools help the ladder along, all built on the same catalog the build valid
   time, and only when the course is public and that lesson is published. Until then it is a 404
   that writes nothing. A preview lesson still on the stand-in clip renders without a player,
   because the clip is signed and the free page embeds without a token, so the free lesson needs
-  its own recording before the page is worth linking.
+  its own recording before the page is worth linking. The page has no line in `llms.txt` and no
+  `.md` variant: the spec keeps lesson prose out of the machine-readable surfaces, and the free
+  lesson is still lesson prose.
 
 ### A worksheet file
 

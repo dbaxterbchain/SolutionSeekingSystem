@@ -238,9 +238,7 @@ export interface CheckStandingView {
   id: string;
   question: string;
   choices: [string, string];
-  attempts: number;
   answered_correctly: boolean;
-  last_choice: 1 | 2 | null;
 }
 export interface ModuleChecksPayload {
   module: { id: string; title: string; order: number };
@@ -251,7 +249,6 @@ export interface ModuleChecksPayload {
 export interface CheckAnswerResponse {
   correct: boolean;
   explanation: string;
-  check_complete: boolean;
   module_complete: boolean;
 }
 

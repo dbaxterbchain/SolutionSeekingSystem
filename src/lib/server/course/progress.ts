@@ -59,7 +59,7 @@ export interface CheckAttemptRow {
   created_at: string;
 }
 
-/** Every attempt on one module, newest first. The island shows the count and whether a check is done. */
+/** Every attempt on one module, newest first. The island shows only whether a check is done. */
 export async function loadCheckHistory(userId: string, moduleId: string): Promise<CheckAttemptRow[]> {
   const { data, error } = await supabaseAdmin
     .from('course_check_attempts')
@@ -67,7 +67,10 @@ export async function loadCheckHistory(userId: string, moduleId: string): Promis
     .eq('user_id', userId)
     .eq('course_id', COURSE.id)
     .eq('module_id', moduleId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    // Bounded read: the table is append-only, so a learner who keeps
+    // re-answering a question could otherwise grow this unbounded.
+    .limit(200);
   if (error) throw new Error(`course_check_attempts read failed: ${error.message}`);
   return (data as CheckAttemptRow[]) ?? [];
 }

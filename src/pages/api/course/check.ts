@@ -14,27 +14,20 @@ export const prerender = false;
  * verdict with the author's explanation. The key never leaves this file.
  */
 
-/** What the island sees of one check: the question, the choices, and how the learner stands. */
+/** What the island sees of one check: the question, the choices, and whether it is done. */
 interface CheckStanding {
   id: string;
   question: string;
   choices: [string, string];
-  attempts: number;
   answered_correctly: boolean;
-  last_choice: 1 | 2 | null;
 }
 
 async function standing(userId: string, moduleId: string, checks: ReturnType<typeof publicChecks>) {
   const history = await loadCheckHistory(userId, moduleId);
-  return checks.map<CheckStanding>((c) => {
-    const rows = history.filter((h) => h.check_id === c.id);
-    return {
-      ...c,
-      attempts: rows.length,
-      answered_correctly: rows.some((r) => r.correct),
-      last_choice: rows[0]?.choice ?? null,
-    };
-  });
+  return checks.map<CheckStanding>((c) => ({
+    ...c,
+    answered_correctly: history.some((h) => h.check_id === c.id && h.correct),
+  }));
 }
 
 export const GET: APIRoute = async ({ request }) => {
@@ -74,14 +67,10 @@ export const POST: APIRoute = async ({ request }) => {
   const verdict = gradeCheck(hit.check, choice);
   try {
     await recordCheckAttempt(auth.user.id, module_id, check_id, choice, verdict.correct);
-    const [history, state] = await Promise.all([
-      loadCheckHistory(auth.user.id, module_id),
-      computeCourseState(auth.user.id),
-    ]);
+    const state = await computeCourseState(auth.user.id);
     return privateJson({
       correct: verdict.correct,
       explanation: verdict.explanation,
-      check_complete: verdict.correct || history.some((r) => r.check_id === check_id && r.correct),
       module_complete: state.modules[module_id].complete,
     });
   } catch (err) {
