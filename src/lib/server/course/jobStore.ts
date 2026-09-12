@@ -27,7 +27,7 @@ export function supabaseJobStore(client: SupabaseClient): GradingJobStore {
     async loadContext(attemptId): Promise<JobContext | null> {
       const { data: attempt, error } = await client
         .from('course_assessment_attempts')
-        .select('id, form_id, form_version, rubric_version, prompt_version, submission_hash, source_pack_id, snapshot_public, snapshot_private')
+        .select('id, user_id, form_id, form_version, rubric_version, prompt_version, submission_hash, source_pack_id, snapshot_public, snapshot_private')
         .eq('id', attemptId)
         .maybeSingle();
       if (error) throw new Error(`attempt load failed: ${error.message}`);
@@ -58,6 +58,7 @@ export function supabaseJobStore(client: SupabaseClient): GradingJobStore {
       return {
         attempt: {
           id: attempt.id,
+          user_id: attempt.user_id,
           form_id: attempt.form_id,
           form_version: attempt.form_version,
           rubric_version: attempt.rubric_version,
@@ -99,6 +100,17 @@ export function supabaseJobStore(client: SupabaseClient): GradingJobStore {
       if (error) throw new Error(`fail failed: ${error.message}`);
       const outcome = (data as { outcome: string }).outcome;
       return outcome === 'requeued' ? 'requeued' : outcome === 'failed' ? 'failed' : 'stale';
+    },
+
+    async markResultEmailSent(jobId): Promise<boolean> {
+      const { data, error } = await client
+        .from('course_grading_jobs')
+        .update({ result_email_sent_at: new Date().toISOString() })
+        .eq('id', jobId)
+        .is('result_email_sent_at', null)
+        .select('id');
+      if (error) throw new Error(`result email claim failed: ${error.message}`);
+      return (data ?? []).length === 1;
     },
   };
 }
