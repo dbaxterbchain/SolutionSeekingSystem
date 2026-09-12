@@ -274,6 +274,11 @@ export default function CourseDashboard(props: Props) {
         ) : (
           <p className="mt-4 text-slate-600">The first lessons are being prepared. Check back soon.</p>
         )}
+        <p className="mt-4">
+          <a href="/course/learn/resources/" className="text-sm font-semibold text-brand-700 hover:underline">
+            Worksheets and resources
+          </a>
+        </p>
       </header>
 
       {courseState && <CertificationPanel state={courseState} />}
