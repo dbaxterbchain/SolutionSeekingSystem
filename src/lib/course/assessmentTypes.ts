@@ -42,7 +42,7 @@ export interface LessonLink { id: string; title: string; href: string | null }
 export interface CriterionFeedback { criterion_id: CriterionId; name: string; weight: number; score: number; effective_score: number; status: 'answered' | 'unanswered' | 'misconception'; reason: string; evidence: EvidenceView[]; revision_lessons: LessonLink[] }
 export interface ResultView { total: number; pass_total: number; passed: boolean; criteria: CriterionFeedback[]; caps_applied: CapApplied[]; misconceptions: { criterion_id: CriterionId; description: string }[]; graded_at: string }
 export type EligibilityReason = 'ready' | 'modules_incomplete' | 'already_passed' | 'open_attempt';
-export interface AssessmentStatus { attempt: AttemptView | null; job: JobView | null; result: ResultView | null; awards_enabled: boolean; certificate: null; eligibility: { eligible: boolean; reason: EligibilityReason }; support_contact: string }
+export interface AssessmentStatus { attempt: AttemptView | null; job: JobView | null; result: ResultView | null; awards_enabled: boolean; certificate: CertificateSummary | null; eligibility: { eligible: boolean; reason: EligibilityReason }; support_contact: string }
 
 /** One row of a learner's attempt history. Outcome fields are null until a grade exists. */
 export interface AttemptSummary {
@@ -59,4 +59,45 @@ export interface AttemptSummary {
 }
 export interface AssessmentHistory {
   attempts: AttemptSummary[];
+}
+
+export type CertificateStatus = 'active' | 'revoked';
+
+/** What the assessment page needs in order to point at the certificate page. */
+export interface CertificateSummary {
+  id: string;
+  serial: string;
+  status: CertificateStatus;
+  name_confirmed: boolean;
+  issued_at: string;
+}
+
+/** The learner's own certificate, as the certificate page shows it. The share url is present only while sharing is on. */
+export interface CertificateRecord {
+  id: string;
+  serial: string;
+  certification_version: string;
+  display_name: string | null;
+  name_confirmed_at: string | null;
+  issued_at: string;
+  status: CertificateStatus;
+  revoked_at: string | null;
+  share_active: boolean;
+  share_url: string | null;
+}
+
+/** GET /api/course/certificate: the certificate, or null with the facts the page needs to say why. */
+export interface CertificatePayload {
+  certificate: CertificateRecord | null;
+  awards_enabled: boolean;
+  passed_current: boolean;
+  certification_version: string;
+}
+
+/** What the verify page shows: an active, shared certificate with a confirmed name, and nothing else. */
+export interface PublicCertificate {
+  display_name: string;
+  serial: string;
+  certification_version: string;
+  issued_at: string;
 }

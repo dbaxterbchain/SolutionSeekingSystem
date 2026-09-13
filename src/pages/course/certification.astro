@@ -5,6 +5,7 @@ import { breadcrumbs } from '../../lib/schema';
 import { COURSE_STATUS } from '../../data/course';
 import { courseCopy } from '../../lib/course/copy';
 import {
+  CERTIFICATION_MEANING,
   CERTIFICATION_TITLE,
   CERTIFICATION_VERSION,
   CRITERIA,
@@ -119,10 +120,7 @@ const schemas = [
     <section class="mt-16 max-w-2xl">
       <p class="eyebrow mb-3">The credential</p>
       <h2 class="text-3xl font-bold text-ink-800">What the certification means</h2>
-      <p class="mt-4 text-slate-600">
-        An AI-assessed course credential earned on supplied scenarios. It is not an accreditation
-        and does not verify live behaviour.
-      </p>
+      <p class="mt-4 text-slate-600">{CERTIFICATION_MEANING}</p>
       <p class="mt-4 text-slate-600">
         Version {CERTIFICATION_VERSION}. A change to the rubric bumps the version; a certificate
         keeps the version it was awarded under.
