@@ -31,6 +31,12 @@ describe('normalizeDisplayName', () => {
     expect(normalizeDisplayName('Ada ' + String.fromCharCode(0x2014) + ' Lovelace')).toBeNull();
     expect(normalizeDisplayName('<Ada>')).toBeNull();
   });
+  it('refuses invisible and direction-changing characters that could spoof the printed name', () => {
+    const spoofers = [0x202e, 0x200b, 0x00ad, 0x2060, 0x200c];
+    for (const code of spoofers) {
+      expect(normalizeDisplayName('Ada' + String.fromCharCode(code) + 'Lovelace')).toBeNull();
+    }
+  });
 });
 
 describe('share tokens and urls', () => {

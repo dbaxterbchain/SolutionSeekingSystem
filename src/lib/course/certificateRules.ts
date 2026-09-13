@@ -12,8 +12,14 @@ export const DISPLAY_NAME_MAX = 80;
 export const SHARE_TOKEN_BYTES = 24;
 export const SHARE_TOKEN_RE = /^[A-Za-z0-9_-]{32}$/;
 
-/** Control characters, the C0 and C1 ranges. */
-const CONTROL_RE = /\p{Cc}/u;
+/**
+ * Control characters (the C0 and C1 ranges) and format characters: marks that
+ * hide or reorder text instead of printing, such as the right-to-left
+ * override, zero-width spaces and joiners, and the soft hyphen. A name that a
+ * certificate prints and a public verification page renders on trust cannot
+ * carry any of them.
+ */
+const CONTROL_RE = /[\p{Cc}\p{Cf}]/u;
 /** The em dash, the en dash, template braces and angle brackets: the verify page prints the name, and the copy rules apply to it. Built from code points so the source carries no dash. */
 const BANNED_RE = new RegExp(`[${String.fromCharCode(0x2014, 0x2013)}{}<>]`);
 const LETTER_RE = /\p{L}/u;
