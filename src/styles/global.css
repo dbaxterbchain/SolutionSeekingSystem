@@ -117,7 +117,4 @@
     box-shadow: none;
     page-break-inside: avoid;
   }
-  @page {
-    margin: 14mm;
-  }
 }

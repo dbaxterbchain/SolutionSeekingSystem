@@ -770,6 +770,15 @@ function Result({ result, awardsEnabled, certificate }: { result: NonNullable<As
             </a>
           </p>
         )}
+        {result.passed && certificate?.status === 'revoked' && (
+          <p className="mt-2 text-slate-700">
+            Your certificate has been revoked.{' '}
+            <a href="/course/learn/certificate/" className="font-semibold text-brand-700 underline">
+              Your certificate page
+            </a>{' '}
+            says when, and who to write to.
+          </p>
+        )}
         {result.passed && !certificate && awardsEnabled && (
           <p className="mt-2 text-slate-700">Your pass is recorded. Your certificate has not been issued yet and will appear on your certificate page when it is.</p>
         )}
