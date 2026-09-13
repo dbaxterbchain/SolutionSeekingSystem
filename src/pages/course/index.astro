@@ -43,7 +43,7 @@ const facts = [
   `${curriculum.totalLessons} short video lessons`,
   `About ${COURSE.learnerHours} hours including practice`,
   'Self-paced',
-  'AI-assessed certification included',
+  'Certification included',
 ];
 
 const practice = [
@@ -64,7 +64,7 @@ const included = [
 ];
 
 const site = Astro.site ?? Astro.url;
-const description = `Learn the Solution Seeking System with ${COURSE.presenter} through ${curriculum.totalLessons} video lessons, practical exercises, and AI-assessed certification.`;
+const description = `Learn the Solution Seeking System with ${COURSE.presenter} through ${curriculum.totalLessons} video lessons, practical exercises, and certification against a rubric published in full.`;
 const schemas = [
   breadcrumbs(site, [
     { name: 'Home', path: '/' },
@@ -100,7 +100,7 @@ const cta = {
   <PageHero
     eyebrow="Video course"
     title="Learn to turn difficult conversations into shared understanding and workable solutions"
-    intro={`${curriculum.totalLessons} short video lessons with ${COURSE.presenter}, each with an exercise and a model response, a worksheet for every module, and an AI-assessed certification at the end.`}
+    intro={`${curriculum.totalLessons} short video lessons with ${COURSE.presenter}, each with an exercise and a model response, a worksheet for every module, and a certification at the end.`}
   >
     <div class="mt-8 flex flex-wrap items-center gap-4">
       <CourseSalesCta client:load location="course_hero" trackView {...cta} />

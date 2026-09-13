@@ -48,8 +48,8 @@ ramp meaning "the solution")_
 
 ### Paid video course (in progress, 4 phases)
 
-A one-time-purchase video course with a printable worksheet per module and an AI-assessed
-certification, sold from `/course` and delivered at `/course/learn/`. Design agreed
+A one-time-purchase video course with a printable worksheet per module and a certification
+earned on a written scenario, sold from `/course` and delivered at `/course/learn/`. Design agreed
 **2026-09-09** ([the spec](superpowers/specs/2026-09-09-paid-video-course-design.md)); Phase 1
 was built on branch `course` across five sub-plans, all executed **2026-09-10**, and merged to
 `main` through PRs #15 and #16 (**2026-09-11**). Production runs it hidden, so there is nothing a visitor can

@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   CERTIFICATION_MEANING,
+  CERTIFICATION_METHOD,
+  CERTIFICATION_TITLE,
   CRITERIA,
   CRITERION_IDS,
   PASS_MIN_CRITERION,
@@ -45,8 +47,20 @@ describe('certification rubric data', () => {
     expect([...TOOL_IDS].sort()).toEqual(Object.keys(TOOL_ICONS).sort());
   });
 
-  it('states the meaning of the credential in house copy', () => {
-    expect(CERTIFICATION_MEANING).toMatch(/AI-assessed/);
+  it('says what the credential is worth, and anchors it to the published rubric', () => {
+    expect(CERTIFICATION_MEANING).toMatch(/rubric/i);
     expect(hasBannedCopy(CERTIFICATION_MEANING)).toBe(false);
+    expect(hasBannedCopy(CERTIFICATION_METHOD)).toBe(false);
+  });
+
+  // The credential is sold on what its holder can do. Naming the machinery that
+  // scores it, on the certificate or the page a stranger opens to check it,
+  // reads as a caveat rather than a credential. How scoring works belongs on
+  // the certification page, which is where someone goes to understand it.
+  it('leaves the grading machinery out of the certificate and the verification page', () => {
+    for (const copy of [CERTIFICATION_MEANING, CERTIFICATION_METHOD, CERTIFICATION_TITLE]) {
+      expect(copy).not.toMatch(/\bAI\b/);
+      expect(copy).not.toMatch(/automated|machine|algorithm|model-scored/i);
+    }
   });
 });

@@ -46,7 +46,7 @@ const schemas = [
   <PageHero
     eyebrow="Video course"
     title={CERTIFICATION_TITLE}
-    intro="The certification at the end of the course is AI-assessed and unproctored. The rubric below is the whole rubric: what is scored, how much each criterion counts, what each score means, and what it takes to pass."
+    intro="The certification at the end of the course is earned on one written scenario, taken in your own time. The rubric below is the whole rubric: what is scored, how much each criterion counts, what each score means, and what it takes to pass."
   />
 
   <div class="container-page py-16">
@@ -58,8 +58,10 @@ const schemas = [
         information, and your answers to the earlier parts are locked before you see it.
       </p>
       <p class="mt-4 text-slate-600">
-        An AI grader scores each criterion against the rubric below, quotes the passages in your
-        response it relied on, and names the lessons to revisit for anything below the bar.
+        Each criterion is scored against the rubric below by an automated grader, which quotes the
+        passages in your response it relied on and names the lessons to revisit for anything below
+        the bar. Nobody invigilates the assessment, so the rubric being public is what makes a
+        score worth anything: you can check the reasoning behind every mark against it.
       </p>
       <p class="mt-4 text-slate-600">{courseCopy('{{retakes_summary}}')}</p>
     </section>

@@ -118,8 +118,8 @@ wildcard subdomains on our own domain.
 
 The first thing on this site somebody buys once rather than subscribes to. David presents the
 whole system on video, module by module, each module closing with a printable worksheet and two
-checks; the course ends with a staged written assessment that an AI grader marks against a
-published rubric, and a pass earns a certificate. Sold from `/course`, delivered at
+checks; the course ends with a staged written assessment marked against a published rubric by an
+automated grader, and a pass earns a certificate. Sold from `/course`, delivered at
 `/course/learn/`, and deliberately independent of the chat subscription in both directions.
 
 Everything is behind one launch flag, `PUBLIC_COURSE_STATUS`, which defaults to `hidden`. That

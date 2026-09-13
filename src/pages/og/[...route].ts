@@ -135,7 +135,7 @@ const pages: Record<string, OgPage> = {
     ? {
         course: {
           title: COURSE.title,
-          description: `Learn the Solution Seeking System with ${COURSE.presenter}: video lessons, practical exercises, and AI-assessed certification.`,
+          description: `Learn the Solution Seeking System with ${COURSE.presenter}: video lessons, practical exercises, and certification against a published rubric.`,
         },
         'course/certification': {
           title: CERTIFICATION_TITLE,

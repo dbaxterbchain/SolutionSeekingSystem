@@ -2,6 +2,7 @@ import { getCollection, type CollectionEntry } from 'astro:content';
 import { glossary, pillars, systemDefinition } from '../data/concepts';
 import { COURSE } from '../data/course';
 import {
+  CERTIFICATION_MEANING,
   CERTIFICATION_METHOD,
   CERTIFICATION_TITLE,
   CERTIFICATION_VERSION,
@@ -235,7 +236,7 @@ export function courseToMarkdown(
   return [
     `# ${COURSE.title}`,
     '',
-    `A paid video course with ${COURSE.presenter}: ${curriculum.totalLessons} short lessons across ${curriculum.modules.length} modules, an exercise and a model response for each, a printable worksheet for every module, and an AI-assessed certification at the end. About ${COURSE.learnerHours} hours of learner time over ${COURSE.suggestedWeeks} weeks.`,
+    `A paid video course with ${COURSE.presenter}: ${curriculum.totalLessons} short lessons across ${curriculum.modules.length} modules, an exercise and a model response for each, a printable worksheet for every module, and a certification at the end. About ${COURSE.learnerHours} hours of learner time over ${COURSE.suggestedWeeks} weeks.`,
     '',
     opts.status === 'open' && opts.priceLine ? opts.priceLine : 'Not on sale yet.',
     '',
@@ -256,7 +257,7 @@ export function certificationToMarkdown(site: URL | undefined): string {
   return [
     `# ${CERTIFICATION_TITLE}`,
     '',
-    `${CERTIFICATION_METHOD}. An AI-assessed course credential earned on supplied scenarios. It is not an accreditation and does not verify live behaviour. Version ${CERTIFICATION_VERSION}.`,
+    `${CERTIFICATION_MEANING} ${CERTIFICATION_METHOD}. Version ${CERTIFICATION_VERSION}.`,
     '',
     '## Criteria',
     '',
