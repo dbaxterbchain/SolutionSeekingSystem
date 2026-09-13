@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSession } from '../../lib/useSession';
 import { useDialog, type PromptOptions } from './Dialog';
+import { DISPLAY_NAME_MAX } from '../../lib/course/certificateRules';
 
 /**
  * The operator's console.
@@ -13,7 +14,7 @@ import { useDialog, type PromptOptions } from './Dialog';
  * false sense of where the boundary is. The boundary is the API.
  */
 
-type Tab = 'feedback' | 'orgs' | 'subscribers' | 'enquiries' | 'grading' | 'enrollments' | 'content';
+type Tab = 'feedback' | 'orgs' | 'subscribers' | 'enquiries' | 'grading' | 'enrollments' | 'certificates' | 'content';
 
 interface FeedbackRow {
   id: string;
@@ -135,6 +136,8 @@ export default function AdminView() {
   const [enquiries, setEnquiries] = useState<EnquiryRow[] | null>(null);
   const [grading, setGrading] = useState<GradingRow[] | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentRow[] | null>(null);
+  const [certificates, setCertificates] = useState<{ rows: AdminCertificateRow[]; pending: PendingPassRow[] } | null>(null);
+  const certificateQuery = useRef('');
   const [content, setContent] = useState<{ rows: LadderRow[]; summary: string } | null>(null);
   const { confirm, prompt, dialog } = useDialog();
 
@@ -183,6 +186,9 @@ export default function AdminView() {
     } else if (which === 'content') {
       const d = await call('course?view=content');
       if (d) setContent({ rows: d.rows, summary: d.summary });
+    } else if (which === 'certificates') {
+      const d = await call(`course?view=certificates&q=${encodeURIComponent(certificateQuery.current)}`);
+      if (d) setCertificates({ rows: d.rows, pending: d.pending });
     } else {
       const d = await call('enquiries');
       if (d) setEnquiries(d.rows);
@@ -240,6 +246,7 @@ export default function AdminView() {
     { id: 'enquiries', label: 'Enquiries', count: enquiries?.filter((e) => !e.handled).length },
     { id: 'grading', label: 'Grading' },
     { id: 'enrollments', label: 'Enrollments', count: enrollments?.filter((e) => e.status === 'enrolled').length },
+    { id: 'certificates', label: 'Certificates' },
     { id: 'content', label: 'Content' },
   ];
 
@@ -319,6 +326,18 @@ export default function AdminView() {
           reload={() => loadTab('enrollments')}
           setNotice={setNotice}
           prompt={prompt}
+        />
+      )}
+      {tab === 'certificates' && (
+        <CertificatesTab
+          data={certificates}
+          onSearch={(q) => {
+            certificateQuery.current = q;
+            void loadTab('certificates');
+          }}
+          act={(body) => call('course', body)}
+          reload={() => loadTab('certificates')}
+          notify={setNotice}
         />
       )}
       {tab === 'content' && <ContentTab data={content} />}
@@ -897,6 +916,252 @@ function GradingTab({
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ Certificates */
+
+interface AdminCertificateRow {
+  id: string;
+  serial: string;
+  user_id: string;
+  certification_version: string;
+  attempt_id: string | null;
+  display_name: string | null;
+  name_confirmed_at: string | null;
+  issued_at: string;
+  status: 'active' | 'revoked';
+  revoked_at: string | null;
+  revoke_reason: string | null;
+  share_active: boolean;
+  email_sent_at: string | null;
+}
+
+interface PendingPassRow {
+  attempt_id: string;
+  user_id: string;
+  certification_version: string;
+  finalized_at: string | null;
+}
+
+/**
+ * Certificates: a search box (serial, email or version), the passes still
+ * waiting for a certificate, and the list. Learners appear by id, as in the
+ * grading queue. Every action reloads the list either way, since a refusal
+ * usually means the list was behind the database.
+ */
+function CertificatesTab({
+  data,
+  onSearch,
+  act,
+  reload,
+  notify,
+}: {
+  data: { rows: AdminCertificateRow[]; pending: PendingPassRow[] } | null;
+  onSearch: (q: string) => void;
+  act: (body: Record<string, unknown>) => Promise<{ ok?: boolean; issued?: boolean; serial?: string; sent?: boolean } | null>;
+  reload: () => Promise<void>;
+  notify: (text: string) => void;
+}) {
+  const { prompt, dialog } = useDialog();
+  const [q, setQ] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const issue = async (attemptId: string) => {
+    setBusyId(attemptId);
+    const d = await act({ action: 'issue_pending', attempt_id: attemptId });
+    if (d) notify(d.issued ? `Issued ${d.serial}.` : `Already issued as ${d.serial}.`);
+    await reload();
+    setBusyId(null);
+  };
+  const revoke = async (row: AdminCertificateRow) => {
+    const reason = await prompt({
+      title: `Revoke ${row.serial}?`,
+      message: 'The learner sees the revoked state and the verification link stops resolving. There is no undo here.',
+      label: 'Reason',
+      maxLength: 500,
+      confirmLabel: 'Revoke',
+    });
+    if (!reason?.trim()) return;
+    setBusyId(row.id);
+    const d = await act({ action: 'revoke_certificate', certificate_id: row.id, reason: reason.trim() });
+    if (d) notify(`Revoked ${row.serial}.`);
+    await reload();
+    setBusyId(null);
+  };
+  const rename = async (row: AdminCertificateRow) => {
+    const name = await prompt({
+      title: `Rename ${row.serial}`,
+      message: 'For a typo the learner reports. The confirmation stands; only the printed name changes.',
+      label: 'Name',
+      defaultValue: row.display_name ?? '',
+      maxLength: DISPLAY_NAME_MAX,
+      confirmLabel: 'Rename',
+    });
+    if (!name?.trim()) return;
+    setBusyId(row.id);
+    const d = await act({ action: 'rename_certificate', certificate_id: row.id, name: name.trim() });
+    if (d) notify('Name updated.');
+    await reload();
+    setBusyId(null);
+  };
+  const resend = async (row: AdminCertificateRow) => {
+    setBusyId(row.id);
+    const d = await act({ action: 'resend_certificate_email', certificate_id: row.id });
+    if (d) notify(d.sent ? `Emailed ${row.serial}.` : 'Not sent: no address on file, or the mail service is not configured.');
+    await reload();
+    setBusyId(null);
+  };
+
+  return (
+    <div className="space-y-6">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSearch(q);
+        }}
+        className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card"
+      >
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-xs font-semibold text-slate-600">
+            Serial, email or version
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="SSS-2026-00001" className="mt-1 block w-72 rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+          </label>
+          <button type="submit" className="btn-primary py-2 text-xs">
+            Search
+          </button>
+        </div>
+      </form>
+
+      {data && data.pending.length > 0 && (
+        <section className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-card">
+          <h2 className="px-5 pt-4 font-heading text-base font-bold text-ink-800">Passes without a certificate</h2>
+          <table className="w-full text-left text-sm">
+            <thead className="text-xs uppercase tracking-wide text-slate-400">
+              <tr>
+                <th className="px-5 py-3">Attempt</th>
+                <th className="px-5 py-3">Learner</th>
+                <th className="px-5 py-3">Version</th>
+                <th className="px-5 py-3">Passed</th>
+                <th className="px-5 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.pending.map((p) => (
+                <tr key={p.attempt_id} className="border-t border-slate-100">
+                  <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{p.attempt_id.slice(0, 8)}</td>
+                  <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{p.user_id.slice(0, 8)}</td>
+                  <td className="px-5 py-2.5">{p.certification_version}</td>
+                  <td className="px-5 py-2.5 text-slate-400">{p.finalized_at ? `${date(p.finalized_at)} ${time(p.finalized_at)}` : ''}</td>
+                  <td className="px-5 py-2.5">
+                    <button
+                      type="button"
+                      disabled={busyId === p.attempt_id}
+                      onClick={() => issue(p.attempt_id)}
+                      className="rounded-full bg-brand-500 px-3.5 py-1 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+                    >
+                      Issue
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      <section className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-card">
+        <table className="w-full text-left text-sm">
+          <thead className="text-xs uppercase tracking-wide text-slate-400">
+            <tr>
+              <th className="px-5 py-3">Serial</th>
+              <th className="px-5 py-3">Learner</th>
+              <th className="px-5 py-3">Name</th>
+              <th className="px-5 py-3">Version</th>
+              <th className="px-5 py-3">Issued</th>
+              <th className="px-5 py-3">Status</th>
+              <th className="px-5 py-3">Link</th>
+              <th className="px-5 py-3">Emailed</th>
+              <th className="px-5 py-3">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data && data.rows.length === 0 && (
+              <tr>
+                <td className="px-5 py-6 text-slate-400" colSpan={9}>
+                  No certificates match.
+                </td>
+              </tr>
+            )}
+            {data?.rows.map((r) => (
+              <tr key={r.id} className="border-t border-slate-100">
+                <td className="px-5 py-2.5 font-mono text-xs">{r.serial}</td>
+                <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{r.user_id.slice(0, 8)}</td>
+                <td className="px-5 py-2.5">
+                  {r.name_confirmed_at ? (
+                    r.display_name
+                  ) : r.display_name ? (
+                    <>
+                      {r.display_name} <span className="text-slate-400">not confirmed</span>
+                    </>
+                  ) : (
+                    <span className="text-slate-400">not confirmed</span>
+                  )}
+                </td>
+                <td className="px-5 py-2.5">{r.certification_version}</td>
+                <td className="px-5 py-2.5 text-slate-400">
+                  {date(r.issued_at)} {time(r.issued_at)}
+                </td>
+                <td className="px-5 py-2.5">
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${r.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{r.status}</span>
+                </td>
+                <td className="px-5 py-2.5 text-slate-500">{r.status === 'active' && r.share_active ? 'on' : 'off'}</td>
+                <td className="px-5 py-2.5 text-slate-400">{r.email_sent_at ? `${date(r.email_sent_at)} ${time(r.email_sent_at)}` : 'no'}</td>
+                <td className="space-x-2 px-5 py-2.5">
+                  {r.status === 'active' && (
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => rename(r)}
+                      className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
+                    >
+                      Rename
+                    </button>
+                  )}
+                  {r.status === 'active' && r.email_sent_at === null && (
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => resend(r)}
+                      className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
+                    >
+                      Resend
+                    </button>
+                  )}
+                  {r.status === 'active' && (
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => revoke(r)}
+                      className="rounded-full border border-rose-200 px-3.5 py-1 text-xs font-semibold text-rose-700 hover:border-rose-300 disabled:opacity-60"
+                    >
+                      Revoke
+                    </button>
+                  )}
+                  {r.status === 'revoked' && r.revoke_reason && <span className="text-xs text-slate-400">{r.revoke_reason}</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+      <p className="text-xs text-slate-400">
+        A date in Emailed means a send was attempted, so Resend is not offered for that row. If a
+        learner says the certificate email never arrived, the Resend log and the address on their
+        account are the next places to look.
+      </p>
+      {dialog}
     </div>
   );
 }

@@ -93,7 +93,7 @@
   }
 }
 
-/* Printing a worksheet: the sheet and its title, nothing else. */
+/* Printing a worksheet or a certificate: the sheet alone, nothing else. */
 @media print {
   header,
   footer,
@@ -112,5 +112,8 @@
   .container-page {
     max-width: none;
     padding: 0;
+  }
+  .certificate-sheet {
+    page-break-inside: avoid;
   }
 }

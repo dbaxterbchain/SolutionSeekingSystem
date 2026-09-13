@@ -2,6 +2,7 @@ import { readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  CERTIFICATION_MEANING,
   CRITERIA,
   CRITERION_IDS,
   PASS_MIN_CRITERION,
@@ -10,6 +11,7 @@ import {
   SCORE_ANCHORS,
   TOOL_IDS,
 } from '../../../data/certification';
+import { hasBannedCopy } from '../ids';
 import { PRINCIPLE_ICONS, TOOL_ICONS } from '../../icons';
 
 // Resolved from this file's own location, not the process cwd, so the test
@@ -41,5 +43,10 @@ describe('certification rubric data', () => {
     expect([...PRINCIPLE_IDS].sort()).toEqual(Object.keys(PRINCIPLE_ICONS).sort());
     expect([...TOOL_IDS].sort()).toEqual(basenames(TOOLS_DIR, '.md'));
     expect([...TOOL_IDS].sort()).toEqual(Object.keys(TOOL_ICONS).sort());
+  });
+
+  it('states the meaning of the credential in house copy', () => {
+    expect(CERTIFICATION_MEANING).toMatch(/AI-assessed/);
+    expect(hasBannedCopy(CERTIFICATION_MEANING)).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { serverEnv } from '../env';
 import { supabaseAdmin } from '../supabaseAdmin';
+import { notifyLearnerOfCertificate } from './certificateEmail';
 import { sendGradingFailureAlert } from './gradingAlert';
 import { GRADER_CALL_TIMEOUT_MS, gradeAttempt } from './grader';
 import { runGradingJob } from './gradingJob';
@@ -72,11 +73,11 @@ export async function triggerGradingWorker(args: { origin: string; jobId: string
       grade: (input, ctx) => gradeAttempt({ anthropic: getAnthropic(), input, ctx, settings: { model: settings.model } }),
       settings,
     })
-      .then((outcome) => {
+      .then(async (outcome) => {
         // Exhausted counts as a failure: the claim retired the job without
         // grading it, so the learner is on grading_error with nobody told.
-        if (outcome.outcome === 'failed' || outcome.outcome === 'exhausted')
-          return sendGradingFailureAlert(
+        if (outcome.outcome === 'failed' || outcome.outcome === 'exhausted') {
+          await sendGradingFailureAlert(
             { apiKey: serverEnv('RESEND_API_KEY'), from: serverEnv('EMAIL_FROM'), to: serverEnv('ALERTS_TO') || serverEnv('TEAM_ENQUIRY_TO') || serverEnv('EMAIL_FROM') },
             {
               jobId: args.jobId,
@@ -90,23 +91,28 @@ export async function triggerGradingWorker(args: { origin: string; jobId: string
               adminUrl: `${workerOrigin(args.origin) || args.origin}/admin/`,
             }
           );
-        if (outcome.outcome === 'finalized')
-          return notifyLearnerOfResult(
-            { apiKey: serverEnv('RESEND_API_KEY'), from: serverEnv('EMAIL_FROM') },
-            {
-              jobId: args.jobId,
-              generation: outcome.generation,
-              userId: outcome.userId,
-              assessmentUrl: `${workerOrigin(args.origin) || args.origin}/course/learn/assessment/`,
-            },
-            {
-              emailFor: async (userId) => {
-                const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
-                if (error) console.error(`grading job ${args.jobId}: learner lookup failed`, error);
-                return data.user?.email ?? null;
-              },
-              markSent: (id) => store.markResultEmailSent(id),
-            }
+          return;
+        }
+        if (outcome.outcome !== 'finalized') return;
+        const emailConfig = { apiKey: serverEnv('RESEND_API_KEY'), from: serverEnv('EMAIL_FROM') };
+        const origin = workerOrigin(args.origin) || args.origin;
+        const emailFor = async (userId: string) => {
+          const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+          if (error) console.error(`grading job ${args.jobId}: learner lookup failed`, error);
+          return data.user?.email ?? null;
+        };
+        await notifyLearnerOfResult(
+          emailConfig,
+          { jobId: args.jobId, generation: outcome.generation, userId: outcome.userId, assessmentUrl: `${origin}/course/learn/assessment/` },
+          { emailFor, markSent: (id) => store.markResultEmailSent(id) }
+        );
+        if (!outcome.passed) return;
+        const certificate = await store.certificateForAttempt(outcome.attemptId);
+        if (certificate)
+          await notifyLearnerOfCertificate(
+            emailConfig,
+            { certificateId: certificate.id, userId: outcome.userId, certificateUrl: `${origin}/course/learn/certificate/` },
+            { emailFor, markSent: (id) => store.markCertificateEmailSent(id) }
           );
       })
       .catch((err) => console.error(`grading job ${args.jobId}: inline run failed`, err));

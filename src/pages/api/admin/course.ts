@@ -4,6 +4,8 @@ import { adminJson, requireAdmin } from '../../../lib/server/adminAuth';
 import { supabaseAdmin } from '../../../lib/server/supabaseAdmin';
 import { triggerGradingWorker } from '../../../lib/server/course/workerTrigger';
 import { changeCourseAccess, findUserByEmail, listEnrollments } from '../../../lib/server/course/adminEnrollment';
+import { issuePendingCertificate, listCertificatesForAdmin, renameCertificate, resendCertificateEmail, revokeCertificate } from '../../../lib/server/course/adminCertificates';
+import { normalizeDisplayName } from '../../../lib/course/certificateRules';
 import { getCourseCatalog } from '../../../lib/course/catalog';
 import { ladderReport } from '../../../lib/course/ladder';
 
@@ -13,7 +15,9 @@ export const prerender = false;
  * Course administration. Sub-plan 1d: the grading queue, with a safe retry
  * of a failed job and a "kick" that re-triggers the worker for any job (the
  * claim function decides whether anything happens). Sub-plan 1e adds the
- * enrollment actions here. snapshot_private is never selected by this route
+ * enrollment actions here. Phase 3b adds the certificates view, plus
+ * issue_pending, revoke_certificate, rename_certificate and
+ * resend_certificate_email. snapshot_private is never selected by this route
  * until the Phase 3 review queue needs one reference response.
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -34,6 +38,9 @@ const MESSAGES: Record<string, string> = {
   not_enrolled: 'That account does not have access right now.',
   not_inactive: 'That account already has access.',
   already_refunded: 'That account is already recorded as refunded.',
+  not_passed: 'Only a passed attempt can be issued a certificate.',
+  already_revoked: 'This certificate is already revoked.',
+  not_found: 'No such record.',
 };
 const deny = (error: string, status: number): Response => adminJson({ error, message: MESSAGES[error] }, status);
 
@@ -56,6 +63,14 @@ export const GET: APIRoute = async ({ request }) => {
       return adminJson({ rows: ladderReport(catalog, COURSE_STATUS), summary: catalog.summary });
     } catch (err) {
       console.error('admin content ladder failed', err);
+      return adminJson({ error: 'server_error' }, 500);
+    }
+  }
+  if (view === 'certificates') {
+    try {
+      return adminJson(await listCertificatesForAdmin(new URL(request.url).searchParams.get('q') ?? ''));
+    } catch (err) {
+      console.error('admin certificate list failed', err);
       return adminJson({ error: 'server_error' }, 500);
     }
   }
@@ -172,6 +187,64 @@ export const POST: APIRoute = async ({ request }) => {
     if (!outcome.ok) return deny(outcome.error, 409);
     console.log('admin action', admin.email, action, userId, note ?? '');
     return adminJson({ ok: true, enrollment: outcome.enrollment });
+  }
+
+  if (action === 'issue_pending') {
+    const attemptId = typeof body?.attempt_id === 'string' ? body.attempt_id : '';
+    if (!UUID_RE.test(attemptId)) return deny('invalid', 400);
+    try {
+      const outcome = await issuePendingCertificate(attemptId, admin, origin);
+      if (!outcome.ok) return deny(outcome.error, outcome.error === 'not_found' ? 404 : 409);
+      console.log('admin action', admin.email, 'issue_pending', attemptId, outcome.issued ? 'issued' : 'already issued');
+      return adminJson({ ok: true, issued: outcome.issued, serial: outcome.certificate.serial });
+    } catch (err) {
+      console.error('admin issue_pending failed', err);
+      return adminJson({ error: 'server_error' }, 500);
+    }
+  }
+
+  if (action === 'revoke_certificate') {
+    const certificateId = typeof body?.certificate_id === 'string' ? body.certificate_id : '';
+    const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+    if (!UUID_RE.test(certificateId) || !reason || reason.length > 500) return deny('invalid', 400);
+    try {
+      const outcome = await revokeCertificate(certificateId, admin, reason);
+      if (outcome !== 'revoked') return deny(outcome, outcome === 'not_found' ? 404 : 409);
+      console.log('admin action', admin.email, 'revoke_certificate', certificateId);
+      return adminJson({ ok: true });
+    } catch (err) {
+      console.error('admin revoke_certificate failed', err);
+      return adminJson({ error: 'server_error' }, 500);
+    }
+  }
+
+  if (action === 'rename_certificate') {
+    const certificateId = typeof body?.certificate_id === 'string' ? body.certificate_id : '';
+    const name = normalizeDisplayName(typeof body?.name === 'string' ? body.name : '');
+    if (!UUID_RE.test(certificateId) || !name) return deny('invalid', 400);
+    try {
+      const row = await renameCertificate(certificateId, name);
+      if (!row) return deny('not_found', 404);
+      console.log('admin action', admin.email, 'rename_certificate', certificateId);
+      return adminJson({ ok: true });
+    } catch (err) {
+      console.error('admin rename_certificate failed', err);
+      return adminJson({ error: 'server_error' }, 500);
+    }
+  }
+
+  if (action === 'resend_certificate_email') {
+    const certificateId = typeof body?.certificate_id === 'string' ? body.certificate_id : '';
+    if (!UUID_RE.test(certificateId)) return deny('invalid', 400);
+    try {
+      const outcome = await resendCertificateEmail(certificateId, origin);
+      if (!outcome.ok) return deny(outcome.error, 404);
+      console.log('admin action', admin.email, 'resend_certificate_email', certificateId, outcome.sent ? 'sent' : 'not sent');
+      return adminJson({ ok: true, sent: outcome.sent });
+    } catch (err) {
+      console.error('admin resend_certificate_email failed', err);
+      return adminJson({ error: 'server_error' }, 500);
+    }
   }
 
   return deny('invalid', 400);

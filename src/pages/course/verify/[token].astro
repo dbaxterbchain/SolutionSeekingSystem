@@ -1,0 +1,76 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { COURSE_STATUS } from '../../../data/course';
+import { CERTIFICATION_MEANING, CERTIFICATION_METHOD, CERTIFICATION_TITLE } from '../../../data/certification';
+import { SHARE_TOKEN_RE } from '../../../lib/course/certificateRules';
+import { lookupSharedCertificate } from '../../../lib/server/course/certificates';
+
+// Server-rendered per request with the service role. Every miss (unknown
+// token, malformed token, sharing off, revoked, name not confirmed) renders
+// the same page with the same status, so the page cannot be used to test
+// tokens. Not gated on PUBLIC_COURSE_STATUS: a link printed on a certificate
+// must resolve whatever the sales page is doing. The card is passed by hand
+// because the pathname carries the token.
+export const prerender = false;
+
+const token = Astro.params.token ?? '';
+let certificate = null;
+let unavailable = false;
+if (SHARE_TOKEN_RE.test(token)) {
+  try {
+    certificate = await lookupSharedCertificate(token);
+  } catch (err) {
+    console.error('certificate verify lookup failed', err);
+    unavailable = true;
+  }
+}
+Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+Astro.response.headers.set('Cache-Control', 'no-store');
+if (unavailable) Astro.response.status = 503;
+
+const issued = certificate ? new Date(certificate.issued_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+---
+
+<BaseLayout title="Certificate verification" description="Confirms a Solution Seeking System Certification that its holder chose to share." noindex noAnalytics ogImage="/og/course/verify.png">
+  <div class="container-page max-w-2xl py-10 sm:py-14">
+    <p class="eyebrow">{CERTIFICATION_TITLE}</p>
+    {unavailable ? (
+      <section class="mt-4 rounded-2xl border border-slate-200 bg-white p-8">
+        <h1 class="font-heading text-3xl font-bold text-ink-800">Verification is unavailable right now</h1>
+        <p class="mt-4 text-slate-700">Please try the link again in a few minutes.</p>
+      </section>
+    ) : certificate ? (
+      <section class="mt-4 rounded-2xl border border-slate-200 bg-white p-8">
+        <h1 class="font-heading text-3xl font-bold text-ink-800">This certificate is active</h1>
+        <p class="mt-6 text-sm uppercase tracking-wide text-slate-500">Awarded to</p>
+        <p class="mt-1 font-heading text-2xl font-bold text-ink-800">{certificate.display_name}</p>
+        <dl class="mt-6 grid gap-4 text-sm sm:grid-cols-3">
+          <div>
+            <dt class="text-slate-500">Issued</dt>
+            <dd class="font-semibold text-ink-800">{issued}</dd>
+          </div>
+          <div>
+            <dt class="text-slate-500">Version</dt>
+            <dd class="font-semibold text-ink-800">{certificate.certification_version}</dd>
+          </div>
+          <div>
+            <dt class="text-slate-500">Serial</dt>
+            <dd class="font-semibold text-ink-800">{certificate.serial}</dd>
+          </div>
+        </dl>
+        <p class="mt-6 text-slate-700">{CERTIFICATION_MEANING}</p>
+        <p class="mt-2 text-sm text-slate-500">
+          {CERTIFICATION_METHOD}.
+          {COURSE_STATUS !== 'hidden' && (
+            <a href="/course/certification/" class="underline">How the certification is assessed</a>
+          )}
+        </p>
+      </section>
+    ) : (
+      <section class="mt-4 rounded-2xl border border-slate-200 bg-white p-8">
+        <h1 class="font-heading text-3xl font-bold text-ink-800">This verification link is not active</h1>
+        <p class="mt-4 text-slate-700">The holder may have turned sharing off, or the link may be incomplete. Ask them for a current link.</p>
+      </section>
+    )}
+  </div>
+</BaseLayout>

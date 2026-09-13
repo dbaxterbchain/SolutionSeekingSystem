@@ -12,6 +12,10 @@ export const CERTIFICATION_VERSION = '1';
 export const CERTIFICATION_TITLE = 'Solution Seeking System Certification';
 export const CERTIFICATION_METHOD = 'AI-assessed, unproctored';
 
+/** The one sentence that says what the credential is and is not. Printed on the certificate, the verify page and the certification page, from here, so they cannot disagree. */
+export const CERTIFICATION_MEANING =
+  'An AI-assessed course credential earned on supplied scenarios. It is not an accreditation and does not verify live behaviour.';
+
 export const CRITERIA = [
   {
     id: 'self_understanding',

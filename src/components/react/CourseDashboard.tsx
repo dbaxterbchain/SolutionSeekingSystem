@@ -345,9 +345,16 @@ function CertificationPanel({ state }: { state: CourseStateView }) {
     <section className="mt-10 max-w-xl rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
       <h2 className="font-heading text-lg font-bold text-ink-800">Certification</h2>
       <p className="mt-3 text-slate-700">{body}</p>
-      <a href="/course/learn/assessment/" className="btn-primary mt-4">
-        {linkLabel}
-      </a>
+      <div className="mt-4 flex flex-wrap gap-3">
+        <a href="/course/learn/assessment/" className="btn-primary">
+          {linkLabel}
+        </a>
+        {state.certification.status === 'passed' && (
+          <a href="/course/learn/certificate/" className="btn-secondary">
+            Your certificate
+          </a>
+        )}
+      </div>
     </section>
   );
 }

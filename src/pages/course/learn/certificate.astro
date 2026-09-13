@@ -1,0 +1,21 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import CertificateView from '../../../components/react/CertificateView.tsx';
+import { CERTIFICATION_MEANING, CERTIFICATION_METHOD, CERTIFICATION_TITLE } from '../../../data/certification';
+import { courseCopy } from '../../../lib/course/copy';
+
+// Prerendered public shell, like the assessment page: no certificate data in
+// the HTML. The island fetches the certificate with the bearer token.
+---
+
+<BaseLayout title="Your certificate" description="The certificate for the Solution Seeking System Certification, with its verification link." noindex>
+  <div class="container-page py-10">
+    <CertificateView
+      client:load
+      certificationTitle={CERTIFICATION_TITLE}
+      method={CERTIFICATION_METHOD}
+      meaning={CERTIFICATION_MEANING}
+      supportContact={courseCopy('{{support_contact}}')}
+    />
+  </div>
+</BaseLayout>

@@ -850,15 +850,21 @@ One video per lesson. The media baseline and the upload clicks are Bradley's, in
 
 ### Course migrations and advisors
 
-The course adds two migrations: [`0030_course.sql`](../supabase/migrations/0030_course.sql)
-(enrollments, the enrollment ledger, progress, check attempts, Stream tokens) and
+The course adds migrations [`0030_course.sql`](../supabase/migrations/0030_course.sql)
+(enrollments, the enrollment ledger, progress, check attempts, Stream tokens),
 [`0031_course_assessment.sql`](../supabase/migrations/0031_course_assessment.sql) (source
-packs, attempts, responses, grading jobs, grades, certificates, review requests). Apply them
-before the deploy that needs them:
+packs, attempts, responses, grading jobs, grades, certificates, review requests), and
+[`0032_course_certificates.sql`](../supabase/migrations/0032_course_certificates.sql) (the
+certificate email claim column, the audit columns, `issue_course_certificate`,
+`revoke_course_certificate`). Apply them before the deploy that needs them, and apply `0032`
+specifically before any deploy that carries the certificates work: the certificate reads select
+its new columns and fail against a database that does not have them. The assessment route builds
+its status through that same certificate read on every action, so a database missing `0032` does
+not merely break the certificate page: it takes out saving and submitting for anyone mid-attempt.
 
 ```bash
 npx supabase db push
-npx supabase migration list     # both must show on remote
+npx supabase migration list     # all must show on remote
 ```
 
 `migration list` only says the file ran. The course puts most of its rules in SQL functions,
@@ -870,12 +876,13 @@ functions exist and then prove one of them works:
 select proname from pg_proc where proname like '%course%' order by proname;
 ```
 
-Eight names come back: `admin_change_course_access`, `create_course_attempt`,
+These come back: `admin_change_course_access`, `create_course_attempt`,
 `submit_course_attempt`, `claim_course_grading_job`, `finalize_course_grade`,
-`fail_course_grading_job` and `retry_course_grading_job`, which the routes call, plus the
-`course_progress_monotone` trigger function behind `course_progress`. A short list means a
-migration ran against a schema that already had part of it, and the missing function is the
-one to run by hand from the migration file.
+`fail_course_grading_job`, `retry_course_grading_job`, `issue_course_certificate` and
+`revoke_course_certificate`, which the routes call, plus the `course_progress_monotone` trigger
+function behind `course_progress`. A short list means a migration ran against a schema that
+already had part of it, and the missing function is the one to run by hand from the migration
+file.
 
 Then, on the hosted stack, **grant access to one real account from `/admin` and revoke it
 again.** That exercises `admin_change_course_access`, the ledger insert, the auth admin
@@ -942,6 +949,18 @@ address on the account. Pressing Kick on a succeeded job sends nothing, since th
 `unavailable` before any email code runs. `RESEND_API_KEY` and `EMAIL_FROM` already carry
 Functions scope for the failure alert, so no new variable is involved.
 
+**The certificate email.** Issuing a certificate emails the learner "Your certificate is ready"
+with a link to the certificate page, from every place a certificate can be issued: the worker
+after a pass with awards on, the dev server's inline run, and the admin's Issue action. It is
+sent once per certificate: whichever call reaches it first sets `email_sent_at` on the
+certificate row where it is null, and only the call that set it sends, under the Resend
+idempotency key `course-certificate/<id>`. When a learner writes in that no certificate email
+came, read the certificate row: an empty `email_sent_at` means no send was ever attempted, and
+the admin area's Certificates tab offers a Resend action for exactly that case; a set one means
+a send was attempted, so the next places to look are the Resend log and the address on the
+account. Resend is offered only while the column is empty. `RESEND_API_KEY` and `EMAIL_FROM`
+already carry Functions scope, so no new variable is involved.
+
 **Deploy-preview checks**, once the secret is set:
 
 - POST to `/.netlify/functions/course-grade` **without** the secret. The job must be
@@ -986,15 +1005,51 @@ user id, so the ledger says who changed what and when. What the learner sees aft
 "Access to the course has ended for this account" on both the sales page and the dashboard,
 and every course endpoint answering 403 with the reason.
 
+### Certificates from /admin
+
+`/admin` → **Certificates** searches by serial, email or version. Below the search box, before
+the list of issued certificates, a pending list surfaces any pass with no certificate yet:
+`finalize_course_grade` only issues one when awards are on, so a pass recorded while they were
+off waits here until an operator acts on it. That list shows only on the unsearched view: a
+search narrows the results to issued certificates, so the box has to be cleared to get back to
+the passes waiting.
+
+- **Issue**, for a pass in the pending list. One that already has a certificate is reported,
+  not refused.
+- **Revoke** asks for a reason first. The verification link goes dark the moment it commits.
+  Revoking is final as far as the product is concerned: nothing in the admin area or the
+  learner's own account can bring a certificate back once it is revoked. Putting a wrongly
+  revoked certificate right means changing the row in the database directly, by hand. That is
+  why the reason field is required, and why the dialog never lets a click alone confirm
+  anything: an admin has to write the reason down, and only then can they press Revoke.
+- **Rename** fixes a typo the learner reports after confirming their own name. The confirmation
+  stands; only the printed name changes.
+- **Resend** sends the certificate email for one that never got out. It is offered only while
+  the Emailed column says no, and it reuses the same claim on `email_sent_at`, so a second press
+  is safe.
+
+Revoke, Rename and Resend all apply only to an active certificate; a revoked row shows its
+reason and none of them. The **Emailed** column is that same `email_sent_at`, so an operator can
+see at a glance whether Resend has anything to do.
+
+The verify page at `/course/verify/<token>` needs no sign-in and is not gated by
+`PUBLIC_COURSE_STATUS`. A link printed on a certificate months ago still has to work, whatever
+the sales page is doing on the day someone opens it.
+
+`COURSE_AWARDS_ENABLED` stays `false` on every deploy, `course-beta` included, until 3d's grader
+benchmark clears it. Nothing is lost while it is off: a pass just waits in the pending list
+above until an operator presses Issue.
+
 ### Registering the course events
 
 Course events follow the same four-place rule as every other event, and the mechanics are in
 the GTM and GA4 sections below. What to add:
 
 1. **The GTM custom-event trigger regex** gains
-   `course_viewed|enrollment_ready|lesson_completed|module_completed|assessment_submitted|grade_ready|grading_error`.
+   `course_viewed|enrollment_ready|lesson_completed|module_completed|assessment_submitted|grade_ready|grading_error|certificate_issued`.
    An event missing from that regex reaches the dataLayer and dies there, with no error
-   anywhere.
+   anywhere. `certificate_issued` carries no parameters, so it needs nothing added under GA4
+   custom dimensions below.
 2. **GA4 custom dimensions** (event-scoped): `course_id`, `sale_status`, `lesson_id`,
    `module_id`, `content_version`, `attempt_id`, `form_id`, `result`. See
    [4. GA4 UI setup](#4-ga4-ui-setup). Without them the parameters are collected and cannot

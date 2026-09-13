@@ -58,6 +58,10 @@ export interface GradingJobStore {
   fail(args: { jobId: string; lockToken: string; category: ErrorCategory; error: string; retryable: boolean }): Promise<'requeued' | 'failed' | 'stale'>;
   /** Sets result_email_sent_at where it is null; true when this call set it. */
   markResultEmailSent(jobId: string): Promise<boolean>;
+  /** The certificate finalize issued for this attempt, if any: null while awards are off, or when the pass was recorded before they were. */
+  certificateForAttempt(attemptId: string): Promise<{ id: string } | null>;
+  /** Sets email_sent_at on the certificate where it is null; true when this call set it. */
+  markCertificateEmailSent(certificateId: string): Promise<boolean>;
 }
 export interface RunSettings {
   model: string;

@@ -1,14 +1,15 @@
 # Project Status
 
-_Last updated: 2026-09-12 (paid video course, Phase 2 and 3a code complete on their branches and
-the pilot running on the `course-beta` deploy; before that, icons for the 12 Wisdom Principles and
-the gold ramp meaning "the solution")_
+_Last updated: 2026-09-13 (paid video course, Phase 3b code complete on its branch, certificates
+and the verify page; before that, Phase 2 and 3a code complete on their branches and the pilot
+running on the `course-beta` deploy; before that, icons for the 12 Wisdom Principles and the gold
+ramp meaning "the solution")_
 
 ## At a glance
 
 | | |
 |---|---|
-| **Current phase** | Growth plan P1-P5 shipped (measurement, anonymous trial, pricing, email capture, social proof + testimonial collector). In progress: the **paid video course**, whose Phase 2 and 3a are code complete on their branches and the pilot runs on the `course-beta` deploy. Next: SEO/community channels, then a small paid test. |
+| **Current phase** | Growth plan P1-P5 shipped (measurement, anonymous trial, pricing, email capture, social proof + testimonial collector). In progress: the **paid video course**, whose Phase 2, 3a and 3b are code complete on their branches and the pilot runs on the `course-beta` deploy. Next: SEO/community channels, then a small paid test. |
 | **Live URL** | https://solutionseeking.com (apex is primary; www and the netlify.app subdomain 301 to it) |
 | **Build health** | `npm run build` ✅ · `npm run check` ✅ (0 errors) |
 | **Hosting** | Netlify (Beanchain team), site `solution-seeking-system` |
@@ -109,8 +110,20 @@ result email: code complete 2026-09-12**
 ([plan](superpowers/plans/2026-09-12-course-phase3a-results-retakes-result-email.md)). A
 learner's attempt history, a read-only view of any earlier attempt, the way to start again
 after a not-yet result (with the honest message when no form is left), and the email that says
-a result is ready, sent once per grade from the worker. Still to come: 3b certificates and the
-verify page, 3c review requests and the review queue with regrades, 3d the grader benchmark
+a result is ready, sent once per grade from the worker. The real send was proven on the
+`course-beta` deploy on 2026-09-13: one graded attempt there produced one email at the
+learner's address, the job's sent-at column was set, and a kick through the admin API on that
+job afterwards sent nothing.
+
+**3b, certificates and the verify page: code complete**
+([plan](superpowers/plans/2026-09-12-course-phase3b-certificates-verify-page.md)). A learner
+confirms the name once and controls their own verification link from the certificate page, and
+`/course/verify/<token>` shows a visitor the certificate itself, or one not-active page for
+every kind of miss. The admin area gained a Certificates tab that issues a certificate for a
+pass recorded while awards were off, revokes one, fixes a name, or sends the certificate email
+again.
+
+Still to come: 3c review requests and the review queue with regrades, 3d the grader benchmark
 that decides whether `COURSE_AWARDS_ENABLED` can be turned on. The content Phase 3 waits on is
 David's: Forms A and B, the practice form, the rated examples for the benchmark, and V39.
 

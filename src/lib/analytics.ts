@@ -110,6 +110,8 @@ export type AnalyticsEvent =
   | { event: 'grade_ready'; attempt_id: string; result: 'passed' | 'needs_revision' }
   /** Grading failed after every retry and the learner saw the honest copy (once per attempt). */
   | { event: 'grading_error'; attempt_id: string }
+  /** The learner confirmed the name on an issued certificate (once per certificate; the server refuses a second confirmation). */
+  | { event: 'certificate_issued' }
   /** A visitor opened the free preview lesson's exercise (fired once, on mount). */
   | { event: 'course_preview_started'; lesson_id: string }
   /**

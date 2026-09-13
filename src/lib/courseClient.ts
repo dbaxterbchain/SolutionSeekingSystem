@@ -3,8 +3,9 @@ import { getFirstTouch } from './attribution';
 import type { ProgressAction } from './course/progressRules';
 import type { CourseStatus } from './course/status';
 import type { AssessmentHistory, AssessmentStatus, CertificationStatus } from './course/assessmentTypes';
+import type { CertificatePayload } from './course/assessmentTypes';
 
-export type { AssessmentHistory, AssessmentStatus, AttemptSummary, AttemptView, CapApplied, CriterionFeedback, JobView, PromptView, ResultView, StageView } from './course/assessmentTypes';
+export type { AssessmentHistory, AssessmentStatus, AttemptSummary, AttemptView, CapApplied, CertificatePayload, CertificateRecord, CertificateSummary, CriterionFeedback, JobView, PromptView, ResultView, StageView } from './course/assessmentTypes';
 
 /**
  * The browser's view of the course, fetched from the server and never
@@ -145,6 +146,16 @@ export function courseErrorMessage(code: string): string {
       return 'This part is locked. Your later parts are still open.';
     case 'stage_mismatch':
       return 'This page is out of date. Reload to see where you are.';
+    case 'no_certificate':
+      return 'There is no certificate on this account yet.';
+    case 'name_already_confirmed':
+      return 'The name on this certificate is already confirmed. Write to course support to change it.';
+    case 'name_required':
+      return 'Confirm the name on your certificate before turning on its link.';
+    case 'certificate_revoked':
+      return 'This certificate has been revoked. Write to course support if that seems wrong.';
+    case 'certificate_unavailable':
+      return 'Your certificate is unavailable right now. Please try again in a minute.';
     case 'assessment_unavailable':
       return 'The assessment is unavailable right now. Please try again in a minute.';
     default:
@@ -372,3 +383,10 @@ export const advanceAssessment = (
 export const submitAssessment = (accessToken: string, attemptId: string, requestKey: string): Promise<AssessmentStatus> =>
   postAssessment(accessToken, { action: 'submit', attempt_id: attemptId, request_key: requestKey });
 export const listAttempts = (accessToken: string): Promise<AssessmentHistory> => postAssessment(accessToken, { action: 'list' });
+
+/** The learner's certificate page: GET the record, confirm the name once, or turn the verification link on and off. */
+export const fetchCertificate = (accessToken: string): Promise<CertificatePayload> => getJson(accessToken, '/api/course/certificate');
+export const confirmCertificateName = (accessToken: string, name: string): Promise<CertificatePayload> =>
+  postJson(accessToken, '/api/course/certificate', { action: 'confirm_name', name });
+export const setCertificateSharing = (accessToken: string, active: boolean): Promise<CertificatePayload> =>
+  postJson(accessToken, '/api/course/certificate', { action: 'share', active });

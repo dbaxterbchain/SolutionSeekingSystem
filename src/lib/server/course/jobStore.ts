@@ -112,5 +112,21 @@ export function supabaseJobStore(client: SupabaseClient): GradingJobStore {
       if (error) throw new Error(`result email claim failed: ${error.message}`);
       return (data ?? []).length === 1;
     },
+
+    async certificateForAttempt(attemptId): Promise<{ id: string } | null> {
+      const { data, error } = await client.from('course_certificates').select('id').eq('attempt_id', attemptId).maybeSingle();
+      if (error) throw new Error(`certificate lookup failed: ${error.message}`);
+      return data ? { id: data.id as string } : null;
+    },
+    async markCertificateEmailSent(certificateId): Promise<boolean> {
+      const { data, error } = await client
+        .from('course_certificates')
+        .update({ email_sent_at: new Date().toISOString() })
+        .eq('id', certificateId)
+        .is('email_sent_at', null)
+        .select('id');
+      if (error) throw new Error(`certificate email claim failed: ${error.message}`);
+      return (data ?? []).length === 1;
+    },
   };
 }
