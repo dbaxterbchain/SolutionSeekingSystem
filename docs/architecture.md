@@ -90,11 +90,14 @@ astro.config.mjs · tailwind.config.mjs · tsconfig.json · netlify.toml
 | `/course/learn/lessons/:id` | `pages/course/learn/lessons/[id].astro` | Lesson shell (`LessonView` island). The prose is fetched, never prerendered |
 | `/course/learn/worksheets/:id` | `pages/course/learn/worksheets/[id].astro` | Printable worksheet shell (`WorksheetView` island) |
 | `/course/learn/assessment` | `pages/course/learn/assessment.astro` | The staged final assessment (`AssessmentView` island) |
+| `/course/learn/certificate` | `pages/course/learn/certificate.astro` | The learner's certificate: name confirmation, printing and the verification link (`CertificateView` island) |
 | `/course/learn/modules/:id` | `pages/course/learn/modules/[id].astro` | One module's lessons, worksheet and check (`ModuleCheck` island); modules 1 to 8 only |
 | `/course/learn/resources` | `pages/course/learn/resources.astro` | Worksheets, the guide, the practice tools and support; public data, no island |
 | `/course/preview` | `pages/course/preview.astro` | The one free lesson, rendered at build time; exists only when the course is public and that lesson is published |
+| `/course/verify/[token]` | `pages/course/verify/[token].astro` | Server-rendered; confirms a shared certificate, or shows the same not-active page for every miss |
 | `/api/course/*` | `pages/api/course/{entitlement,checkout,lesson,progress,state,worksheet,check,assessment}.ts` | The learner API: Bearer token in, `Cache-Control: no-store` out. `assessment` answers `start`, `save`, `advance`, `submit`, `status` (the latest attempt or one by id) and `list` (the learner's attempt history) |
-| `/api/admin/course` | `pages/api/admin/course.ts` | Enrollment actions, the grading queue and the content ladder, behind `requireAdmin()` |
+| `/api/course/certificate` | `pages/api/course/certificate.ts` | The learner's certificate: confirm the name once, turn the verification link on and off; sign-in and ownership, not enrollment |
+| `/api/admin/course` | `pages/api/admin/course.ts` | Enrollment actions, the grading queue, the content ladder and certificates, behind `requireAdmin()` |
 | `/api/stripe-webhook` (course branch) | `pages/api/stripe-webhook.ts` | `metadata.purchase_intent = course` is tested before the org and personal paths |
 | `/.netlify/functions/course-grade` · `course-grade-sweeper` | `netlify/functions/*.mts` | The background grader and its ten-minute sweeper, outside Astro entirely |
 | `/a/:org/:slug` | `pages/a/[org]/[slug].astro` | **Server-rendered** (`prerender = false`) white-label page; bare `WhiteLabelLayout`, `noindex`, 404 for unknown/inactive; the only per-request `.astro` route |
