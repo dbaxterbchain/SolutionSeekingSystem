@@ -107,10 +107,13 @@ export type ResendOutcome = { ok: true; sent: boolean } | { ok: false; error: 'n
  * sendCertificateEmail rather than a second sender, so the same sent-at claim
  * guards this call exactly as it guards the original send. Only the press
  * that wins the claim actually sends, so pressing Resend twice is safe by
- * construction and needs no guard of its own here.
+ * construction and needs no guard of its own here. Applies only to an active
+ * certificate: an email announcing a certificate must never go out for one
+ * that was revoked, so a revoked id answers not_found here, the same as
+ * rename.
  */
 export async function resendCertificateEmail(id: string, origin: string): Promise<ResendOutcome> {
-  const { data, error } = await supabaseAdmin.from('course_certificates').select(CERTIFICATE_COLUMNS).eq('id', id).maybeSingle();
+  const { data, error } = await supabaseAdmin.from('course_certificates').select(CERTIFICATE_COLUMNS).eq('id', id).eq('status', 'active').maybeSingle();
   if (error) throw new Error(`certificate lookup failed: ${error.message}`);
   if (!data) return { ok: false, error: 'not_found' };
   const sent = await sendCertificateEmail(data as CertificateRow, origin);
