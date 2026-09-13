@@ -2,6 +2,7 @@ import type { Config } from '@netlify/functions';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { notifyLearnerOfCertificate } from '../../src/lib/server/course/certificateEmail';
 import { GRADER_CALL_TIMEOUT_MS, gradeAttempt } from '../../src/lib/server/course/grader';
 import { sendGradingFailureAlert } from '../../src/lib/server/course/gradingAlert';
 import { runGradingJob } from '../../src/lib/server/course/gradingJob';
@@ -92,18 +93,31 @@ export default async (req: Request) => {
     );
   }
   if (outcome.outcome === 'finalized') {
+    const emailConfig = { apiKey: env('RESEND_API_KEY'), from: env('EMAIL_FROM') };
+    const emailFor = async (userId: string) => {
+      const { data, error } = await supabase.auth.admin.getUserById(userId);
+      if (error) console.error(`grading job ${jobId}: learner lookup failed`, error);
+      return data.user?.email ?? null;
+    };
     await notifyLearnerOfResult(
-      { apiKey: env('RESEND_API_KEY'), from: env('EMAIL_FROM') },
+      emailConfig,
       { jobId, generation: outcome.generation, userId: outcome.userId, assessmentUrl: `${deployOrigin()}/course/learn/assessment/` },
-      {
-        emailFor: async (userId) => {
-          const { data, error } = await supabase.auth.admin.getUserById(userId);
-          if (error) console.error(`grading job ${jobId}: learner lookup failed`, error);
-          return data.user?.email ?? null;
-        },
-        markSent: (id) => store.markResultEmailSent(id),
-      }
+      { emailFor, markSent: (id) => store.markResultEmailSent(id) }
     );
+    // A certificate exists here only when awards were on at finalize; the
+    // admin's Issue action sends the same email for a pass recorded before.
+    if (outcome.passed) {
+      const certificate = await store.certificateForAttempt(outcome.attemptId).catch((err) => {
+        console.error(`grading job ${jobId}: certificate lookup failed`, err);
+        return null;
+      });
+      if (certificate)
+        await notifyLearnerOfCertificate(
+          emailConfig,
+          { certificateId: certificate.id, userId: outcome.userId, certificateUrl: `${deployOrigin()}/course/learn/certificate/` },
+          { emailFor, markSent: (id) => store.markCertificateEmailSent(id) }
+        );
+    }
   }
   return new Response(null, { status: 202 });
 };

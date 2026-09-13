@@ -71,6 +71,14 @@ function fakeStore(opts: { claim?: ClaimResult; context?: JobContext | null; fin
       calls.push({ name: 'markResultEmailSent', args: jobId });
       return true;
     },
+    async certificateForAttempt(attemptId) {
+      calls.push({ name: 'certificateForAttempt', args: attemptId });
+      return null;
+    },
+    async markCertificateEmailSent(certificateId) {
+      calls.push({ name: 'markCertificateEmailSent', args: certificateId });
+      return true;
+    },
   };
   return { calls, store };
 }
