@@ -58,10 +58,12 @@ rather than carrying a price.
 | ![Admin certificates tab](admin-certificates-1280.png) | **`admin-certificates-1280.png`**: `/admin` → Certificates. An active certificate with its Rename, Resend and Revoke actions, beside a revoked certificate showing the reason it was revoked. A revoked row keeps none of those actions, because there is nothing left for any of them to do. |
 | ![Certificate name confirmation](certificate-name-confirmation-1280.png) | **`certificate-name-confirmation-1280.png`**: the certificate page before a name is set. This form appears only until a name is confirmed, because the server refuses a second attempt at it, so the printed name is a single decision rather than something to keep tinkering with. |
 | ![Certificate issued](certificate-issued-1280.png) | **`certificate-issued-1280.png`**: the certificate once a name is confirmed. Nothing on the sheet is held back from the verify page, so the printed copy and the page a stranger opens cannot disagree. |
-| ![Certificate print view](certificate-print-1280.png) | **`certificate-print-1280.png`**: the same page under print media. The header, footer, nav and the print button drop out, leaving the sheet as the thing that actually goes onto paper or into a saved PDF. |
+| ![Certificate print view](certificate-print-1280.png) | **`certificate-print-1280.png`**: the same page under print media. The header, footer, nav, the page's own eyebrow and heading, the print button and the verification link section all drop out, leaving the sheet alone as the thing that actually goes onto paper or into a saved PDF. |
 | ![Verification link section, phone](certificate-link-390.png) | **`certificate-link-390.png`**: the verification link section at 390px. The sentence above the url is exact about what a stranger sees through it, which matters because this is the piece of a certificate a learner is actively choosing to hand out. |
 | ![Verify page, active](verify-active-1280.png) | **`verify-active-1280.png`**: `/course/verify/<token>` for a link that is turned on. A visitor sees exactly what the certificate page promises to show and nothing about who is asking, since the page takes no sign-in and asks nothing of them. |
 | ![Verify page, not active, phone](verify-not-active-390.png) | **`verify-not-active-390.png`**: the same page at 390px for a token that resolves to nothing. A revoked certificate, a link its owner turned off, and a token that was never real all land on this exact page, so no response tells a visitor which one they hit. |
 
 _Captured with a headless Chromium session against the local Supabase stack. The dark pill at
-the bottom of some shots is the Astro dev toolbar, not part of the feature._
+the bottom of some shots is the Astro dev toolbar, not part of the feature. The verification
+links visible in the certificate shots point at the local stack, so nobody mistakes them for a
+working link on the live site._

@@ -72,6 +72,6 @@ export function certificateRecord(row: CertificateRowLike, origin: string): Cert
     status: row.status,
     revoked_at: row.revoked_at,
     share_active: row.share_active,
-    share_url: row.share_active && row.share_token ? certificateShareUrl(origin, row.share_token) : null,
+    share_url: row.status === 'active' && row.share_active && row.share_token ? certificateShareUrl(origin, row.share_token) : null,
   };
 }

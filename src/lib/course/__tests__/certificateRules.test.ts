@@ -63,5 +63,10 @@ describe('views', () => {
     expect(off.share_url).toBeNull();
     expect(JSON.stringify(off)).not.toContain(token);
     expect(Object.keys(off)).not.toContain('share_token');
+    // Revoked but still share_active with a token: the status check must win, since a revoked
+    // certificate's verification link is not supposed to resolve for anyone.
+    const revoked = certificateRecord({ ...row, status: 'revoked' }, 'https://example.com');
+    expect(revoked.share_url).toBeNull();
+    expect(JSON.stringify(revoked)).not.toContain(token);
   });
 });

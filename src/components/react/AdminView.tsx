@@ -1098,7 +1098,17 @@ function CertificatesTab({
               <tr key={r.id} className="border-t border-slate-100">
                 <td className="px-5 py-2.5 font-mono text-xs">{r.serial}</td>
                 <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{r.user_id.slice(0, 8)}</td>
-                <td className="px-5 py-2.5">{r.display_name ?? <span className="text-slate-400">not confirmed</span>}</td>
+                <td className="px-5 py-2.5">
+                  {r.name_confirmed_at ? (
+                    r.display_name
+                  ) : r.display_name ? (
+                    <>
+                      {r.display_name} <span className="text-slate-400">not confirmed</span>
+                    </>
+                  ) : (
+                    <span className="text-slate-400">not confirmed</span>
+                  )}
+                </td>
                 <td className="px-5 py-2.5">{r.certification_version}</td>
                 <td className="px-5 py-2.5 text-slate-400">
                   {date(r.issued_at)} {time(r.issued_at)}
@@ -1106,7 +1116,7 @@ function CertificatesTab({
                 <td className="px-5 py-2.5">
                   <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${r.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{r.status}</span>
                 </td>
-                <td className="px-5 py-2.5 text-slate-500">{r.share_active ? 'on' : 'off'}</td>
+                <td className="px-5 py-2.5 text-slate-500">{r.status === 'active' && r.share_active ? 'on' : 'off'}</td>
                 <td className="px-5 py-2.5 text-slate-400">{r.email_sent_at ? `${date(r.email_sent_at)} ${time(r.email_sent_at)}` : 'no'}</td>
                 <td className="space-x-2 px-5 py-2.5">
                   {r.status === 'active' && (
@@ -1146,6 +1156,11 @@ function CertificatesTab({
           </tbody>
         </table>
       </section>
+      <p className="text-xs text-slate-400">
+        A date in Emailed means a send was attempted, so Resend is not offered for that row. If a
+        learner says the certificate email never arrived, the Resend log and the address on their
+        account are the next places to look.
+      </p>
       {dialog}
     </div>
   );

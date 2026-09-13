@@ -28,6 +28,17 @@ export interface CertificateRow extends CertificateRowLike {
   updated_at: string;
 }
 
+/**
+ * What the admin area may see: every certificate column except the share
+ * token. The token is the whole secret of a verification link, an operator
+ * never needs it, and a response that carries one hands out working links for
+ * learners who turned sharing off.
+ */
+export const ADMIN_CERTIFICATE_COLUMNS =
+  'id, serial, user_id, certification_version, attempt_id, display_name, name_confirmed_at, issued_at, status, revoked_at, revoke_reason, share_active, email_sent_at, issued_by, revoked_by, created_at, updated_at' as const;
+
+export type AdminCertificateRow = Omit<CertificateRow, 'share_token'>;
+
 const asRow = (data: unknown): CertificateRow => data as CertificateRow;
 
 /** Where share links and email links point: the deploy that is serving, production's own address in production. */

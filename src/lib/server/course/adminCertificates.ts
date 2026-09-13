@@ -3,7 +3,7 @@ import { supabaseAdmin } from '../supabaseAdmin';
 import { serverEnv } from '../env';
 import { COURSE } from '../../../data/course';
 import { findUserByEmail } from './adminEnrollment';
-import { CERTIFICATE_COLUMNS, certificateOrigin, type CertificateRow } from './certificates';
+import { ADMIN_CERTIFICATE_COLUMNS, CERTIFICATE_COLUMNS, certificateOrigin, type AdminCertificateRow, type CertificateRow } from './certificates';
 import { notifyLearnerOfCertificate } from './certificateEmail';
 import { supabaseJobStore } from './jobStore';
 
@@ -28,10 +28,10 @@ const SERIAL_RE = /^SSS-\d{4}-\d{5}$/i;
 const LIMIT = 100;
 
 /** `q` is a serial, an email, or a certification version; empty lists the newest. Pending passes are listed only for the empty query. */
-export async function listCertificatesForAdmin(q: string): Promise<{ rows: CertificateRow[]; pending: PendingPassRow[] }> {
+export async function listCertificatesForAdmin(q: string): Promise<{ rows: AdminCertificateRow[]; pending: PendingPassRow[] }> {
   const query = q.trim();
   // Filters first, then order and limit: the filter builder is what `.eq()` returns, so the reassignments type-check.
-  let builder = supabaseAdmin.from('course_certificates').select(CERTIFICATE_COLUMNS);
+  let builder = supabaseAdmin.from('course_certificates').select(ADMIN_CERTIFICATE_COLUMNS);
   if (SERIAL_RE.test(query)) builder = builder.eq('serial', query.toUpperCase());
   else if (query.includes('@')) {
     const account = await findUserByEmail(query);
@@ -40,7 +40,7 @@ export async function listCertificatesForAdmin(q: string): Promise<{ rows: Certi
   } else if (query) builder = builder.eq('certification_version', query);
   const { data, error } = await builder.order('issued_at', { ascending: false }).limit(LIMIT);
   if (error) throw new Error(`certificate list failed: ${error.message}`);
-  return { rows: (data ?? []) as CertificateRow[], pending: query ? [] : await listPendingPasses() };
+  return { rows: (data ?? []) as AdminCertificateRow[], pending: query ? [] : await listPendingPasses() };
 }
 
 /** Passed attempts at the current version whose learner has no certificate for it. */

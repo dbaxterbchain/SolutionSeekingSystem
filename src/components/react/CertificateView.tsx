@@ -99,8 +99,8 @@ export default function CertificateView(props: Props) {
   const { certificate } = payload;
   return (
     <div>
-      <p className="eyebrow">{props.certificationTitle}</p>
-      <h1 className="mt-2 font-heading text-3xl font-bold text-ink-800">Your certificate</h1>
+      <p className="no-print eyebrow">{props.certificationTitle}</p>
+      <h1 className="no-print mt-2 font-heading text-3xl font-bold text-ink-800">Your certificate</h1>
       {!certificate && <NoCertificate payload={payload} />}
       {certificate && certificate.status === 'revoked' && <Revoked certificate={certificate} supportContact={props.supportContact} />}
       {certificate && certificate.status === 'active' && !certificate.name_confirmed_at && <NameForm busy={busy} error={actionError} onConfirm={confirmName} />}

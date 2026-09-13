@@ -858,7 +858,9 @@ packs, attempts, responses, grading jobs, grades, certificates, review requests)
 certificate email claim column, the audit columns, `issue_course_certificate`,
 `revoke_course_certificate`). Apply them before the deploy that needs them, and apply `0032`
 specifically before any deploy that carries the certificates work: the certificate reads select
-its new columns and fail against a database that does not have them.
+its new columns and fail against a database that does not have them. The assessment route builds
+its status through that same certificate read on every action, so a database missing `0032` does
+not merely break the certificate page: it takes out saving and submitting for anyone mid-attempt.
 
 ```bash
 npx supabase db push
@@ -1014,8 +1016,12 @@ the passes waiting.
 
 - **Issue**, for a pass in the pending list. One that already has a certificate is reported,
   not refused.
-- **Revoke** asks for a reason first. The verification link goes dark the moment it commits,
-  and there is no undo in the admin area.
+- **Revoke** asks for a reason first. The verification link goes dark the moment it commits.
+  Revoking is final as far as the product is concerned: nothing in the admin area or the
+  learner's own account can bring a certificate back once it is revoked. Putting a wrongly
+  revoked certificate right means changing the row in the database directly, by hand. That is
+  why the reason field is required, and why the dialog never lets a click alone confirm
+  anything: an admin has to write the reason down, and only then can they press Revoke.
 - **Rename** fixes a typo the learner reports after confirming their own name. The confirmation
   stands; only the printed name changes.
 - **Resend** sends the certificate email for one that never got out. It is offered only while
