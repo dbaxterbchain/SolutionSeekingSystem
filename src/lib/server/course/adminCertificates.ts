@@ -9,10 +9,12 @@ import { supabaseJobStore } from './jobStore';
 
 /**
  * The admin's side of certificates: the list behind ?view=certificates, the
- * passes waiting for a certificate, and the three actions. Issue and revoke go
- * through the SQL functions in 0032 so the row lock and the audit columns are
- * theirs; rename is one guarded update. Learners are shown by id, as the
- * grading queue does; a search by email resolves to the id first.
+ * passes waiting for a certificate, and its actions: issue, revoke, rename
+ * and resend the certificate email. Issue and revoke go through the SQL
+ * functions in 0032, so the row lock and the audit columns are theirs.
+ * Rename is one guarded update; resend reuses the same claim-guarded send
+ * that issuing already calls. Learners are shown by id, as the grading
+ * queue does; a search by email resolves to the id first.
  */
 
 export interface PendingPassRow {
@@ -97,15 +99,33 @@ export function sendCertificateEmail(certificate: CertificateRow, origin: string
   );
 }
 
+export type ResendOutcome = { ok: true; sent: boolean } | { ok: false; error: 'not_found' };
+
+/**
+ * Resend the certificate email by hand: the path for a send that was lost the
+ * first time (Resend down, or the process gone before it ran). Reuses
+ * sendCertificateEmail rather than a second sender, so the same sent-at claim
+ * guards this call exactly as it guards the original send. Only the press
+ * that wins the claim actually sends, so pressing Resend twice is safe by
+ * construction and needs no guard of its own here.
+ */
+export async function resendCertificateEmail(id: string, origin: string): Promise<ResendOutcome> {
+  const { data, error } = await supabaseAdmin.from('course_certificates').select(CERTIFICATE_COLUMNS).eq('id', id).maybeSingle();
+  if (error) throw new Error(`certificate lookup failed: ${error.message}`);
+  if (!data) return { ok: false, error: 'not_found' };
+  const sent = await sendCertificateEmail(data as CertificateRow, origin);
+  return { ok: true, sent };
+}
+
 export async function revokeCertificate(id: string, admin: User, reason: string): Promise<'revoked' | 'already_revoked' | 'not_found'> {
   const { data, error } = await supabaseAdmin.rpc('revoke_course_certificate', { p_certificate: id, p_admin: admin.id, p_reason: reason });
   if (error) throw new Error(`certificate revoke failed: ${error.message}`);
   return (data as { outcome: 'revoked' | 'already_revoked' | 'not_found' }).outcome;
 }
 
-/** A typo fix after the learner confirmed. The confirmation stands, since the learner did confirm; only the printed name changes. Null when no such certificate. */
+/** A typo fix after the learner confirmed. The confirmation stands, since the learner did confirm; only the printed name changes. Applies only to an active certificate; null when there is no such active certificate. */
 export async function renameCertificate(id: string, name: string): Promise<CertificateRow | null> {
-  const { data, error } = await supabaseAdmin.from('course_certificates').update({ display_name: name }).eq('id', id).select(CERTIFICATE_COLUMNS).maybeSingle();
+  const { data, error } = await supabaseAdmin.from('course_certificates').update({ display_name: name }).eq('id', id).eq('status', 'active').select(CERTIFICATE_COLUMNS).maybeSingle();
   if (error) throw new Error(`certificate rename failed: ${error.message}`);
   return data ? (data as CertificateRow) : null;
 }

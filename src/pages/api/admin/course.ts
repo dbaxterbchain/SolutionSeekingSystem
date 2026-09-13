@@ -4,7 +4,7 @@ import { adminJson, requireAdmin } from '../../../lib/server/adminAuth';
 import { supabaseAdmin } from '../../../lib/server/supabaseAdmin';
 import { triggerGradingWorker } from '../../../lib/server/course/workerTrigger';
 import { changeCourseAccess, findUserByEmail, listEnrollments } from '../../../lib/server/course/adminEnrollment';
-import { issuePendingCertificate, listCertificatesForAdmin, renameCertificate, revokeCertificate } from '../../../lib/server/course/adminCertificates';
+import { issuePendingCertificate, listCertificatesForAdmin, renameCertificate, resendCertificateEmail, revokeCertificate } from '../../../lib/server/course/adminCertificates';
 import { normalizeDisplayName } from '../../../lib/course/certificateRules';
 import { getCourseCatalog } from '../../../lib/course/catalog';
 import { ladderReport } from '../../../lib/course/ladder';
@@ -16,9 +16,9 @@ export const prerender = false;
  * of a failed job and a "kick" that re-triggers the worker for any job (the
  * claim function decides whether anything happens). Sub-plan 1e adds the
  * enrollment actions here. Phase 3b adds the certificates view, plus
- * issue_pending, revoke_certificate and rename_certificate. snapshot_private
- * is never selected by this route until the Phase 3 review queue needs one
- * reference response.
+ * issue_pending, revoke_certificate, rename_certificate and
+ * resend_certificate_email. snapshot_private is never selected by this route
+ * until the Phase 3 review queue needs one reference response.
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -229,6 +229,20 @@ export const POST: APIRoute = async ({ request }) => {
       return adminJson({ ok: true });
     } catch (err) {
       console.error('admin rename_certificate failed', err);
+      return adminJson({ error: 'server_error' }, 500);
+    }
+  }
+
+  if (action === 'resend_certificate_email') {
+    const certificateId = typeof body?.certificate_id === 'string' ? body.certificate_id : '';
+    if (!UUID_RE.test(certificateId)) return deny('invalid', 400);
+    try {
+      const outcome = await resendCertificateEmail(certificateId, origin);
+      if (!outcome.ok) return deny(outcome.error, 404);
+      console.log('admin action', admin.email, 'resend_certificate_email', certificateId, outcome.sent ? 'sent' : 'not sent');
+      return adminJson({ ok: true, sent: outcome.sent });
+    } catch (err) {
+      console.error('admin resend_certificate_email failed', err);
       return adminJson({ error: 'server_error' }, 500);
     }
   }

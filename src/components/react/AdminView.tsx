@@ -960,7 +960,7 @@ function CertificatesTab({
 }: {
   data: { rows: AdminCertificateRow[]; pending: PendingPassRow[] } | null;
   onSearch: (q: string) => void;
-  act: (body: Record<string, unknown>) => Promise<{ ok?: boolean; issued?: boolean; serial?: string } | null>;
+  act: (body: Record<string, unknown>) => Promise<{ ok?: boolean; issued?: boolean; serial?: string; sent?: boolean } | null>;
   reload: () => Promise<void>;
   notify: (text: string) => void;
 }) {
@@ -1003,6 +1003,13 @@ function CertificatesTab({
     setBusyId(row.id);
     const d = await act({ action: 'rename_certificate', certificate_id: row.id, name: name.trim() });
     if (d) notify('Name updated.');
+    await reload();
+    setBusyId(null);
+  };
+  const resend = async (row: AdminCertificateRow) => {
+    setBusyId(row.id);
+    const d = await act({ action: 'resend_certificate_email', certificate_id: row.id });
+    if (d) notify(d.sent ? `Emailed ${row.serial}.` : 'Not sent: no address on file, or the mail service is not configured.');
     await reload();
     setBusyId(null);
   };
@@ -1075,13 +1082,14 @@ function CertificatesTab({
               <th className="px-5 py-3">Issued</th>
               <th className="px-5 py-3">Status</th>
               <th className="px-5 py-3">Link</th>
+              <th className="px-5 py-3">Emailed</th>
               <th className="px-5 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
             {data && data.rows.length === 0 && (
               <tr>
-                <td className="px-5 py-6 text-slate-400" colSpan={8}>
+                <td className="px-5 py-6 text-slate-400" colSpan={9}>
                   No certificates match.
                 </td>
               </tr>
@@ -1099,6 +1107,7 @@ function CertificatesTab({
                   <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${r.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{r.status}</span>
                 </td>
                 <td className="px-5 py-2.5 text-slate-500">{r.share_active ? 'on' : 'off'}</td>
+                <td className="px-5 py-2.5 text-slate-400">{r.email_sent_at ? `${date(r.email_sent_at)} ${time(r.email_sent_at)}` : 'no'}</td>
                 <td className="space-x-2 px-5 py-2.5">
                   {r.status === 'active' && (
                     <button
@@ -1108,6 +1117,16 @@ function CertificatesTab({
                       className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
                     >
                       Rename
+                    </button>
+                  )}
+                  {r.status === 'active' && r.email_sent_at === null && (
+                    <button
+                      type="button"
+                      disabled={busyId === r.id}
+                      onClick={() => resend(r)}
+                      className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
+                    >
+                      Resend
                     </button>
                   )}
                   {r.status === 'active' && (
