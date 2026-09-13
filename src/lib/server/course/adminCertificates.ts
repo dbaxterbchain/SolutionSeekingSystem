@@ -2,7 +2,7 @@ import type { User } from '@supabase/supabase-js';
 import { supabaseAdmin } from '../supabaseAdmin';
 import { serverEnv } from '../env';
 import { COURSE } from '../../../data/course';
-import { findUserByEmail } from './adminEnrollment';
+import { findUserByEmail, resolveEmails } from './adminEnrollment';
 import { ADMIN_CERTIFICATE_COLUMNS, CERTIFICATE_COLUMNS, certificateOrigin, type AdminCertificateRow, type CertificateRow } from './certificates';
 import { notifyLearnerOfCertificate } from './certificateEmail';
 import { supabaseJobStore } from './jobStore';
@@ -13,13 +13,19 @@ import { supabaseJobStore } from './jobStore';
  * and resend the certificate email. Issue and revoke go through the SQL
  * functions in 0032, so the row lock and the audit columns are theirs.
  * Rename is one guarded update; resend reuses the same claim-guarded send
- * that issuing already calls. Learners are shown by id, as the grading
- * queue does; a search by email resolves to the id first.
+ * that issuing already calls. Every row carries the learner's address
+ * beside the id, because an operator reaching this tab is looking for a
+ * person and an opaque id tells them nothing about who they are about to
+ * revoke.
  */
+
+/** An admin row with the learner's sign-in address resolved beside the id. */
+export type NamedCertificateRow = AdminCertificateRow & { email: string | null };
 
 export interface PendingPassRow {
   attempt_id: string;
   user_id: string;
+  email: string | null;
   certification_version: string;
   finalized_at: string | null;
 }
@@ -28,7 +34,7 @@ const SERIAL_RE = /^SSS-\d{4}-\d{5}$/i;
 const LIMIT = 100;
 
 /** `q` is a serial, an email, or a certification version; empty lists the newest. Pending passes are listed only for the empty query. */
-export async function listCertificatesForAdmin(q: string): Promise<{ rows: AdminCertificateRow[]; pending: PendingPassRow[] }> {
+export async function listCertificatesForAdmin(q: string): Promise<{ rows: NamedCertificateRow[]; pending: PendingPassRow[] }> {
   const query = q.trim();
   // Filters first, then order and limit: the filter builder is what `.eq()` returns, so the reassignments type-check.
   let builder = supabaseAdmin.from('course_certificates').select(ADMIN_CERTIFICATE_COLUMNS);
@@ -40,7 +46,12 @@ export async function listCertificatesForAdmin(q: string): Promise<{ rows: Admin
   } else if (query) builder = builder.eq('certification_version', query);
   const { data, error } = await builder.order('issued_at', { ascending: false }).limit(LIMIT);
   if (error) throw new Error(`certificate list failed: ${error.message}`);
-  return { rows: (data ?? []) as AdminCertificateRow[], pending: query ? [] : await listPendingPasses() };
+  const rows = (data ?? []) as AdminCertificateRow[];
+  const emails = await resolveEmails(rows.map((r) => r.user_id));
+  return {
+    rows: rows.map((r) => ({ ...r, email: emails.get(r.user_id) ?? null })),
+    pending: query ? [] : await listPendingPasses(),
+  };
 }
 
 /** Passed attempts at the current version whose learner has no certificate for it. */
@@ -63,9 +74,15 @@ async function listPendingPasses(): Promise<PendingPassRow[]> {
     .in('user_id', [...new Set(passes.map((p) => p.user_id))]);
   if (certError) throw new Error(`pending pass certificates failed: ${certError.message}`);
   const covered = new Set((certs ?? []).map((c) => c.user_id));
-  return passes
-    .filter((p) => !covered.has(p.user_id))
-    .map((p) => ({ attempt_id: p.id, user_id: p.user_id, certification_version: p.certification_version, finalized_at: p.finalized_at }));
+  const waiting = passes.filter((p) => !covered.has(p.user_id));
+  const emails = await resolveEmails(waiting.map((p) => p.user_id));
+  return waiting.map((p) => ({
+    attempt_id: p.id,
+    user_id: p.user_id,
+    email: emails.get(p.user_id) ?? null,
+    certification_version: p.certification_version,
+    finalized_at: p.finalized_at,
+  }));
 }
 
 export type IssueOutcome = { ok: true; certificate: CertificateRow; issued: boolean } | { ok: false; error: 'not_found' | 'not_passed' };

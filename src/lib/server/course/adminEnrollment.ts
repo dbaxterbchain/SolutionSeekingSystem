@@ -43,6 +43,23 @@ export interface EnrollmentListRow {
   updated_at: string;
 }
 
+/**
+ * The sign-in address for each of these accounts, or null where there is
+ * none. The service role cannot read auth.users through PostgREST, so every
+ * admin list that wants to show a person rather than an opaque id comes
+ * through here.
+ */
+export async function resolveEmails(userIds: string[]): Promise<Map<string, string | null>> {
+  const emails = new Map<string, string | null>();
+  await Promise.all(
+    [...new Set(userIds)].map(async (userId) => {
+      const { data: found } = await supabaseAdmin.auth.admin.getUserById(userId);
+      emails.set(userId, found?.user?.email ?? null);
+    })
+  );
+  return emails;
+}
+
 /** The newest 200 enrollments with the account's email resolved for each. */
 export async function listEnrollments(): Promise<EnrollmentListRow[]> {
   const { data, error } = await supabaseAdmin
@@ -53,13 +70,7 @@ export async function listEnrollments(): Promise<EnrollmentListRow[]> {
     .limit(200);
   if (error) throw new Error(`enrollment list failed: ${error.message}`);
   const rows = data ?? [];
-  const emails = new Map<string, string | null>();
-  await Promise.all(
-    [...new Set(rows.map((r) => r.user_id))].map(async (userId) => {
-      const { data: found } = await supabaseAdmin.auth.admin.getUserById(userId);
-      emails.set(userId, found?.user?.email ?? null);
-    })
-  );
+  const emails = await resolveEmails(rows.map((r) => r.user_id));
   return rows.map((r) => ({ ...(r as Omit<EnrollmentListRow, 'email'>), email: emails.get(r.user_id) ?? null }));
 }
 
