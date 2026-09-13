@@ -10,11 +10,18 @@
 /** Frozen before any certificate is awarded. A substantial change bumps it. */
 export const CERTIFICATION_VERSION = '1';
 export const CERTIFICATION_TITLE = 'Solution Seeking System Certification';
-export const CERTIFICATION_METHOD = 'AI-assessed, unproctored';
+/**
+ * How the credential was earned, in the smallest honest form. It sits under
+ * the meaning sentence on the certificate and the verification page, where a
+ * stranger needs enough to judge what they are looking at and nothing more.
+ * How scoring actually works belongs on the certification page, which is
+ * where someone goes to understand the process.
+ */
+export const CERTIFICATION_METHOD = 'Assessed on a written scenario, unproctored';
 
-/** The one sentence that says what the credential is and is not. Printed on the certificate, the verify page and the certification page, from here, so they cannot disagree. */
+/** What the credential says its holder can do. Printed on the certificate, the verify page and the certification page, from here, so they cannot disagree. */
 export const CERTIFICATION_MEANING =
-  'An AI-assessed course credential earned on supplied scenarios. It is not an accreditation and does not verify live behaviour.';
+  'Earned by taking a conflict scenario from understanding yourself through to a solution with owners and evidence, scored against a rubric published in full.';
 
 export const CRITERIA = [
   {

@@ -602,7 +602,7 @@ function Intro({ status, busy, error, onStart }: { status: AssessmentStatus; bus
       <p className="text-slate-700">
         The assessment has three parts about one situation. Each part shows new information. When you continue past a part, your responses in it lock, so write each part as you would act in the real conversation.
       </p>
-      <p className="mt-3 text-slate-700">An AI grader scores your responses against the published rubric and quotes what it found. There is no time limit, and your responses save as you type.</p>
+      <p className="mt-3 text-slate-700">Your responses are scored against the published rubric, and the result quotes the passages it relied on. There is no time limit, and your responses save as you type.</p>
       {eligibility.reason === 'modules_incomplete' && (
         <p className="mt-4 text-slate-700">The final assessment opens when modules 1 to 8 and the orientation lesson are complete.</p>
       )}

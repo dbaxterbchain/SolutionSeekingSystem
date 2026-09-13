@@ -4,7 +4,7 @@ import {
   FREE_ACCOUNT_MESSAGES,
 } from './pricing';
 import { COURSE, COURSE_STATUS } from './course';
-import { CERTIFICATION_TITLE, PASS_MIN_CRITERION, PASS_TOTAL } from './certification';
+import { CERTIFICATION_MEANING, CERTIFICATION_METHOD, CERTIFICATION_TITLE, PASS_MIN_CRITERION, PASS_TOTAL } from './certification';
 
 const courseVisible = COURSE_STATUS !== 'hidden';
 
@@ -60,11 +60,11 @@ export const siteFaq: { q: string; a: string }[] = [
     ? [
         {
           q: 'Is there a course?',
-          a: `Yes. The ${COURSE.title} is a paid video course with ${COURSE.presenter}: ${COURSE.plan.lessons} short lessons across ${COURSE.plan.modules} modules, an exercise and a model response for each, a printable worksheet for every module, and an AI-assessed certification at the end. Everything else on the site stays free.`,
+          a: `Yes. The ${COURSE.title} is a paid video course with ${COURSE.presenter}: ${COURSE.plan.lessons} short lessons across ${COURSE.plan.modules} modules, an exercise and a model response for each, a printable worksheet for every module, and a certification at the end. Everything else on the site stays free.`,
         },
         {
           q: `What does the ${CERTIFICATION_TITLE} mean?`,
-          a: `An AI-assessed course credential earned on supplied scenarios. It is not an accreditation and does not verify live behaviour. You pass with a weighted total of at least ${PASS_TOTAL} out of 100 and every criterion at ${PASS_MIN_CRITERION} or more, against a rubric that is published in full.`,
+          a: `${CERTIFICATION_MEANING} You pass with a weighted total of at least ${PASS_TOTAL} out of 100 and every criterion at ${PASS_MIN_CRITERION} or more. ${CERTIFICATION_METHOD}.`,
         },
       ]
     : []),
