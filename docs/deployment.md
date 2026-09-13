@@ -1094,6 +1094,27 @@ Phase 4 of the course plan, and most of it cannot be done by whoever wrote the c
 - [ ] [status.md](status.md) and the screenshots in `docs/features/course/` brought up to
       date.
 
+#### Walks that were started and never finished
+
+These were verified in part during a build, on a branch deploy, and then left. They are written
+down here because a half-walked path is easy to remember as a finished one. Each needs doing on
+a real deploy before the course opens, and none of them needs new code.
+
+- [ ] **The certificate's share link, end to end.** The hosted walk stopped after the name was
+      confirmed and the certificate printed. Still to do: open the link in a window with no
+      session, turn sharing off and reload it, turn it back on and confirm the same link works
+      again, then revoke the certificate and watch the link go dark while the holder's own page
+      explains why.
+- [ ] **Refund, then purchase again.** Never run anywhere. The enrollment on the branch deploy
+      was granted by an admin, so the branch has no Stripe rows at all and the refund path in
+      `enrollFromSession` has only ever been read, not executed. Refund the test purchase in the
+      Stripe dashboard, record it from `/admin`, then buy again with the same account and check
+      one enrollment comes back reinstated with a `reinstated` ledger row.
+- [ ] **A warm grade.** Every hosted grade so far has run with a cold prompt cache, so the
+      figure in the cost note is the expensive end and nobody has seen the cheap one. Grade two
+      attempts within an hour of each other and read `cache_read_input_tokens` on the second
+      job's `usage`.
+
 ## Analytics & conversion tracking (GA4 + GTM)
 
 Google Tag Manager (`GTM-M987NM67`) is hardcoded in
