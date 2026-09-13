@@ -2337,6 +2337,31 @@ git commit -m "Document certificates and add their visual record"
 - **At the close:** delete `sample-p3.json`, restore `.env.local` (`ADMIN_EMAILS=course-admin@example.com`, awards off or the line removed), and confirm `git status` shows nothing untracked under `src/content/`.
 - Review each task with the global constraints as the lens; the whole-branch review goes to the most capable model. The likely places for a Critical are the verify page's miss handling (must be one page, one status, no timing difference worth exploiting), the `certificate` field reaching the read-only assessment view, and the worker's import closure.
 
+## Execution record (2026-09-13)
+
+Executed with subagent-driven development on branch `course-phase3b` from `main` after PR #19: Tasks 1 to 7 in sixteen commits from `d39b054` to `8e19c56`, then the whole-branch review and one fix wave (`850c6a8`). Every task review found something. Five of the seven took a fix round, Task 6 took two, and the whole-branch review found a defect no task review could have seen. Amendments the reviews and the run forced on this plan:
+
+- `normalizeDisplayName` rejects Unicode format characters as well as control characters. The plan guarded category Cc only, which let a right-to-left override, a zero-width space, a soft hyphen and a word joiner through into a name the certificate prints and the public page renders.
+- `setCertificateSharing` writes in two statements, a mint guarded on the token still being null and then the sharing update, rather than the plan's single update. Two concurrent turn-ons otherwise minted two tokens and the loser was handed a url the database no longer held.
+- The result panel covers a passed attempt whose certificate was revoked, which the plan's three branches left blank.
+- The plan's `@page` margin rule was deleted rather than scoped. It sat in the sitewide print block and was changing how the worksheet page printed.
+- `BaseLayout` takes a `noAnalytics` prop and the verify page sets it. The plan had that page inherit the layout's Tag Manager, which sent the share token to analytics on every view.
+- `renameCertificate` and `resendCertificateEmail` both require an active certificate. The plan guarded neither, so a revoked certificate could be renamed, and the resend action added in the fix round could have emailed a learner about a credential that was gone.
+- The admin area gained a Resend action and an Emailed column, which the plan did not have. There was no way to send a certificate email a second time, so a mail outage at the moment of issue lost it with nothing for support to do.
+- The admin listing selects `ADMIN_CERTIFICATE_COLUMNS`, which omits the share token. The plan reused the full server column list in a response that reaches the browser.
+- The certificate page's own heading is hidden when printing, so the sheet prints alone.
+- The tab's component renders the dialog element it creates. Without it the Revoke and Rename prompts opened nothing and waited on a promise that never resolved.
+
+Verification beyond the gates: two real grades were spent locally to produce the states the tasks needed, a pass with awards on that exercised the award branch of `finalize_course_grade`, and a pass with awards off that became the pending case the admin issues. The oracle property of the verify page was tested rather than asserted, by inducing all five kinds of miss at the same url and by forcing the database failure branch. The share token race was reproduced three times. The admin listing was grepped for the token the database held. Gates on the final tree: `npm run check` clean with the guard at eighteen worker-reachable modules, 254 tests, and production builds green in both the hidden and preview course statuses with the dist scan ok.
+
+Carried forward:
+
+1. `AdminCertificateRow` now names two different things, the server type that omits the share token and the hand-written interface in `AdminView.tsx`. They cannot drift into a bug today, since the client shape is a rendering subset, but 3c should give one of them a different name.
+2. The pending list limits to the newest hundred passes before excluding learners who already hold a certificate, so at volume an older uncovered pass could fall off the end. A search does not reach it either, since a search returns no pending rows by design.
+3. The certificate email tells every recipient to confirm the name, including a learner who already confirmed and is receiving it through Resend.
+4. The certificate island shows the revoked message without refreshing, so a learner whose certificate is revoked while the page is open still sees the sheet and can still press print until they reload.
+5. The email claim is taken before the send, so a delivery that fails after a winning claim sets the column and hides Resend. The whole-branch review weighed reversing it and kept it, because the alternative trades a hidden button for duplicate credential emails. The runbook and the tab both now say what a set column means.
+6. `AssessmentStatus.certificate` is the learner's current certificate whichever attempt is being viewed, which is correct but means 3c's review form on a read-only attempt must not read it as belonging to that attempt.
 ## Handoff
 
 After the merge, in this order:
