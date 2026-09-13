@@ -159,6 +159,10 @@ const pages: Record<string, OgPage> = {
     title: 'Final assessment',
     description: 'The staged final assessment for the Complete Solution Seeking course.',
   },
+  'course/learn/certificate': {
+    title: 'Your certificate',
+    description: 'The certificate for the Solution Seeking System Certification, with its verification link.',
+  },
   'course/learn/resources': {
     title: 'Course resources',
     description: 'Worksheets, the guide and support for the Complete Solution Seeking course.',

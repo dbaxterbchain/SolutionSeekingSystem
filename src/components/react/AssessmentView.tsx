@@ -16,6 +16,7 @@ import {
   type AssessmentStatus,
   type AttemptSummary,
   type CapApplied,
+  type CertificateSummary,
   type CriterionFeedback,
   type PromptView,
   type StageView,
@@ -479,7 +480,7 @@ export default function AssessmentView(props: Props) {
             </section>
           )}
           {attempt && isAttemptFinished(attempt.state) && status.result && (
-            <Result result={status.result} awardsEnabled={status.awards_enabled} />
+            <Result result={status.result} awardsEnabled={status.awards_enabled} certificate={status.certificate} />
           )}
           {showRetake && <Retake busy={busy} error={retakeError} onRetake={onRetake} />}
         </>
@@ -508,7 +509,7 @@ function ReadOnlyAttempt({
         <a href="/course/learn/assessment/" className="font-semibold text-brand-700 underline">Back to your assessment</a>
       </p>
       {attempt && isAttemptFinished(attempt.state) && status.result && (
-        <Result result={status.result} awardsEnabled={status.awards_enabled} />
+        <Result result={status.result} awardsEnabled={status.awards_enabled} certificate={status.certificate} />
       )}
       {attempt && attempt.state === 'grading_error' && (
         <section className="mt-8 rounded-2xl border border-amber-100 bg-amber-50 p-6" role="alert">
@@ -752,7 +753,7 @@ function saveCopy(draft: Draft | undefined): string {
   return '';
 }
 
-function Result({ result, awardsEnabled }: { result: NonNullable<AssessmentStatus['result']>; awardsEnabled: boolean }) {
+function Result({ result, awardsEnabled, certificate }: { result: NonNullable<AssessmentStatus['result']>; awardsEnabled: boolean; certificate: CertificateSummary | null }) {
   return (
     <section className="mt-8 space-y-6">
       <div className="rounded-2xl border border-slate-200 bg-white p-6">
@@ -761,7 +762,18 @@ function Result({ result, awardsEnabled }: { result: NonNullable<AssessmentStatu
           Your weighted total is {result.total.toFixed(1)} out of 100. A pass needs {result.pass_total} with every criterion at 3 or more.
         </p>
         {!result.passed && <p className="mt-2 text-slate-700">Each criterion below says what was present, what was missing, and which lessons to revisit before a retake.</p>}
-        {result.passed && !awardsEnabled && (
+        {result.passed && certificate?.status === 'active' && (
+          <p className="mt-2 text-slate-700">
+            Your certificate is ready.{' '}
+            <a href="/course/learn/certificate/" className="font-semibold text-brand-700 underline">
+              {certificate.name_confirmed ? 'Open your certificate' : 'Confirm the name it should show'}
+            </a>
+          </p>
+        )}
+        {result.passed && !certificate && awardsEnabled && (
+          <p className="mt-2 text-slate-700">Your pass is recorded. Your certificate has not been issued yet and will appear on your certificate page when it is.</p>
+        )}
+        {result.passed && !certificate && !awardsEnabled && (
           <p className="mt-2 text-slate-700">Certificates are not being issued yet. Your pass is recorded against your account and will be awarded when they open.</p>
         )}
       </div>
