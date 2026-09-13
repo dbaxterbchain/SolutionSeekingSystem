@@ -65,15 +65,30 @@ export async function confirmCertificateName(id: string, userId: string, name: s
 export const mintShareToken = (): string => randomBytes(SHARE_TOKEN_BYTES).toString('base64url');
 
 /**
- * Turns sharing on or off. The caller has checked that the row is active with
- * a confirmed name; null when the row is no longer this learner's active
- * certificate.
+ * Turns sharing on or off in two statements. Minting happens only when this
+ * row has no token yet, and that update is itself guarded on share_token
+ * being null, so two concurrent turn-on requests against a tokenless row
+ * race to mint but at most one write lands; a loser's attempt simply matches
+ * nothing. The second statement sets share_active, always runs, and always
+ * reads the row back, so every caller answers with the token the database
+ * actually holds rather than the one it minted locally. Null when the row is
+ * no longer this learner's active certificate, including one revoked between
+ * the two statements.
  */
 export async function setCertificateSharing(row: CertificateRow, active: boolean): Promise<CertificateRow | null> {
-  const token = row.share_token ?? mintShareToken();
+  if (!row.share_token) {
+    const { error: mintError } = await supabaseAdmin
+      .from('course_certificates')
+      .update({ share_token: mintShareToken() })
+      .eq('id', row.id)
+      .eq('user_id', row.user_id)
+      .eq('status', 'active')
+      .is('share_token', null);
+    if (mintError) throw new Error(`certificate sharing failed: ${mintError.message}`);
+  }
   const { data, error } = await supabaseAdmin
     .from('course_certificates')
-    .update({ share_token: token, share_active: active })
+    .update({ share_active: active })
     .eq('id', row.id)
     .eq('user_id', row.user_id)
     .eq('status', 'active')
