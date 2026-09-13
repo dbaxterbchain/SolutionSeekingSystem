@@ -2320,7 +2320,7 @@ Add a captioned row per screenshot to `docs/features/course/README.md` in the ta
 
 - [ ] **Step 5: Gates and commit**
 
-Run: `grep -rn  src/ docs/ | grep -v node_modules | head` (expect no hits in files this branch touched), `npm test`, `npm run check`, `PUBLIC_COURSE_STATUS=hidden npm run build` with the dist scan ok, and the HTML asserts from Task 3 step 6 plus `ls dist/og/course/verify.png` and `grep -c "course/verify" dist/sitemap-0.xml` (0).\xe2\x80\x94\|\xe2\x80\x93' src/ docs/ | grep -v node_modules | head` (expect no hits in files this branch touched), `npm test`, `npm run check`, `PUBLIC_COURSE_STATUS=hidden npm run build` with the dist scan ok, and the HTML asserts from Task 3 step 6 plus `ls dist/og/course/verify.png` and `grep -c "course/verify" dist/sitemap-0.xml` (0).
+Run: `grep -rn $'\xe2\x80\x94\|\xe2\x80\x93' src/ docs/ | grep -v node_modules | head` (expect no hits in files this branch touched), `npm test`, `npm run check`, `PUBLIC_COURSE_STATUS=hidden npm run build` with the dist scan ok, and the HTML asserts from Task 3 step 6 plus `ls dist/og/course/verify.png` and `grep -c "course/verify" dist/sitemap-0.xml` (0).\xe2\x80\x94\|\xe2\x80\x93' src/ docs/ | grep -v node_modules | head` (expect no hits in files this branch touched), `npm test`, `npm run check`, `PUBLIC_COURSE_STATUS=hidden npm run build` with the dist scan ok, and the HTML asserts from Task 3 step 6 plus `ls dist/og/course/verify.png` and `grep -c "course/verify" dist/sitemap-0.xml` (0).
 
 ```bash
 git add docs/ 
