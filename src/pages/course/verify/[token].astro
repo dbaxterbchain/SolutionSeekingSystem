@@ -31,7 +31,7 @@ if (unavailable) Astro.response.status = 503;
 const issued = certificate ? new Date(certificate.issued_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
 ---
 
-<BaseLayout title="Certificate verification" description="Confirms a Solution Seeking System Certification that its holder chose to share." noindex ogImage="/og/course/verify.png">
+<BaseLayout title="Certificate verification" description="Confirms a Solution Seeking System Certification that its holder chose to share." noindex noAnalytics ogImage="/og/course/verify.png">
   <div class="container-page max-w-2xl py-10 sm:py-14">
     <p class="eyebrow">{CERTIFICATION_TITLE}</p>
     {unavailable ? (
