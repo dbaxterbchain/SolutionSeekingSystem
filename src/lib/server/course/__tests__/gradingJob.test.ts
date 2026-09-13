@@ -13,6 +13,7 @@ function context(over: Partial<JobContext['attempt']> = {}): JobContext {
   return {
     attempt: {
       id: 'att-1',
+      user_id: 'user-1',
       form_id: 'sample-p0',
       form_version: 1,
       rubric_version: '1',
@@ -66,6 +67,10 @@ function fakeStore(opts: { claim?: ClaimResult; context?: JobContext | null; fin
       calls.push({ name: 'fail', args });
       return opts.fail ?? (args.retryable ? 'requeued' : 'failed');
     },
+    async markResultEmailSent(jobId) {
+      calls.push({ name: 'markResultEmailSent', args: jobId });
+      return true;
+    },
   };
   return { calls, store };
 }
@@ -85,7 +90,7 @@ describe('runGradingJob', () => {
     const { calls, store } = fakeStore();
     const g = grader(okOutcome);
     const r = await runGradingJob({ jobId: 'job-1', worker: 'w1', store, grade: g.grade, settings, log: () => {} });
-    expect(r).toEqual({ outcome: 'finalized', passed: true });
+    expect(r).toEqual({ outcome: 'finalized', passed: true, attemptId: 'att-1', userId: 'user-1', generation: 1 });
     expect(calls.map((c) => c.name)).toEqual(['claim', 'loadContext', 'finalize']);
     const fin = calls[2].args as Record<string, unknown>;
     expect(fin.lockToken).toBe('tok-1');

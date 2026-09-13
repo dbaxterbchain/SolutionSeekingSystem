@@ -17,18 +17,18 @@ import { getCourseCatalog } from '../../../lib/course/catalog';
 import { courseCopy } from '../../../lib/course/copy';
 import { isLearnerVisible } from '../../../lib/course/visibility';
 import { RESPONSE_MAX_CHARS, privateSnapshot, publicSnapshot } from '../../../lib/course/assessmentForm';
-import { chooseForm, promptStage, stageProblems, viewForLearner } from '../../../lib/course/assessmentRules';
-import { OPEN_ATTEMPT_STATES, type AssessmentStatus, type CriterionFeedback, type EligibilityReason, type ResultView } from '../../../lib/course/assessmentTypes';
+import { chooseForm, promptStage, stageProblems, summarizeAttempts, viewForLearner } from '../../../lib/course/assessmentRules';
+import { OPEN_ATTEMPT_STATES, type AssessmentHistory, type AssessmentStatus, type CriterionFeedback, type EligibilityReason, type ResultView } from '../../../lib/course/assessmentTypes';
 
 export const prerender = false;
 
 /**
- * The staged final assessment. One route, five actions, every response
+ * The staged final assessment. One route, six actions, every response
  * no-store, every attempt read scoped to the caller so ids cannot be probed.
  * The view a learner gets is always built by viewForLearner: stages up to the
  * one they are on, nothing beyond it.
  */
-const ACTIONS = ['start', 'save', 'advance', 'submit', 'status'] as const;
+const ACTIONS = ['start', 'save', 'advance', 'submit', 'status', 'list'] as const;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REQUEST_KEY_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const NO_FORMS_MESSAGE = 'Every assessment form has been used on a previous attempt. Write to course support for the next step.';
@@ -59,6 +59,8 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         return await submit(auth.user, body, ip, origin);
       case 'status':
         return await status(auth.user, body);
+      case 'list':
+        return await list(auth.user);
       default:
         return bad('action');
     }
@@ -269,4 +271,9 @@ async function status(user: User, body: Record<string, unknown>): Promise<Respon
     return privateJson(await statusFor(user, row));
   }
   return privateJson(await statusFor(user, await attempts.loadLatestAttempt(user.id)));
+}
+
+async function list(user: User): Promise<Response> {
+  const history: AssessmentHistory = { attempts: summarizeAttempts(await attempts.loadAttemptHistory(user.id)) };
+  return privateJson(history);
 }

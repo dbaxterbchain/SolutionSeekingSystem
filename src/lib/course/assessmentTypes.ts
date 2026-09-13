@@ -43,3 +43,20 @@ export interface CriterionFeedback { criterion_id: CriterionId; name: string; we
 export interface ResultView { total: number; pass_total: number; passed: boolean; criteria: CriterionFeedback[]; caps_applied: CapApplied[]; misconceptions: { criterion_id: CriterionId; description: string }[]; graded_at: string }
 export type EligibilityReason = 'ready' | 'modules_incomplete' | 'already_passed' | 'open_attempt';
 export interface AssessmentStatus { attempt: AttemptView | null; job: JobView | null; result: ResultView | null; awards_enabled: boolean; certificate: null; eligibility: { eligible: boolean; reason: EligibilityReason }; support_contact: string }
+
+/** One row of a learner's attempt history. Outcome fields are null until a grade exists. */
+export interface AttemptSummary {
+  id: string;
+  state: AttemptState;
+  certification_version: string;
+  /** 1-based, counted from the learner's first attempt. */
+  sequence: number;
+  created_at: string;
+  submitted_at: string | null;
+  finalized_at: string | null;
+  passed: boolean | null;
+  total: number | null;
+}
+export interface AssessmentHistory {
+  attempts: AttemptSummary[];
+}

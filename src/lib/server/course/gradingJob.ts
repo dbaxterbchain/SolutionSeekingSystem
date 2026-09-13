@@ -22,6 +22,7 @@ import { hashSubmission } from './submissionHash';
 export interface JobContext {
   attempt: {
     id: string;
+    user_id: string;
     form_id: string;
     form_version: number;
     rubric_version: string;
@@ -55,6 +56,8 @@ export interface GradingJobStore {
     awardsEnabled: boolean;
   }): Promise<'finalized' | 'stale'>;
   fail(args: { jobId: string; lockToken: string; category: ErrorCategory; error: string; retryable: boolean }): Promise<'requeued' | 'failed' | 'stale'>;
+  /** Sets result_email_sent_at where it is null; true when this call set it. */
+  markResultEmailSent(jobId: string): Promise<boolean>;
 }
 export interface RunSettings {
   model: string;
@@ -63,7 +66,7 @@ export interface RunSettings {
 }
 export type Grader = (input: GradingInput, ctx: ValidationContext) => Promise<GradeOutcome>;
 export type RunOutcome =
-  | { outcome: 'finalized'; passed: boolean }
+  | { outcome: 'finalized'; passed: boolean; attemptId: string; userId: string; generation: number }
   | { outcome: 'unavailable' | 'stale' }
   | { outcome: 'exhausted'; attemptId: string; error: string; attempts: number }
   /**
@@ -177,5 +180,5 @@ export async function runGradingJob(args: {
     return { outcome: 'stale' };
   }
   log(`grading job ${jobId}: finalized (${decision.passed ? 'passed' : 'needs revision'}, total ${decision.total})`);
-  return { outcome: 'finalized', passed: decision.passed };
+  return { outcome: 'finalized', passed: decision.passed, attemptId: claim.attemptId, userId: ctx.attempt.user_id, generation: claim.generation };
 }

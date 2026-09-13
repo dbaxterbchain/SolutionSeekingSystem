@@ -5,6 +5,7 @@ import { sendGradingFailureAlert } from './gradingAlert';
 import { GRADER_CALL_TIMEOUT_MS, gradeAttempt } from './grader';
 import { runGradingJob } from './gradingJob';
 import { supabaseJobStore } from './jobStore';
+import { notifyLearnerOfResult } from './resultEmail';
 
 /**
  * How a submitted attempt reaches the grader. COURSE_GRADER_MODE:
@@ -63,10 +64,11 @@ export async function triggerGradingWorker(args: { origin: string; jobId: string
       return;
     }
     const settings = graderSettings();
+    const store = supabaseJobStore(supabaseAdmin);
     void runGradingJob({
       jobId: args.jobId,
       worker: 'inline-dev',
-      store: supabaseJobStore(supabaseAdmin),
+      store,
       grade: (input, ctx) => gradeAttempt({ anthropic: getAnthropic(), input, ctx, settings: { model: settings.model } }),
       settings,
     })
@@ -86,6 +88,24 @@ export async function triggerGradingWorker(args: { origin: string; jobId: string
               // alerts rather than looking like a duplicate of the first.
               runKey: outcome.outcome === 'failed' ? outcome.lockToken : `exhausted-${new Date().toISOString().slice(0, 10)}`,
               adminUrl: `${workerOrigin(args.origin) || args.origin}/admin/`,
+            }
+          );
+        if (outcome.outcome === 'finalized')
+          return notifyLearnerOfResult(
+            { apiKey: serverEnv('RESEND_API_KEY'), from: serverEnv('EMAIL_FROM') },
+            {
+              jobId: args.jobId,
+              generation: outcome.generation,
+              userId: outcome.userId,
+              assessmentUrl: `${workerOrigin(args.origin) || args.origin}/course/learn/assessment/`,
+            },
+            {
+              emailFor: async (userId) => {
+                const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+                if (error) console.error(`grading job ${args.jobId}: learner lookup failed`, error);
+                return data.user?.email ?? null;
+              },
+              markSent: (id) => store.markResultEmailSent(id),
             }
           );
       })

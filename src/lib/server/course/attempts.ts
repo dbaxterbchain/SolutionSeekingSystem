@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '../supabaseAdmin';
 import { COURSE } from '../../../data/course';
 import type { SnapshotPrivate, SnapshotPublic } from '../../course/assessmentForm';
-import type { AttemptRecord, ResponseRecord } from '../../course/assessmentRules';
+import type { AttemptRecord, HistoryRow, ResponseRecord } from '../../course/assessmentRules';
 import {
   OPEN_ATTEMPT_STATES,
   type AttemptState,
@@ -209,4 +209,36 @@ export async function loadGrade(gradeId: string): Promise<GradeRow | null> {
   const { data, error } = await supabaseAdmin.from('course_grades').select(GRADE_COLUMNS).eq('id', gradeId).maybeSingle();
   if (error) throw new Error(`grade load failed: ${error.message}`);
   return (data as GradeRow | null) ?? null;
+}
+
+/** Every attempt with its grade's outcome, for the history list. Two reads: the rows, then the grades they point at. */
+export async function loadAttemptHistory(userId: string): Promise<HistoryRow[]> {
+  const { data, error } = await supabaseAdmin
+    .from('course_assessment_attempts')
+    .select('id, state, certification_version, created_at, submitted_at, finalized_at, grade_id')
+    .eq('user_id', userId)
+    .eq('course_id', COURSE.id)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    // Far above what one exposure per form allows: a ceiling against a runaway
+    // account, not a limit this history is ever expected to reach.
+    .limit(50);
+  if (error) throw new Error(`attempt history failed: ${error.message}`);
+  const rows = data ?? [];
+  const gradeIds = rows.map((r) => r.grade_id).filter((id): id is string => typeof id === 'string');
+  const grades = new Map<string, { passed: boolean; total: number }>();
+  if (gradeIds.length > 0) {
+    const { data: gradeRows, error: gradeError } = await supabaseAdmin.from('course_grades').select('id, passed, total').in('id', gradeIds);
+    if (gradeError) throw new Error(`grade history failed: ${gradeError.message}`);
+    for (const g of gradeRows ?? []) grades.set(g.id, { passed: g.passed, total: Number(g.total) });
+  }
+  return rows.map((r) => ({
+    id: r.id,
+    state: r.state as AttemptState,
+    certification_version: r.certification_version,
+    created_at: r.created_at,
+    submitted_at: r.submitted_at,
+    finalized_at: r.finalized_at,
+    grade: r.grade_id ? grades.get(r.grade_id) ?? null : null,
+  }));
 }

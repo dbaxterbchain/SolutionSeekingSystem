@@ -2,9 +2,9 @@ import { getGaIds } from './analytics';
 import { getFirstTouch } from './attribution';
 import type { ProgressAction } from './course/progressRules';
 import type { CourseStatus } from './course/status';
-import type { AssessmentStatus, CertificationStatus } from './course/assessmentTypes';
+import type { AssessmentHistory, AssessmentStatus, CertificationStatus } from './course/assessmentTypes';
 
-export type { AssessmentStatus, AttemptView, CapApplied, CriterionFeedback, JobView, PromptView, ResultView, StageView } from './course/assessmentTypes';
+export type { AssessmentHistory, AssessmentStatus, AttemptSummary, AttemptView, CapApplied, CriterionFeedback, JobView, PromptView, ResultView, StageView } from './course/assessmentTypes';
 
 /**
  * The browser's view of the course, fetched from the server and never
@@ -332,7 +332,7 @@ export async function postProgress(accessToken: string, body: ProgressBody): Pro
   return data as ProgressResponse;
 }
 
-export type AssessmentAction = 'start' | 'save' | 'advance' | 'submit' | 'status';
+export type AssessmentAction = 'start' | 'save' | 'advance' | 'submit' | 'status' | 'list';
 
 /** POST to the assessment endpoint, keyed by `action`. Twin of postProgress. */
 async function postAssessment<T>(accessToken: string, body: Record<string, unknown> & { action: AssessmentAction }): Promise<T> {
@@ -371,3 +371,4 @@ export const advanceAssessment = (
   postAssessment(accessToken, { action: 'advance', attempt_id: attemptId, stage, expected_revisions: expectedRevisions });
 export const submitAssessment = (accessToken: string, attemptId: string, requestKey: string): Promise<AssessmentStatus> =>
   postAssessment(accessToken, { action: 'submit', attempt_id: attemptId, request_key: requestKey });
+export const listAttempts = (accessToken: string): Promise<AssessmentHistory> => postAssessment(accessToken, { action: 'list' });

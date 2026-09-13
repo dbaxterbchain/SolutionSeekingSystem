@@ -93,7 +93,7 @@ astro.config.mjs · tailwind.config.mjs · tsconfig.json · netlify.toml
 | `/course/learn/modules/:id` | `pages/course/learn/modules/[id].astro` | One module's lessons, worksheet and check (`ModuleCheck` island); modules 1 to 8 only |
 | `/course/learn/resources` | `pages/course/learn/resources.astro` | Worksheets, the guide, the practice tools and support; public data, no island |
 | `/course/preview` | `pages/course/preview.astro` | The one free lesson, rendered at build time; exists only when the course is public and that lesson is published |
-| `/api/course/*` | `pages/api/course/{entitlement,checkout,lesson,progress,state,worksheet,check,assessment}.ts` | The learner API: Bearer token in, `Cache-Control: no-store` out |
+| `/api/course/*` | `pages/api/course/{entitlement,checkout,lesson,progress,state,worksheet,check,assessment}.ts` | The learner API: Bearer token in, `Cache-Control: no-store` out. `assessment` answers `start`, `save`, `advance`, `submit`, `status` (the latest attempt or one by id) and `list` (the learner's attempt history) |
 | `/api/admin/course` | `pages/api/admin/course.ts` | Enrollment actions, the grading queue and the content ladder, behind `requireAdmin()` |
 | `/api/stripe-webhook` (course branch) | `pages/api/stripe-webhook.ts` | `metadata.purchase_intent = course` is tested before the org and personal paths |
 | `/.netlify/functions/course-grade` · `course-grade-sweeper` | `netlify/functions/*.mts` | The background grader and its ten-minute sweeper, outside Astro entirely |

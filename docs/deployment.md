@@ -928,6 +928,20 @@ was lost and you would rather not wait for the sweeper. A job that fails for goo
 `ALERTS_TO` with the job and attempt ids, and the learner gets a panel saying plainly that
 this is not a failed attempt, pointing them at course support.
 
+**The result email.** When a grade finalizes, the worker (and the dev server's inline run)
+emails the learner "Your assessment result is ready" with a link to the assessment page and
+nothing else: no outcome, no score, no quote. It is sent once per job and generation: the
+worker first sets `result_email_sent_at` on the job row where it is null, and only the call
+that set it sends, under the Resend idempotency key `course-result/<job>-<generation>`. A send
+that fails after that claim is logged and not retried, because the result is already on the
+page and the dashboard says it is ready. When a learner writes in that no email came, read the
+job row: an empty `result_email_sent_at` means the grade never finalized (look at the queue), or
+the function had no `RESEND_API_KEY` or `EMAIL_FROM`, which returns before the claim;
+a set one means the send was attempted, so the next places to look are the Resend log and the
+address on the account. Pressing Kick on a succeeded job sends nothing, since the claim answers
+`unavailable` before any email code runs. `RESEND_API_KEY` and `EMAIL_FROM` already carry
+Functions scope for the failure alert, so no new variable is involved.
+
 **Deploy-preview checks**, once the secret is set:
 
 - POST to `/.netlify/functions/course-grade` **without** the secret. The job must be

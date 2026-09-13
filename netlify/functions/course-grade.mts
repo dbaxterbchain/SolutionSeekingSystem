@@ -6,6 +6,7 @@ import { GRADER_CALL_TIMEOUT_MS, gradeAttempt } from '../../src/lib/server/cours
 import { sendGradingFailureAlert } from '../../src/lib/server/course/gradingAlert';
 import { runGradingJob } from '../../src/lib/server/course/gradingJob';
 import { supabaseJobStore } from '../../src/lib/server/course/jobStore';
+import { notifyLearnerOfResult } from '../../src/lib/server/course/resultEmail';
 
 /**
  * The grading worker: a background function (fifteen minute budget) that
@@ -14,21 +15,21 @@ import { supabaseJobStore } from '../../src/lib/server/course/jobStore';
  * as a status code the caller sees. Reads its configuration from Netlify.env
  * (Functions scope): PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
  * ANTHROPIC_API_KEY, COURSE_WORKER_SECRET, COURSE_AWARDS_ENABLED,
- * COURSE_GRADER_MODEL, and (for the failure alert it sends itself when a job
- * fails for good) RESEND_API_KEY, EMAIL_FROM, ALERTS_TO (or TEAM_ENQUIRY_TO),
+ * COURSE_GRADER_MODEL, and (for the failure alert and the result email it
+ * sends itself) RESEND_API_KEY, EMAIL_FROM, ALERTS_TO (or TEAM_ENQUIRY_TO),
  * URL, DEPLOY_PRIME_URL and CONTEXT.
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const env = (name: string): string => Netlify.env.get(name) ?? '';
 
 /**
- * Where the alert's "retry it here" link points. Same preference as
- * workerOrigin() in workerTrigger.ts: on anything but production, the deploy
- * that is running, so an alert from a deploy preview links to that preview's
- * admin area rather than sending an operator to production for a job that
- * exists only on the preview's stack.
+ * Where the alert's "retry it here" link and the result email's assessment
+ * link point. Same preference as workerOrigin() in workerTrigger.ts: on
+ * anything but production, the deploy that is running, so a link from a
+ * deploy preview points at that preview's own stack rather than sending
+ * someone to production for a job that exists only on the preview.
  */
-function adminOrigin(): string {
+function deployOrigin(): string {
   const context = env('CONTEXT');
   const ownDeploy = context && context !== 'production' ? env('DEPLOY_PRIME_URL') : '';
   return ownDeploy || env('URL');
@@ -62,10 +63,11 @@ export default async (req: Request) => {
   // a fresh lease instead of being retried invisibly inside this one.
   const anthropic = new Anthropic({ apiKey: env('ANTHROPIC_API_KEY'), timeout: GRADER_CALL_TIMEOUT_MS, maxRetries: 0 });
   const model = env('COURSE_GRADER_MODEL') || 'claude-opus-5';
+  const store = supabaseJobStore(supabase);
   const outcome = await runGradingJob({
     jobId,
     worker: `netlify:${randomUUID().slice(0, 8)}`,
-    store: supabaseJobStore(supabase),
+    store,
     grade: (input, ctx) => gradeAttempt({ anthropic, input, ctx, settings: { model } }),
     settings: { model, awardsEnabled: env('COURSE_AWARDS_ENABLED') === 'true' },
   });
@@ -85,7 +87,21 @@ export default async (req: Request) => {
         // no token, and happens once per budget cycle, so the day is enough:
         // a repeat within the day is the same retirement, a later one is new.
         runKey: outcome.outcome === 'failed' ? outcome.lockToken : `exhausted-${new Date().toISOString().slice(0, 10)}`,
-        adminUrl: `${adminOrigin()}/admin/`,
+        adminUrl: `${deployOrigin()}/admin/`,
+      }
+    );
+  }
+  if (outcome.outcome === 'finalized') {
+    await notifyLearnerOfResult(
+      { apiKey: env('RESEND_API_KEY'), from: env('EMAIL_FROM') },
+      { jobId, generation: outcome.generation, userId: outcome.userId, assessmentUrl: `${deployOrigin()}/course/learn/assessment/` },
+      {
+        emailFor: async (userId) => {
+          const { data, error } = await supabase.auth.admin.getUserById(userId);
+          if (error) console.error(`grading job ${jobId}: learner lookup failed`, error);
+          return data.user?.email ?? null;
+        },
+        markSent: (id) => store.markResultEmailSent(id),
       }
     );
   }
