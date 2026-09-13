@@ -105,16 +105,15 @@ stale docs, no orphaned pages, no broken prompt cache.
 - [ ] **A new course event follows the four-place rule** like every other event (the union in
       `analytics.ts`, the GTM trigger regex, GA4 key events and dimensions, the Ads import).
       See [Registering the course events](deployment.md#registering-the-course-events).
+- [ ] **The verify page is deliberately left out of `robots.txt`'s Disallow list.**
+      `/course/verify/[token]` is server-rendered, `noindex` by its meta tag and by the
+      `X-Robots-Tag` header, and registered by hand in the OG route. A Disallow entry would stop
+      a crawler from ever fetching the page, which means it would never see the noindex telling
+      it to leave, so the page has to stay crawlable for its own noindex to do anything.
 - [ ] **Update the doc that owns what you changed:** the authoring format goes in
       [content-guide.md](content-guide.md), the filming and upload steps in
       [course-production.md](course-production.md), anything operational in
       [deployment.md](deployment.md#paid-video-course).
-- [ ] **The verify page is deliberately left out of `robots.txt`'s Disallow list.**
-      `/course/verify/[token]` is server-rendered, `noindex` by its meta tag and by the
-      `X-Robots-Tag` header, and registered in `src/pages/og/[...route].ts` by hand like any
-      other learner page. A Disallow entry would stop a crawler from ever fetching the page,
-      which means it would never see the noindex telling it to leave, so the page has to stay
-      crawlable for its own noindex to do anything.
 
 ## AI / chat changes (`src/lib/server/agents.ts`, `contexts.ts`, `/api/chat`)
 

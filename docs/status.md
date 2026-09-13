@@ -1,6 +1,6 @@
 # Project Status
 
-_Last updated: 2026-09-12 (paid video course, Phase 3b code complete on its branch, certificates
+_Last updated: 2026-09-13 (paid video course, Phase 3b code complete on its branch, certificates
 and the verify page; before that, Phase 2 and 3a code complete on their branches and the pilot
 running on the `course-beta` deploy; before that, icons for the 12 Wisdom Principles and the gold
 ramp meaning "the solution")_
@@ -113,14 +113,15 @@ after a not-yet result (with the honest message when no form is left), and the e
 a result is ready, sent once per grade from the worker. The real send was proven on the
 `course-beta` deploy on 2026-09-13: one graded attempt there produced one email at the
 learner's address, the job's sent-at column was set, and a kick through the admin API on that
-job afterward sent nothing.
+job afterwards sent nothing.
 
 **3b, certificates and the verify page: code complete**
 ([plan](superpowers/plans/2026-09-12-course-phase3b-certificates-verify-page.md)). A learner
 confirms the name once and controls their own verification link from the certificate page, and
-`/course/verify/<token>` shows anyone who opens that link the same certificate or the same
-not-active page for every kind of miss. The admin area gained a Certificates tab to issue a pass
-recorded while awards were off, revoke, rename and resend the certificate email.
+`/course/verify/<token>` shows a visitor the certificate itself, or one not-active page for
+every kind of miss. The admin area gained a Certificates tab that issues a certificate for a
+pass recorded while awards were off, revokes one, fixes a name, or sends the certificate email
+again.
 
 Still to come: 3c review requests and the review queue with regrades, 3d the grader benchmark
 that decides whether `COURSE_AWARDS_ENABLED` can be turned on. The content Phase 3 waits on is

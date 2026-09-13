@@ -858,7 +858,7 @@ packs, attempts, responses, grading jobs, grades, certificates, review requests)
 certificate email claim column, the audit columns, `issue_course_certificate`,
 `revoke_course_certificate`). Apply them before the deploy that needs them, and apply `0032`
 specifically before any deploy that carries the certificates work: the certificate reads select
-its new columns, and fail against a database that does not have them yet.
+its new columns and fail against a database that does not have them.
 
 ```bash
 npx supabase db push
@@ -947,15 +947,15 @@ address on the account. Pressing Kick on a succeeded job sends nothing, since th
 `unavailable` before any email code runs. `RESEND_API_KEY` and `EMAIL_FROM` already carry
 Functions scope for the failure alert, so no new variable is involved.
 
-**The certificate email.** A certificate earns "Your certificate is ready" with a link to the
-certificate page, sent from every place a certificate can be issued: the worker after a pass
-with awards on, the dev server's inline run, and the admin's Issue action. It is sent once per
-certificate: whichever call reaches it first sets `email_sent_at` on the certificate row where
-it is null, and only the call that set it sends, under the Resend idempotency key
-`course-certificate/<id>`. When a learner writes in that no certificate email came, read the
-certificate row: an empty `email_sent_at` means no send was ever attempted, and the admin area's
-Certificates tab offers a Resend action for exactly that case; a set one means a send was
-attempted, so the next places to look are the mail provider's log and the address on the
+**The certificate email.** Issuing a certificate emails the learner "Your certificate is ready"
+with a link to the certificate page, from every place a certificate can be issued: the worker
+after a pass with awards on, the dev server's inline run, and the admin's Issue action. It is
+sent once per certificate: whichever call reaches it first sets `email_sent_at` on the
+certificate row where it is null, and only the call that set it sends, under the Resend
+idempotency key `course-certificate/<id>`. When a learner writes in that no certificate email
+came, read the certificate row: an empty `email_sent_at` means no send was ever attempted, and
+the admin area's Certificates tab offers a Resend action for exactly that case; a set one means
+a send was attempted, so the next places to look are the Resend log and the address on the
 account. Resend is offered only while the column is empty. `RESEND_API_KEY` and `EMAIL_FROM`
 already carry Functions scope, so no new variable is involved.
 
@@ -1008,7 +1008,9 @@ and every course endpoint answering 403 with the reason.
 `/admin` → **Certificates** searches by serial, email or version. Below the search box, before
 the list of issued certificates, a pending list surfaces any pass with no certificate yet:
 `finalize_course_grade` only issues one when awards are on, so a pass recorded while they were
-off waits here until an operator acts on it.
+off waits here until an operator acts on it. That list shows only on the unsearched view: a
+search narrows the results to issued certificates, so the box has to be cleared to get back to
+the passes waiting.
 
 - **Issue**, for a pass in the pending list. One that already has a certificate is reported,
   not refused.
@@ -1016,17 +1018,17 @@ off waits here until an operator acts on it.
   and there is no undo in the admin area.
 - **Rename** fixes a typo the learner reports after confirming their own name. The confirmation
   stands; only the printed name changes.
-- **Resend** sends the certificate email again, for one that went missing the first time. It
-  reuses the original claim on `email_sent_at`, so a second press is safe.
+- **Resend** sends the certificate email for one that never got out. It is offered only while
+  the Emailed column says no, and it reuses the same claim on `email_sent_at`, so a second press
+  is safe.
 
 Revoke, Rename and Resend all apply only to an active certificate; a revoked row shows its
-reason and none of the three. The **Emailed** column carries the same `email_sent_at` the
-certificate email above reads for support, so an operator can see at a glance whether Resend
-has anything to do.
+reason and none of them. The **Emailed** column is that same `email_sent_at`, so an operator can
+see at a glance whether Resend has anything to do.
 
 The verify page at `/course/verify/<token>` needs no sign-in and is not gated by
-`PUBLIC_COURSE_STATUS`. A certificate printed and shared months ago still has to resolve
-whatever the sales page happens to be doing on the day someone opens the link.
+`PUBLIC_COURSE_STATUS`. A link printed on a certificate months ago still has to work, whatever
+the sales page is doing on the day someone opens it.
 
 `COURSE_AWARDS_ENABLED` stays `false` on every deploy, `course-beta` included, until 3d's grader
 benchmark clears it. Nothing is lost while it is off: a pass just waits in the pending list
