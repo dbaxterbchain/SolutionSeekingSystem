@@ -13,7 +13,9 @@ import { PROMPT_VERSION, RUBRIC_VERSION } from '../../../lib/server/course/rubri
 import { hashSubmission } from '../../../lib/server/course/submissionHash';
 import { awardsEnabled, triggerGradingWorker } from '../../../lib/server/course/workerTrigger';
 import * as attempts from '../../../lib/server/course/attempts';
+import { loadOwnedCertificate } from '../../../lib/server/course/certificates';
 import { getCourseCatalog } from '../../../lib/course/catalog';
+import { certificateSummary } from '../../../lib/course/certificateRules';
 import { courseCopy } from '../../../lib/course/copy';
 import { isLearnerVisible } from '../../../lib/course/visibility';
 import { RESPONSE_MAX_CHARS, privateSnapshot, publicSnapshot } from '../../../lib/course/assessmentForm';
@@ -119,18 +121,19 @@ async function resultView(grade: attempts.GradeRow, row: attempts.AttemptRow): P
 }
 
 async function statusFor(user: User, row: attempts.AttemptRow | null): Promise<AssessmentStatus> {
-  const [responses, job, grade, elig] = await Promise.all([
+  const [responses, job, grade, elig, certificate] = await Promise.all([
     row ? attempts.loadResponses(row.id) : Promise.resolve([]),
     row ? attempts.loadLatestJob(row.id) : Promise.resolve(null),
     row?.grade_id ? attempts.loadGrade(row.grade_id) : Promise.resolve(null),
     eligibility(user, row),
+    loadOwnedCertificate(user.id),
   ]);
   return {
     attempt: row ? viewForLearner(row, responses) : null,
     job: job ? { id: job.id, state: job.state, generation: job.generation, attempts: job.attempts, error_category: job.error_category, updated_at: job.updated_at } : null,
     result: row && grade ? await resultView(grade, row) : null,
     awards_enabled: awardsEnabled(),
-    certificate: null,
+    certificate: certificate ? certificateSummary(certificate) : null,
     eligibility: elig,
     support_contact: courseCopy('{{support_contact}}'),
   };
