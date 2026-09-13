@@ -1030,7 +1030,10 @@ the passes waiting.
 
 Revoke, Rename and Resend all apply only to an active certificate; a revoked row shows its
 reason and none of them. The **Emailed** column is that same `email_sent_at`, so an operator can
-see at a glance whether Resend has anything to do.
+see at a glance whether Resend has anything to do. Rows name the learner by the address they
+sign in with, falling back to the short form of their account id where an account has none, so
+the person is identifiable before anything is revoked in their name. Revoke and Rename both
+refuse an empty box and say so, rather than closing the dialog and doing nothing.
 
 The verify page at `/course/verify/<token>` needs no sign-in and is not gated by
 `PUBLIC_COURSE_STATUS`. A link printed on a certificate months ago still has to work, whatever

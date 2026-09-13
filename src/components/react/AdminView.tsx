@@ -338,6 +338,7 @@ export default function AdminView() {
           act={(body) => call('course', body)}
           reload={() => loadTab('certificates')}
           notify={setNotice}
+          warn={setError}
         />
       )}
       {tab === 'content' && <ContentTab data={content} />}
@@ -746,7 +747,7 @@ function SubscribersTab({
             <tr>
               <th className="px-5 py-3">Email</th>
               <th className="px-5 py-3">Source</th>
-              <th className="px-5 py-3">Status</th>
+              <th className="whitespace-nowrap px-5 py-3">Status</th>
               <th className="px-5 py-3">Joined</th>
             </tr>
           </thead>
@@ -855,13 +856,13 @@ function GradingTab({
           <tr>
             <th className="px-5 py-3">Job</th>
             <th className="px-5 py-3">Attempt state</th>
-            <th className="px-5 py-3">Learner</th>
+            <th className="whitespace-nowrap px-5 py-3">Learner</th>
             <th className="px-5 py-3">Form</th>
             <th className="px-5 py-3">Job state</th>
             <th className="px-5 py-3">Attempts</th>
             <th className="px-5 py-3">Error</th>
             <th className="px-5 py-3">Updated</th>
-            <th className="px-5 py-3">Actions</th>
+            <th className="whitespace-nowrap px-5 py-3">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -926,6 +927,7 @@ interface AdminCertificateRow {
   id: string;
   serial: string;
   user_id: string;
+  email: string | null;
   certification_version: string;
   attempt_id: string | null;
   display_name: string | null;
@@ -941,14 +943,22 @@ interface AdminCertificateRow {
 interface PendingPassRow {
   attempt_id: string;
   user_id: string;
+  email: string | null;
   certification_version: string;
   finalized_at: string | null;
 }
 
+/** The learner's address where the account has one, and the short id otherwise. */
+function Learner({ email, userId }: { email: string | null; userId: string }) {
+  if (email) return <span className="whitespace-nowrap">{email}</span>;
+  return <span className="whitespace-nowrap font-mono text-xs text-slate-500">{userId.slice(0, 8)}</span>;
+}
+
 /**
  * Certificates: a search box (serial, email or version), the passes still
- * waiting for a certificate, and the list. Learners appear by id, as in the
- * grading queue. Every action reloads the list either way, since a refusal
+ * waiting for a certificate, and the list. Every row names the learner by
+ * the address they sign in with, because an operator here is looking for a
+ * person. Every action reloads the list either way, since a refusal
  * usually means the list was behind the database.
  */
 function CertificatesTab({
@@ -957,12 +967,14 @@ function CertificatesTab({
   act,
   reload,
   notify,
+  warn,
 }: {
   data: { rows: AdminCertificateRow[]; pending: PendingPassRow[] } | null;
   onSearch: (q: string) => void;
   act: (body: Record<string, unknown>) => Promise<{ ok?: boolean; issued?: boolean; serial?: string; sent?: boolean } | null>;
   reload: () => Promise<void>;
   notify: (text: string) => void;
+  warn: (text: string) => void;
 }) {
   const { prompt, dialog } = useDialog();
   const [q, setQ] = useState('');
@@ -983,7 +995,13 @@ function CertificatesTab({
       maxLength: 500,
       confirmLabel: 'Revoke',
     });
-    if (!reason?.trim()) return;
+    // Cancelling is a decision and says nothing. Confirming with the box empty
+    // is not, and silently doing nothing there reads as a broken button.
+    if (reason === null) return;
+    if (!reason.trim()) {
+      warn('Revoking needs a reason. It is the only record of why, because nothing brings a certificate back.');
+      return;
+    }
     setBusyId(row.id);
     const d = await act({ action: 'revoke_certificate', certificate_id: row.id, reason: reason.trim() });
     if (d) notify(`Revoked ${row.serial}.`);
@@ -999,7 +1017,11 @@ function CertificatesTab({
       maxLength: DISPLAY_NAME_MAX,
       confirmLabel: 'Rename',
     });
-    if (!name?.trim()) return;
+    if (name === null) return;
+    if (!name.trim()) {
+      warn('Renaming needs a name. Cancel instead to leave the certificate as it is.');
+      return;
+    }
     setBusyId(row.id);
     const d = await act({ action: 'rename_certificate', certificate_id: row.id, name: name.trim() });
     if (d) notify('Name updated.');
@@ -1040,26 +1062,28 @@ function CertificatesTab({
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-slate-400">
               <tr>
-                <th className="px-5 py-3">Attempt</th>
-                <th className="px-5 py-3">Learner</th>
-                <th className="px-5 py-3">Version</th>
-                <th className="px-5 py-3">Passed</th>
-                <th className="px-5 py-3">Actions</th>
+                <th className="whitespace-nowrap px-3 py-3">Attempt</th>
+                <th className="whitespace-nowrap px-3 py-3">Learner</th>
+                <th className="whitespace-nowrap px-3 py-3">Version</th>
+                <th className="whitespace-nowrap px-3 py-3">Passed</th>
+                <th className="whitespace-nowrap px-3 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
               {data.pending.map((p) => (
                 <tr key={p.attempt_id} className="border-t border-slate-100">
-                  <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{p.attempt_id.slice(0, 8)}</td>
-                  <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{p.user_id.slice(0, 8)}</td>
-                  <td className="px-5 py-2.5">{p.certification_version}</td>
-                  <td className="px-5 py-2.5 text-slate-400">{p.finalized_at ? `${date(p.finalized_at)} ${time(p.finalized_at)}` : ''}</td>
-                  <td className="px-5 py-2.5">
+                  <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs text-slate-500">{p.attempt_id.slice(0, 8)}</td>
+                  <td className="px-3 py-2.5">
+                    <Learner email={p.email} userId={p.user_id} />
+                  </td>
+                  <td className="px-3 py-2.5">{p.certification_version}</td>
+                  <td className="px-3 py-2.5 text-slate-400">{p.finalized_at ? `${date(p.finalized_at)} ${time(p.finalized_at)}` : ''}</td>
+                  <td className="px-3 py-2.5">
                     <button
                       type="button"
                       disabled={busyId === p.attempt_id}
                       onClick={() => issue(p.attempt_id)}
-                      className="rounded-full bg-brand-500 px-3.5 py-1 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+                      className="rounded-full bg-brand-500 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
                     >
                       Issue
                     </button>
@@ -1075,30 +1099,31 @@ function CertificatesTab({
         <table className="w-full text-left text-sm">
           <thead className="text-xs uppercase tracking-wide text-slate-400">
             <tr>
-              <th className="px-5 py-3">Serial</th>
-              <th className="px-5 py-3">Learner</th>
-              <th className="px-5 py-3">Name</th>
-              <th className="px-5 py-3">Version</th>
-              <th className="px-5 py-3">Issued</th>
-              <th className="px-5 py-3">Status</th>
-              <th className="px-5 py-3">Link</th>
-              <th className="px-5 py-3">Emailed</th>
-              <th className="px-5 py-3">Actions</th>
+              <th className="whitespace-nowrap px-3 py-3">Serial</th>
+              <th className="whitespace-nowrap px-3 py-3">Learner</th>
+              <th className="whitespace-nowrap px-3 py-3">Name</th>
+              <th className="whitespace-nowrap px-3 py-3">Issued</th>
+              <th className="whitespace-nowrap px-3 py-3">Status</th>
+              <th className="whitespace-nowrap px-3 py-3">Link</th>
+              <th className="whitespace-nowrap px-3 py-3">Emailed</th>
+              <th className="whitespace-nowrap px-3 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
             {data && data.rows.length === 0 && (
               <tr>
-                <td className="px-5 py-6 text-slate-400" colSpan={9}>
+                <td className="px-3 py-6 text-slate-400" colSpan={8}>
                   No certificates match.
                 </td>
               </tr>
             )}
             {data?.rows.map((r) => (
               <tr key={r.id} className="border-t border-slate-100">
-                <td className="px-5 py-2.5 font-mono text-xs">{r.serial}</td>
-                <td className="px-5 py-2.5 font-mono text-xs text-slate-500">{r.user_id.slice(0, 8)}</td>
-                <td className="px-5 py-2.5">
+                <td className="whitespace-nowrap px-3 py-2.5 font-mono text-xs">{r.serial}</td>
+                <td className="px-3 py-2.5">
+                  <Learner email={r.email} userId={r.user_id} />
+                </td>
+                <td className="whitespace-nowrap px-3 py-2.5">
                   {r.name_confirmed_at ? (
                     r.display_name
                   ) : r.display_name ? (
@@ -1109,22 +1134,19 @@ function CertificatesTab({
                     <span className="text-slate-400">not confirmed</span>
                   )}
                 </td>
-                <td className="px-5 py-2.5">{r.certification_version}</td>
-                <td className="px-5 py-2.5 text-slate-400">
-                  {date(r.issued_at)} {time(r.issued_at)}
-                </td>
-                <td className="px-5 py-2.5">
+                <td className="whitespace-nowrap px-3 py-2.5 text-slate-400">{date(r.issued_at)}</td>
+                <td className="px-3 py-2.5">
                   <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${r.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{r.status}</span>
                 </td>
-                <td className="px-5 py-2.5 text-slate-500">{r.status === 'active' && r.share_active ? 'on' : 'off'}</td>
-                <td className="px-5 py-2.5 text-slate-400">{r.email_sent_at ? `${date(r.email_sent_at)} ${time(r.email_sent_at)}` : 'no'}</td>
-                <td className="space-x-2 px-5 py-2.5">
+                <td className="px-3 py-2.5 text-slate-500">{r.status === 'active' && r.share_active ? 'on' : 'off'}</td>
+                <td className="whitespace-nowrap px-3 py-2.5 text-slate-400">{r.email_sent_at ? date(r.email_sent_at) : 'no'}</td>
+                <td className="space-x-2 whitespace-nowrap px-3 py-2.5">
                   {r.status === 'active' && (
                     <button
                       type="button"
                       disabled={busyId === r.id}
                       onClick={() => rename(r)}
-                      className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
+                      className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
                     >
                       Rename
                     </button>
@@ -1134,7 +1156,7 @@ function CertificatesTab({
                       type="button"
                       disabled={busyId === r.id}
                       onClick={() => resend(r)}
-                      className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
+                      className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
                     >
                       Resend
                     </button>
@@ -1144,12 +1166,18 @@ function CertificatesTab({
                       type="button"
                       disabled={busyId === r.id}
                       onClick={() => revoke(r)}
-                      className="rounded-full border border-rose-200 px-3.5 py-1 text-xs font-semibold text-rose-700 hover:border-rose-300 disabled:opacity-60"
+                      className="rounded-full border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-700 hover:border-rose-300 disabled:opacity-60"
                     >
                       Revoke
                     </button>
                   )}
-                  {r.status === 'revoked' && r.revoke_reason && <span className="text-xs text-slate-400">{r.revoke_reason}</span>}
+                  {r.status === 'revoked' && r.revoke_reason && (
+                    // A reason can run to five hundred characters, so it is clipped
+                    // here and given in full on hover rather than stretching the row.
+                    <span className="inline-block max-w-[15rem] truncate align-middle text-xs text-slate-400" title={r.revoke_reason}>
+                      {r.revoke_reason}
+                    </span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -1270,12 +1298,12 @@ function EnrollmentsTab({
           <table className="w-full text-left text-sm">
             <thead className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">
               <tr>
-                <th className="px-5 py-3">Email</th>
-                <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3">Source</th>
-                <th className="px-5 py-3">Since</th>
-                <th className="px-5 py-3">Ended</th>
-                <th className="px-5 py-3">Actions</th>
+                <th className="px-3 py-3">Email</th>
+                <th className="whitespace-nowrap px-3 py-3">Status</th>
+                <th className="px-3 py-3">Source</th>
+                <th className="px-3 py-3">Since</th>
+                <th className="px-3 py-3">Ended</th>
+                <th className="whitespace-nowrap px-3 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -1284,16 +1312,16 @@ function EnrollmentsTab({
                 const busy = busyId === r.id;
                 return (
                   <tr key={r.id} className="border-b border-slate-50 last:border-0">
-                    <td className="px-5 py-2.5 text-slate-700">{label}</td>
-                    <td className="px-5 py-2.5">
+                    <td className="px-3 py-2.5 text-slate-700">{label}</td>
+                    <td className="px-3 py-2.5">
                       <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${statusBadge[r.status]}`}>
                         {r.status}
                       </span>
                     </td>
-                    <td className="px-5 py-2.5 text-slate-500">{r.source}</td>
-                    <td className="px-5 py-2.5 text-slate-400">{date(r.access_starts_at)}</td>
-                    <td className="px-5 py-2.5 text-slate-400">{date(r.access_ends_at)}</td>
-                    <td className="px-5 py-2.5">
+                    <td className="px-3 py-2.5 text-slate-500">{r.source}</td>
+                    <td className="px-3 py-2.5 text-slate-400">{date(r.access_starts_at)}</td>
+                    <td className="px-3 py-2.5 text-slate-400">{date(r.access_ends_at)}</td>
+                    <td className="px-3 py-2.5">
                       <div className="flex flex-wrap gap-2">
                         {r.status === 'enrolled' && (
                           <button
@@ -1312,7 +1340,7 @@ function EnrollmentsTab({
                                 'Access revoked.'
                               )
                             }
-                            className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
+                            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
                           >
                             Revoke
                           </button>
@@ -1337,7 +1365,7 @@ function EnrollmentsTab({
                                 'Refund recorded. Move the money in the Stripe dashboard.'
                               )
                             }
-                            className="rounded-full border border-slate-200 px-3.5 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
+                            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 disabled:opacity-60"
                           >
                             Record refund
                           </button>
@@ -1354,7 +1382,7 @@ function EnrollmentsTab({
                                 'Access reinstated.'
                               )
                             }
-                            className="rounded-full bg-brand-500 px-3.5 py-1 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
+                            className="rounded-full bg-brand-500 px-3 py-1 text-xs font-semibold text-white hover:bg-brand-600 disabled:opacity-60"
                           >
                             Reinstate
                           </button>
@@ -1394,28 +1422,28 @@ function ContentTab({ data }: { data: { rows: LadderRow[]; summary: string } | n
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-100 text-xs uppercase tracking-wide text-slate-400">
             <tr>
-              <th className="px-5 py-3">Lesson</th>
-              <th className="px-5 py-3">Module</th>
-              <th className="px-5 py-3">Status</th>
-              <th className="px-5 py-3">Next</th>
-              <th className="px-5 py-3">Still needs</th>
+              <th className="px-3 py-3">Lesson</th>
+              <th className="px-3 py-3">Module</th>
+              <th className="whitespace-nowrap px-3 py-3">Status</th>
+              <th className="px-3 py-3">Next</th>
+              <th className="px-3 py-3">Still needs</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-b border-slate-50 last:border-0">
-                <td className="px-5 py-2.5 text-slate-700">
+                <td className="px-3 py-2.5 text-slate-700">
                   {r.seq}. {r.id} {r.title}
                 </td>
-                <td className="px-5 py-2.5 text-slate-500">{r.module}</td>
-                <td className="px-5 py-2.5">
+                <td className="px-3 py-2.5 text-slate-500">{r.module}</td>
+                <td className="px-3 py-2.5">
                   <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
                     {r.status}
                   </span>
                   {r.videoPlaceholder && <p className="mt-0.5 text-xs text-slate-400">stand-in clip</p>}
                 </td>
-                <td className="px-5 py-2.5 text-slate-500">{r.next ?? ''}</td>
-                <td className="px-5 py-2.5 text-slate-500">{stillNeeds(r)}</td>
+                <td className="px-3 py-2.5 text-slate-500">{r.next ?? ''}</td>
+                <td className="px-3 py-2.5 text-slate-500">{stillNeeds(r)}</td>
               </tr>
             ))}
           </tbody>
