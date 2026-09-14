@@ -1079,6 +1079,16 @@ second resolution on a review that already has one, and once a row is answered i
 resolution, no more controls. Putting a wrongly answered review right means changing the row in
 the database directly, by hand.
 
+**The review email.** Filing a request emails the learner "We received your review request" with
+a link to the assessment page, sent right after the row is created. It is sent once per review:
+the call that sets `email_sent_at` on the review row, where it is null, is the only one that
+sends, under the Resend idempotency key `course-review-received/<id>`. An empty `email_sent_at`
+means the configuration was missing when the request was filed (`RESEND_API_KEY` or `EMAIL_FROM`
+unset, which returns before the claim); a set one means the send was attempted, so the next places
+to look are the Resend log and the address on the account. There is no resend action for it: the
+acknowledgement is a courtesy, not a step the review depends on, and the operator's actual answer
+still lands on the assessment page either way.
+
 ### Registering the course events
 
 Course events follow the same four-place rule as every other event, and the mechanics are in
