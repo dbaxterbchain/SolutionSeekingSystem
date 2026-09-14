@@ -75,6 +75,7 @@ declare
   v_passed boolean;
   v_serial text;
   v_certificate uuid;
+  v_cert_row public.course_certificates%rowtype;
   v_applied text := 'none';
 begin
   select * into v_review from public.course_review_requests where id = p_review for update;
@@ -111,17 +112,31 @@ begin
     where id = v_attempt.id;
 
   if p_certificate_action = 'issue' then
-    select id into v_certificate from public.course_certificates
-      where user_id = v_attempt.user_id and certification_version = v_attempt.certification_version;
-    if v_certificate is null then
+    -- Three outcomes, not two: no row at all gets one inserted, same as
+    -- before; a revoked row is brought back rather than left alone, which is
+    -- the fix this migration makes; an already active row is untouched and
+    -- reported as no-op, the same way the revoke branch below already
+    -- reports a no-op.
+    select * into v_cert_row from public.course_certificates
+      where user_id = v_attempt.user_id and certification_version = v_attempt.certification_version
+      for update;
+    if not found then
       v_serial := 'SSS-' || to_char(now(), 'YYYY') || '-'
         || lpad(nextval('public.course_certificate_serial_seq')::text, 5, '0');
       insert into public.course_certificates (serial, user_id, certification_version, attempt_id, issued_by)
         values (v_serial, v_attempt.user_id, v_attempt.certification_version, v_attempt.id, p_admin)
         on conflict (user_id, certification_version) do nothing
         returning id into v_certificate;
+      v_applied := case when v_certificate is null then 'none' else 'issue' end;
+    elsif v_cert_row.status = 'revoked' then
+      update public.course_certificates
+        set status = 'active', revoked_at = null, revoke_reason = null, revoked_by = null,
+            attempt_id = v_attempt.id, issued_by = p_admin
+        where id = v_cert_row.id;
+      v_applied := 'issue';
+    else
+      v_applied := 'none';
     end if;
-    v_applied := case when v_certificate is null then 'none' else 'issue' end;
   elsif p_certificate_action = 'revoke' then
     update public.course_certificates
       set status = 'revoked', revoked_at = now(), revoke_reason = p_resolution, revoked_by = p_admin
