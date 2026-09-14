@@ -1,6 +1,7 @@
 # Project Status
 
-_Last updated: 2026-09-13 (paid video course, Phase 3b code complete on its branch, certificates
+_Last updated: 2026-09-13 (paid video course, Phase 3c code complete on its branch, review
+requests and the regrade queue; before that, Phase 3b code complete on its branch, certificates
 and the verify page; before that, Phase 2 and 3a code complete on their branches and the pilot
 running on the `course-beta` deploy; before that, icons for the 12 Wisdom Principles and the gold
 ramp meaning "the solution")_
@@ -9,7 +10,7 @@ ramp meaning "the solution")_
 
 | | |
 |---|---|
-| **Current phase** | Growth plan P1-P5 shipped (measurement, anonymous trial, pricing, email capture, social proof + testimonial collector). In progress: the **paid video course**, whose Phase 2, 3a and 3b are code complete on their branches and the pilot runs on the `course-beta` deploy. Next: SEO/community channels, then a small paid test. |
+| **Current phase** | Growth plan P1-P5 shipped (measurement, anonymous trial, pricing, email capture, social proof + testimonial collector). In progress: the **paid video course**, whose Phase 2, 3a, 3b and 3c are code complete on their branches and the pilot runs on the `course-beta` deploy. Next: SEO/community channels, then a small paid test. |
 | **Live URL** | https://solutionseeking.com (apex is primary; www and the netlify.app subdomain 301 to it) |
 | **Build health** | `npm run build` ✅ · `npm run check` ✅ (0 errors) |
 | **Hosting** | Netlify (Beanchain team), site `solution-seeking-system` |
@@ -123,9 +124,17 @@ every kind of miss. The admin area gained a Certificates tab that issues a certi
 pass recorded while awards were off, revokes one, fixes a name, or sends the certificate email
 again.
 
-Still to come: 3c review requests and the review queue with regrades, 3d the grader benchmark
-that decides whether `COURSE_AWARDS_ENABLED` can be turned on. The content Phase 3 waits on is
-David's: Forms A and B, the practice form, the rated examples for the benchmark, and V39.
+**3c, review requests and the regrade queue: code complete**
+([plan](superpowers/plans/2026-09-13-course-phase3c-reviews-and-regrades.md)). A learner can ask
+for a second look at one criterion on a graded attempt, and the admin area's new Reviews tab lets
+an operator read the grader's scores and evidence, correct them, and answer in words the learner
+reads. Resolving a review never edits the graded attempt: it inserts the corrected grade at the
+next generation, repoints the attempt at it, and can issue or revoke a certificate in the same
+action, with the original grade and certificate history untouched.
+
+Still to come: 3d the grader benchmark that decides whether `COURSE_AWARDS_ENABLED` can be
+turned on. The content Phase 3 waits on is David's: Forms A and B, the practice form, the rated
+examples for the benchmark, and V39.
 
 **Phase 4** is the release itself, gated on the
 ready-to-open checklist in [deployment.md](deployment.md#ready-to-open-checklist).

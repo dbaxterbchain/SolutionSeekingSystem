@@ -5,7 +5,7 @@ import type { CourseStatus } from './course/status';
 import type { AssessmentHistory, AssessmentStatus, CertificationStatus } from './course/assessmentTypes';
 import type { CertificatePayload } from './course/assessmentTypes';
 
-export type { AssessmentHistory, AssessmentStatus, AttemptSummary, AttemptView, CapApplied, CertificatePayload, CertificateRecord, CertificateSummary, CriterionFeedback, JobView, PromptView, ResultView, StageView } from './course/assessmentTypes';
+export type { AssessmentHistory, AssessmentStatus, AttemptSummary, AttemptView, CapApplied, CertificatePayload, CertificateRecord, CertificateSummary, CriterionFeedback, JobView, PromptView, ResultView, ReviewSummary, StageView } from './course/assessmentTypes';
 
 /**
  * The browser's view of the course, fetched from the server and never
@@ -156,6 +156,10 @@ export function courseErrorMessage(code: string): string {
       return 'This certificate has been revoked. Write to course support if that seems wrong.';
     case 'certificate_unavailable':
       return 'Your certificate is unavailable right now. Please try again in a minute.';
+    case 'review_open':
+      return 'You already have a review request open on this attempt. We will reply on this page.';
+    case 'not_reviewable':
+      return 'This attempt has no result to review yet.';
     case 'assessment_unavailable':
       return 'The assessment is unavailable right now. Please try again in a minute.';
     default:
@@ -343,7 +347,7 @@ export async function postProgress(accessToken: string, body: ProgressBody): Pro
   return data as ProgressResponse;
 }
 
-export type AssessmentAction = 'start' | 'save' | 'advance' | 'submit' | 'status' | 'list';
+export type AssessmentAction = 'start' | 'save' | 'advance' | 'submit' | 'status' | 'list' | 'review';
 
 /** POST to the assessment endpoint, keyed by `action`. Twin of postProgress. */
 async function postAssessment<T>(accessToken: string, body: Record<string, unknown> & { action: AssessmentAction }): Promise<T> {
@@ -383,6 +387,10 @@ export const advanceAssessment = (
 export const submitAssessment = (accessToken: string, attemptId: string, requestKey: string): Promise<AssessmentStatus> =>
   postAssessment(accessToken, { action: 'submit', attempt_id: attemptId, request_key: requestKey });
 export const listAttempts = (accessToken: string): Promise<AssessmentHistory> => postAssessment(accessToken, { action: 'list' });
+
+/** Ask for a second look at one criterion of a finished attempt. */
+export const requestReview = (accessToken: string, attemptId: string, criterionId: string, reason: string): Promise<AssessmentStatus> =>
+  postAssessment(accessToken, { action: 'review', attempt_id: attemptId, criterion_id: criterionId, reason });
 
 /** The learner's certificate page: GET the record, confirm the name once, or turn the verification link on and off. */
 export const fetchCertificate = (accessToken: string): Promise<CertificatePayload> => getJson(accessToken, '/api/course/certificate');

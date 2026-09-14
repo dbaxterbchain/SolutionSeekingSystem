@@ -5,7 +5,9 @@ import { supabaseAdmin } from '../../../lib/server/supabaseAdmin';
 import { triggerGradingWorker } from '../../../lib/server/course/workerTrigger';
 import { changeCourseAccess, findUserByEmail, listEnrollments } from '../../../lib/server/course/adminEnrollment';
 import { issuePendingCertificate, listCertificatesForAdmin, renameCertificate, resendCertificateEmail, revokeCertificate } from '../../../lib/server/course/adminCertificates';
+import { listReviewsForAdmin, resolveReview } from '../../../lib/server/course/adminReviews';
 import { normalizeDisplayName } from '../../../lib/course/certificateRules';
+import { RESOLUTION_MAX, isCriterionId } from '../../../lib/course/reviewRules';
 import { getCourseCatalog } from '../../../lib/course/catalog';
 import { ladderReport } from '../../../lib/course/ladder';
 
@@ -17,8 +19,11 @@ export const prerender = false;
  * claim function decides whether anything happens). Sub-plan 1e adds the
  * enrollment actions here. Phase 3b adds the certificates view, plus
  * issue_pending, revoke_certificate, rename_certificate and
- * resend_certificate_email. snapshot_private is never selected by this route
- * until the Phase 3 review queue needs one reference response.
+ * resend_certificate_email. Phase 3c adds the reviews view and the
+ * resolve_review action: the operator reads a request, corrects the grade,
+ * and resolve_course_review persists it. snapshot_private is never selected
+ * by this route; the reviews view only needs snapshot_public, for the prompt
+ * labels beside each of the learner's answers.
  */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -41,8 +46,12 @@ const MESSAGES: Record<string, string> = {
   not_passed: 'Only a passed attempt can be issued a certificate.',
   already_revoked: 'This certificate is already revoked.',
   not_found: 'No such record.',
+  already_resolved: 'That review has already been answered.',
+  no_grade: 'That request points at no grade, so there is nothing to correct.',
+  certificate_active: 'This correction takes the attempt below the pass line, and the learner already holds an active certificate for it. Set the certificate action to revoke, then resolve again.',
 };
 const deny = (error: string, status: number): Response => adminJson({ error, message: MESSAGES[error] }, status);
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 export const GET: APIRoute = async ({ request }) => {
   const admin = await requireAdmin(request);
@@ -71,6 +80,14 @@ export const GET: APIRoute = async ({ request }) => {
       return adminJson(await listCertificatesForAdmin(new URL(request.url).searchParams.get('q') ?? ''));
     } catch (err) {
       console.error('admin certificate list failed', err);
+      return adminJson({ error: 'server_error' }, 500);
+    }
+  }
+  if (view === 'reviews') {
+    try {
+      return adminJson({ rows: await listReviewsForAdmin() });
+    } catch (err) {
+      console.error('admin review list failed', err);
       return adminJson({ error: 'server_error' }, 500);
     }
   }
@@ -243,6 +260,42 @@ export const POST: APIRoute = async ({ request }) => {
       return adminJson({ ok: true, sent: outcome.sent });
     } catch (err) {
       console.error('admin resend_certificate_email failed', err);
+      return adminJson({ error: 'server_error' }, 500);
+    }
+  }
+
+  if (action === 'resolve_review') {
+    const reviewId = typeof body?.review_id === 'string' ? body.review_id : '';
+    const resolution = typeof body?.resolution === 'string' ? body.resolution.trim() : '';
+    const certificateAction = typeof body?.certificate_action === 'string' ? body.certificate_action : 'none';
+    // Codepoints, not JavaScript's UTF-16 .length: the same unit normalizeReviewReason
+    // counts the learner's reason in, so an operator's answer full of emoji or other
+    // supplementary-plane characters is measured the same way on both sides of the form.
+    if (!UUID_RE.test(reviewId) || !resolution || Array.from(resolution).length > RESOLUTION_MAX) return deny('invalid', 400);
+    if (!['none', 'issue', 'revoke'].includes(certificateAction)) return deny('invalid', 400);
+
+    const raw = isRecord(body?.corrections) ? body.corrections : {};
+    const scores: Record<string, number> = {};
+    for (const [id, value] of Object.entries(isRecord(raw.scores) ? raw.scores : {})) {
+      if (!isCriterionId(id) || !Number.isInteger(value) || (value as number) < 0 || (value as number) > 4) return deny('invalid', 400);
+      scores[id] = value as number;
+    }
+    const list = (value: unknown): string[] => (Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : []);
+    const indices = (value: unknown): number[] => (Array.isArray(value) ? value.filter((v): v is number => Number.isInteger(v) && v >= 0) : []);
+    const corrections = {
+      scores,
+      principles: list(raw.principles),
+      tools: list(raw.tools),
+      misconceptions: indices(raw.misconceptions),
+    } as Parameters<typeof resolveReview>[0]['corrections'];
+
+    try {
+      const outcome = await resolveReview({ reviewId, admin, resolution, corrections, certificateAction: certificateAction as 'none' | 'issue' | 'revoke' });
+      if (!outcome.ok) return deny(outcome.error, outcome.error === 'not_found' ? 404 : 409);
+      console.log('admin action', admin.email, 'resolve_review', reviewId, outcome.passed ? 'passed' : 'not passed', outcome.certificate);
+      return adminJson({ ok: true, passed: outcome.passed, certificate: outcome.certificate });
+    } catch (err) {
+      console.error('admin resolve_review failed', err);
       return adminJson({ error: 'server_error' }, 500);
     }
   }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSession } from '../../lib/useSession';
 import { useDialog, type PromptOptions } from './Dialog';
 import { DISPLAY_NAME_MAX } from '../../lib/course/certificateRules';
+import { RESOLUTION_MAX } from '../../lib/course/reviewRules';
 
 /**
  * The operator's console.
@@ -14,7 +15,7 @@ import { DISPLAY_NAME_MAX } from '../../lib/course/certificateRules';
  * false sense of where the boundary is. The boundary is the API.
  */
 
-type Tab = 'feedback' | 'orgs' | 'subscribers' | 'enquiries' | 'grading' | 'enrollments' | 'certificates' | 'content';
+type Tab = 'feedback' | 'orgs' | 'subscribers' | 'enquiries' | 'grading' | 'reviews' | 'enrollments' | 'certificates' | 'content';
 
 interface FeedbackRow {
   id: string;
@@ -135,6 +136,7 @@ export default function AdminView() {
   const [bySource, setBySource] = useState<Record<string, { total: number; confirmed: number }>>({});
   const [enquiries, setEnquiries] = useState<EnquiryRow[] | null>(null);
   const [grading, setGrading] = useState<GradingRow[] | null>(null);
+  const [reviews, setReviews] = useState<AdminReviewRow[] | null>(null);
   const [enrollments, setEnrollments] = useState<EnrollmentRow[] | null>(null);
   const [certificates, setCertificates] = useState<{ rows: AdminCertificateRow[]; pending: PendingPassRow[] } | null>(null);
   const certificateQuery = useRef('');
@@ -180,6 +182,9 @@ export default function AdminView() {
     } else if (which === 'grading') {
       const d = await call('course?view=grading');
       if (d) setGrading(d.rows);
+    } else if (which === 'reviews') {
+      const d = await call('course?view=reviews');
+      if (d) setReviews(d.rows);
     } else if (which === 'enrollments') {
       const d = await call('course?view=enrollments');
       if (d) setEnrollments(d.rows);
@@ -245,6 +250,7 @@ export default function AdminView() {
     { id: 'subscribers', label: 'Email list', count: subscribers?.length },
     { id: 'enquiries', label: 'Enquiries', count: enquiries?.filter((e) => !e.handled).length },
     { id: 'grading', label: 'Grading' },
+    { id: 'reviews', label: 'Reviews', count: reviews?.filter((r) => r.state === 'open').length },
     { id: 'enrollments', label: 'Enrollments', count: enrollments?.filter((e) => e.status === 'enrolled').length },
     { id: 'certificates', label: 'Certificates' },
     { id: 'content', label: 'Content' },
@@ -317,6 +323,15 @@ export default function AdminView() {
               await loadTab('grading');
             }
           }}
+        />
+      )}
+      {tab === 'reviews' && (
+        <ReviewsTab
+          rows={reviews}
+          act={(body) => call('course', body)}
+          reload={() => loadTab('reviews')}
+          notify={setNotice}
+          warn={setError}
         />
       )}
       {tab === 'enrollments' && (
@@ -1190,6 +1205,261 @@ function CertificatesTab({
         account are the next places to look.
       </p>
       {dialog}
+    </div>
+  );
+}
+
+interface AdminReviewRow {
+  id: string;
+  attempt_id: string;
+  user_id: string;
+  email: string | null;
+  state: 'open' | 'resolved';
+  criterion_id: string;
+  criterion_name: string;
+  reason: string;
+  created_at: string;
+  resolved_at: string | null;
+  owner: string | null;
+  resolution: string | null;
+  certificate_action: 'none' | 'issue' | 'revoke';
+  grade: {
+    id: string;
+    total: number;
+    passed: boolean;
+    rubric_version: string;
+    criteria: { criterion_id: string; score: number; reason: string; evidence: { prompt_id: string; exact_quote: string }[] }[];
+    principles: { id: string; coverage: string }[];
+    tools: { id: string; coverage: string }[];
+    misconceptions: { criterion_id: string; description: string }[];
+    caps_applied: { criterion_id: string; cause: string; detail: string; from: number; to: number }[];
+  } | null;
+  responses: { prompt_id: string; prompt_label: string; text: string }[];
+  certificate: { id: string; serial: string; status: 'active' | 'revoked' } | null;
+}
+
+/**
+ * The review queue. Open requests first. Each one opens into what judging it
+ * needs: the learner's words, the grader's score and quotes for the criterion
+ * they named, the findings that capped it, and their whole response. Resolving
+ * corrects scores, withdraws findings the grader got wrong, and says what
+ * should happen to a certificate.
+ */
+function ReviewsTab({
+  rows,
+  act,
+  reload,
+  notify,
+  warn,
+}: {
+  rows: AdminReviewRow[] | null;
+  act: (body: Record<string, unknown>) => Promise<{ ok?: boolean; passed?: boolean; certificate?: string } | null>;
+  reload: () => Promise<void>;
+  notify: (text: string) => void;
+  warn: (text: string) => void;
+}) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [resolution, setResolution] = useState('');
+  const [scores, setScores] = useState<Record<string, number>>({});
+  const [withdrawn, setWithdrawn] = useState<{ principles: string[]; tools: string[]; misconceptions: number[] }>({ principles: [], tools: [], misconceptions: [] });
+  const [certificateAction, setCertificateAction] = useState<'none' | 'issue' | 'revoke'>('none');
+  const [busy, setBusy] = useState(false);
+
+  const openRow = (row: AdminReviewRow) => {
+    setOpenId(row.id === openId ? null : row.id);
+    setResolution('');
+    setScores({});
+    setWithdrawn({ principles: [], tools: [], misconceptions: [] });
+    setCertificateAction('none');
+  };
+
+  const toggle = (kind: 'principles' | 'tools', id: string) =>
+    setWithdrawn((w) => ({ ...w, [kind]: w[kind].includes(id) ? w[kind].filter((x) => x !== id) : [...w[kind], id] }));
+  const toggleMisconception = (index: number) =>
+    setWithdrawn((w) => ({ ...w, misconceptions: w.misconceptions.includes(index) ? w.misconceptions.filter((x) => x !== index) : [...w.misconceptions, index] }));
+
+  const resolve = async (row: AdminReviewRow) => {
+    if (!resolution.trim()) {
+      warn('Write the answer the learner will read. It is the whole of what they get back.');
+      return;
+    }
+    setBusy(true);
+    const d = await act({
+      action: 'resolve_review',
+      review_id: row.id,
+      resolution: resolution.trim(),
+      certificate_action: certificateAction,
+      corrections: { scores, principles: withdrawn.principles, tools: withdrawn.tools, misconceptions: withdrawn.misconceptions },
+    });
+    setBusy(false);
+    // A refusal leaves the panel exactly as it is, with the error already showing:
+    // resolving is final, and an operator gets one shot at the wording, so a mistyped
+    // score must not cost the answer they wrote.
+    if (!d) return;
+    notify(`Answered. The attempt now reads ${d.passed ? 'passed' : 'not yet'}${d.certificate && d.certificate !== 'none' ? `, certificate ${d.certificate}d` : ''}.`);
+    await reload();
+    setOpenId(null);
+  };
+
+  if (!rows) return <p className="text-slate-500">Loading…</p>;
+  if (!rows.length) return <p className="rounded-2xl border border-slate-100 bg-white p-6 text-slate-500 shadow-card">No review requests.</p>;
+
+  return (
+    <div className="space-y-4">
+      {rows.map((r) => (
+        <section key={r.id} className="rounded-2xl border border-slate-100 bg-white p-5 shadow-card">
+          <div className="flex flex-wrap items-baseline gap-3">
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${r.state === 'open' ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-500'}`}>{r.state}</span>
+            <span className="font-semibold text-ink-800">{r.criterion_name}</span>
+            <Learner email={r.email} userId={r.user_id} />
+            <span className="text-xs text-slate-400">
+              {date(r.created_at)} {time(r.created_at)}
+            </span>
+            {r.grade && <span className="text-xs text-slate-400">scored {r.grade.total.toFixed(1)}, {r.grade.passed ? 'passed' : 'not yet'}</span>}
+          </div>
+          <p className="mt-3 whitespace-pre-wrap rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700">{r.reason}</p>
+
+          {r.state === 'resolved' && (
+            <div className="mt-3 text-sm text-slate-600">
+              <p className="whitespace-pre-wrap">{r.resolution}</p>
+              <p className="mt-1 text-xs text-slate-400">
+                Answered by {r.owner ?? 'an admin'} on {date(r.resolved_at)}
+                {r.certificate_action !== 'none' ? `, certificate ${r.certificate_action}d` : ''}
+              </p>
+            </div>
+          )}
+
+          {r.state === 'open' && (
+            <button type="button" className="btn-secondary mt-4 py-2 text-xs" onClick={() => openRow(r)}>
+              {openId === r.id ? 'Close' : 'Read and answer'}
+            </button>
+          )}
+
+          {openId === r.id && r.grade && (
+            <div className="mt-5 space-y-5 border-t border-slate-100 pt-5">
+              <div>
+                <h3 className="text-sm font-semibold text-ink-800">What the grader said</h3>
+                <ul className="mt-2 space-y-2 text-sm text-slate-600">
+                  {r.grade.criteria.map((c) => (
+                    <li key={c.criterion_id} className={c.criterion_id === r.criterion_id ? 'rounded-xl bg-amber-50 px-3 py-2' : ''}>
+                      <span className="font-semibold text-ink-800">{c.criterion_id}</span> scored {c.score}. {c.reason}
+                      {c.evidence.map((e, i) => (
+                        <span key={i} className="mt-1 block text-xs italic text-slate-500">“{e.exact_quote}”</span>
+                      ))}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-ink-800">Corrected scores</h3>
+                <div className="mt-2 flex flex-wrap gap-3">
+                  {r.grade.criteria.map((c) => (
+                    <label key={c.criterion_id} className="text-xs text-slate-600">
+                      {c.criterion_id}
+                      <input
+                        type="number"
+                        min={0}
+                        max={4}
+                        defaultValue={c.score}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const next = Number(raw);
+                          // An empty box reads as untouched, not zero: Number('') is 0, and
+                          // deleting a digit to retype it is the ordinary way to edit this
+                          // field, so a blank box must drop the correction, the same as
+                          // typing back the original score does.
+                          const noCorrection = raw.trim() === '' || Number.isNaN(next) || next === c.score;
+                          setScores((s) => (noCorrection ? Object.fromEntries(Object.entries(s).filter(([k]) => k !== c.criterion_id)) : { ...s, [c.criterion_id]: next }));
+                        }}
+                        className="mt-1 block w-16 rounded-xl border border-slate-200 px-2 py-1"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {(r.grade.principles.some((p) => p.coverage === 'missing' || p.coverage === 'misapplied') ||
+                r.grade.tools.some((t) => t.coverage === 'missing' || t.coverage === 'misapplied') ||
+                r.grade.misconceptions.length > 0) && (
+                <div>
+                  <h3 className="text-sm font-semibold text-ink-800">Findings that capped a score</h3>
+                  <p className="text-xs text-slate-500">Tick anything the grader got wrong. Withdrawing a finding lifts the cap it caused.</p>
+                  <div className="mt-2 space-y-1 text-sm text-slate-600">
+                    {r.grade.principles
+                      .filter((p) => p.coverage === 'missing' || p.coverage === 'misapplied')
+                      .map((p) => (
+                        <label key={p.id} className="flex items-center gap-2">
+                          <input type="checkbox" checked={withdrawn.principles.includes(p.id)} onChange={() => toggle('principles', p.id)} />
+                          {p.id}: {p.coverage}
+                        </label>
+                      ))}
+                    {r.grade.tools
+                      .filter((t) => t.coverage === 'missing' || t.coverage === 'misapplied')
+                      .map((t) => (
+                        <label key={t.id} className="flex items-center gap-2">
+                          <input type="checkbox" checked={withdrawn.tools.includes(t.id)} onChange={() => toggle('tools', t.id)} />
+                          {t.id}: {t.coverage}
+                        </label>
+                      ))}
+                    {r.grade.misconceptions.map((m, i) => (
+                      <label key={i} className="flex items-center gap-2">
+                        <input type="checkbox" checked={withdrawn.misconceptions.includes(i)} onChange={() => toggleMisconception(i)} />
+                        {m.criterion_id}: {m.description}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <details>
+                <summary className="cursor-pointer text-sm font-semibold text-ink-800">The learner's whole response</summary>
+                <div className="mt-2 space-y-3">
+                  {r.responses.map((p) => (
+                    <div key={p.prompt_id}>
+                      <p className="text-xs font-semibold text-slate-500">{p.prompt_label}</p>
+                      <p className="whitespace-pre-wrap text-sm text-slate-600">{p.text}</p>
+                    </div>
+                  ))}
+                </div>
+              </details>
+
+              <div>
+                <label className="block text-sm font-semibold text-ink-800">
+                  Your answer, which the learner reads
+                  <textarea
+                    value={resolution}
+                    onChange={(e) => setResolution(e.target.value)}
+                    maxLength={RESOLUTION_MAX}
+                    rows={4}
+                    className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-normal"
+                  />
+                </label>
+                <label className="mt-3 block text-xs font-semibold text-slate-600">
+                  Certificate
+                  <select
+                    value={certificateAction}
+                    onChange={(e) => setCertificateAction(e.target.value as 'none' | 'issue' | 'revoke')}
+                    className="mt-1 block rounded-xl border border-slate-200 px-3 py-2 text-sm font-normal"
+                  >
+                    <option value="none">Leave it as it is</option>
+                    <option value="issue">Issue one</option>
+                    <option value="revoke">Revoke the one they hold</option>
+                  </select>
+                  {r.certificate && (
+                    <span className="ml-2 text-slate-400">
+                      They hold {r.certificate.serial}, {r.certificate.status}.
+                    </span>
+                  )}
+                </label>
+                <button type="button" className="btn-primary mt-4 py-2 text-xs" disabled={busy} onClick={() => resolve(r)}>
+                  {busy ? 'Saving…' : 'Answer and record a new grade'}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      ))}
     </div>
   );
 }

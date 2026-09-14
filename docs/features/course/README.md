@@ -11,8 +11,8 @@ preview of a staged lesson, the content ladder, the free lesson page and the res
 shots follow the Phase 1 rows. The free lesson page has no shot yet, because the preview lesson
 is still a draft and a page of placeholder copy would show nothing true. Phase 3a added the
 attempt history, the read-only earlier attempt and the retake path, and its shots follow the
-Phase 2 rows. Phase 3b added certificates and the public verification page; its shots close the
-table.
+Phase 2 rows. Phase 3b added certificates and the public verification page; its shots follow the
+Phase 3a rows. Phase 3c added review requests and the regrade queue; its shots close the table.
 
 The public pages were captured with `PUBLIC_COURSE_STATUS=preview`, because production stays
 `hidden` through the pilots. That is why the sales page and the pricing panel say "Opens soon"
@@ -62,6 +62,11 @@ rather than carrying a price.
 | ![Verification link section, phone](certificate-link-390.png) | **`certificate-link-390.png`**: the verification link section at 390px. The sentence above the url is exact about what a stranger sees through it, which matters because this is the piece of a certificate a learner is actively choosing to hand out. |
 | ![Verify page, active](verify-active-1280.png) | **`verify-active-1280.png`**: `/course/verify/<token>` for a link that is turned on. A visitor sees exactly what the certificate page promises to show and nothing about who is asking, since the page takes no sign-in and asks nothing of them. |
 | ![Verify page, not active, phone](verify-not-active-390.png) | **`verify-not-active-390.png`**: the same page at 390px for a token that resolves to nothing. A revoked certificate, a link its owner turned off, and a token that was never real all land on this exact page, so no response tells a visitor which one they hit. |
+| ![Review request form](assessment-review-form-1280.png) | **`assessment-review-form-1280.png`**: the request form open under the result, Solution quality chosen and a genuine reason typed, captured before sending. This is the only state that shows the trigger: once a review exists for an attempt, even a resolved one, this same panel shows that record instead of the form. |
+| ![Review request, open, phone](assessment-review-open-390.png) | **`assessment-review-open-390.png`**: the learner's own view of that same request, still open, at 390 wide. The reason sits in its own shaded box, and the result above it stays exactly as it was while an answer is pending. |
+| ![Admin reviews queue](admin-reviews-queue-1280.png) | **`admin-reviews-queue-1280.png`**: `/admin` → Reviews with a new open request at the top and the earlier resolved requests, each carrying real operator text, below it. The open one is filed against `course-admin@example.com`'s own older, deliberately thin practice attempt; both local accounts are enrolled, so here the requester is the admin acting as a learner would, not a real dispute. Open requests sort first and each state then sorts newest first, so nothing waiting for an answer sits under one that already has one. |
+| ![Admin answering a review](admin-review-answering-1280.png) | **`admin-review-answering-1280.png`**: the same request opened for answering, against a grade straight from the grader that nobody has corrected yet, so every control is on screen at once: all six criteria with their reasons and quoted evidence, a correction input beside each, and the full findings checklist, twelve principle findings, four tool findings and four misconceptions, every one of them still outstanding. Left open and unanswered on purpose: an open queue with its history underneath is the truer resting state for whoever opens this tab next. |
+| ![Review answered](assessment-review-answered-1280.png) | **`assessment-review-answered-1280.png`**: the learner's panel once the request above is resolved, showing the operator's answer. The score never moved, since solution quality was already at the top of the scale; the answer itself, not a changed number, is the whole outcome of asking. |
 
 _Captured with a headless Chromium session against the local Supabase stack. The dark pill at
 the bottom of some shots is the Astro dev toolbar, not part of the feature. The verification

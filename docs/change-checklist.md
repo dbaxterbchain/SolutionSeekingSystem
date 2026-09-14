@@ -93,6 +93,11 @@ stale docs, no orphaned pages, no broken prompt cache.
       or `import.meta.env`.
       `npm run build` fails if a reveal, a reference response or a later-stage prompt reaches
       `dist/`. If one of those guards fires, the fix is the import, never the guard.
+- [ ] **A grade is never edited.** `course_grades` is insert-only: a regrade or a review's
+      correction inserts a new row at the next generation for the same attempt and repoints
+      `course_assessment_attempts.grade_id` at it, leaving every earlier grade exactly as it was
+      written. The rubric stays in one place, `decide()` in `decision.ts`; a new write path calls
+      back through it rather than restating a cap or the pass rule in SQL.
 - [ ] **A change to a public course surface needs two builds**, one with
       `PUBLIC_COURSE_STATUS` unset or `hidden` and one with `preview`. They produce different
       page sets, and production serves the hidden one today. The free lesson page has no line in
