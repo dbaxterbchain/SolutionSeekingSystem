@@ -65,7 +65,9 @@ export async function listReviewsForAdmin(): Promise<AdminReviewView[]> {
   const { data: responseRows, error: responseError } = await supabaseAdmin
     .from('course_assessment_responses')
     .select('attempt_id, prompt_id, response_text')
-    .in('attempt_id', attemptIds);
+    .in('attempt_id', attemptIds)
+    .order('stage', { ascending: true })
+    .order('prompt_id', { ascending: true });
   if (responseError) throw new Error(`review response load failed: ${responseError.message}`);
 
   const { data: certRows, error: certError } = await supabaseAdmin
@@ -119,7 +121,7 @@ export async function listReviewsForAdmin(): Promise<AdminReviewView[]> {
 
 export type ResolveOutcome =
   | { ok: true; gradeId: string; passed: boolean; certificate: CertificateAction }
-  | { ok: false; error: 'not_found' | 'already_resolved' | 'no_grade' };
+  | { ok: false; error: 'not_found' | 'already_resolved' | 'no_grade' | 'not_passed' | 'certificate_active' };
 
 /**
  * Resolve one request. The corrected grade is rebuilt here and decided here;
@@ -174,5 +176,7 @@ export async function resolveReview(args: {
   const outcome = result as { outcome: string; grade_id?: string; passed?: boolean; certificate?: CertificateAction };
   if (outcome.outcome === 'not_found') return { ok: false, error: 'not_found' };
   if (outcome.outcome === 'already_resolved') return { ok: false, error: 'already_resolved' };
+  if (outcome.outcome === 'not_passed') return { ok: false, error: 'not_passed' };
+  if (outcome.outcome === 'certificate_active') return { ok: false, error: 'certificate_active' };
   return { ok: true, gradeId: outcome.grade_id ?? '', passed: outcome.passed ?? false, certificate: outcome.certificate ?? 'none' };
 }

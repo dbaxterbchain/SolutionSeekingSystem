@@ -22,8 +22,9 @@ comment on column public.course_review_requests.resolved_by is
  * second one, so a race that gets past the lock lands on the constraint and is
  * reported rather than raised.
  */
+drop function if exists public.create_course_review(uuid, uuid, text, text, uuid, jsonb);
 create or replace function public.create_course_review(
-  p_attempt uuid, p_user uuid, p_criterion text, p_reason text, p_grade uuid, p_original jsonb
+  p_attempt uuid, p_user uuid, p_criterion text, p_reason text, p_original jsonb
 ) returns jsonb
 language plpgsql security invoker set search_path = '' as $$
 declare
@@ -42,7 +43,11 @@ begin
   begin
     insert into public.course_review_requests
       (attempt_id, user_id, grade_id, criterion_id, reason, original_scores)
-    values (p_attempt, p_user, p_grade, p_criterion, p_reason, p_original)
+    -- v_attempt.grade_id, not a caller-supplied id: the row is locked above,
+    -- so this is the grade the attempt holds right now, not whatever the
+    -- caller read a couple of awaits earlier, which another resolution can
+    -- have since superseded.
+    values (p_attempt, p_user, v_attempt.grade_id, p_criterion, p_reason, p_original)
     returning id into v_id;
   exception when unique_violation then
     return jsonb_build_object('outcome', 'review_open');
@@ -94,6 +99,29 @@ begin
   select coalesce(max(generation), 0) + 1 into v_generation
     from public.course_grades where attempt_id = v_attempt.id;
   v_passed := coalesce((p_grade->'decision'->>'passed')::boolean, false);
+
+  -- A certificate must never be issued for an attempt that did not pass. The
+  -- sibling function issue_course_certificate already refuses this in 0032;
+  -- this path had no guard at all, so an operator could issue a credential
+  -- the system's own record says was not earned. Checked before the grade
+  -- insert, so a refused resolution leaves no trace.
+  if p_certificate_action = 'issue' and not v_passed then
+    return jsonb_build_object('outcome', 'not_passed');
+  end if;
+
+  -- A correction that drops the attempt below the pass line must not leave a
+  -- live certificate standing beside it. The operator chooses revoke
+  -- deliberately, which is the point: this function does not decide a
+  -- credential question quietly, and it does not leave a contradiction
+  -- quietly either. Checked before the grade insert, for the same reason.
+  if not v_passed and p_certificate_action <> 'revoke' and exists (
+    select 1 from public.course_certificates
+    where user_id = v_attempt.user_id
+      and certification_version = v_attempt.certification_version
+      and status = 'active'
+  ) then
+    return jsonb_build_object('outcome', 'certificate_active');
+  end if;
 
   insert into public.course_grades
     (attempt_id, generation, job_id, source, rubric_version, model, prompt_version,
@@ -160,7 +188,7 @@ begin
 end $$;
 
 -- The service role is the only caller (the 0006 pattern).
-revoke execute on function public.create_course_review(uuid, uuid, text, text, uuid, jsonb) from public, anon, authenticated;
-grant  execute on function public.create_course_review(uuid, uuid, text, text, uuid, jsonb) to service_role;
+revoke execute on function public.create_course_review(uuid, uuid, text, text, jsonb) from public, anon, authenticated;
+grant  execute on function public.create_course_review(uuid, uuid, text, text, jsonb) to service_role;
 revoke execute on function public.resolve_course_review(uuid, uuid, text, text, jsonb, jsonb, text) from public, anon, authenticated;
 grant  execute on function public.resolve_course_review(uuid, uuid, text, text, jsonb, jsonb, text) to service_role;

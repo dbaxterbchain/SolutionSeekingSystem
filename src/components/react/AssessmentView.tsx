@@ -829,6 +829,15 @@ function Result({
           Your weighted total is {result.total.toFixed(1)} out of 100. A pass needs {result.pass_total} with every criterion at 3 or more.
         </p>
         {!result.passed && <p className="mt-2 text-slate-700">Each criterion below says what was present, what was missing, and which lessons to revisit before a retake.</p>}
+        {!result.passed && certificate?.status === 'active' && (
+          <p className="mt-2 text-slate-700">
+            This attempt does not change the certificate you already hold.{' '}
+            <a href="/course/learn/certificate/" className="font-semibold text-brand-700 underline">
+              Your certificate page
+            </a>{' '}
+            still shows it active.
+          </p>
+        )}
         {result.passed && certificate?.status === 'active' && (
           <p className="mt-2 text-slate-700">
             Your certificate is ready.{' '}

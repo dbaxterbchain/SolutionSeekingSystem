@@ -12,6 +12,9 @@ import type { ReviewCorrections, ValidatedGrade } from './assessmentTypes';
 export const REVIEW_REASON_MIN = 20;
 export const REVIEW_REASON_MAX = 2000;
 
+/** The operator's resolution: no floor, the same ceiling as the learner's reason, counted the same way. */
+export const RESOLUTION_MAX = 2000;
+
 /** Control characters and format characters, the same guard the certificate's display name uses. */
 const HIDDEN_RE = /[\p{Cc}\p{Cf}]/u;
 const LETTER_RE = /\p{L}/u;

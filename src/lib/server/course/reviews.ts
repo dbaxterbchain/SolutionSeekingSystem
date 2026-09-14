@@ -71,7 +71,6 @@ export async function createReview(args: {
   userId: string;
   criterionId: CriterionId;
   reason: string;
-  gradeId: string | null;
   originalScores: Record<string, number>;
 }): Promise<CreateReviewOutcome> {
   const { data, error } = await supabaseAdmin.rpc('create_course_review', {
@@ -79,7 +78,6 @@ export async function createReview(args: {
     p_user: args.userId,
     p_criterion: args.criterionId,
     p_reason: args.reason,
-    p_grade: args.gradeId,
     p_original: args.originalScores,
   });
   if (error) throw new Error(`review create failed: ${error.message}`);

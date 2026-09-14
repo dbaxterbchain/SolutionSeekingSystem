@@ -316,7 +316,6 @@ async function review(user: User, body: Record<string, unknown>, origin: string)
     userId: user.id,
     criterionId,
     reason,
-    gradeId: row.grade_id,
     originalScores,
   });
   // outcome.outcome's non-created member groups three literals under one

@@ -7,7 +7,7 @@ import { changeCourseAccess, findUserByEmail, listEnrollments } from '../../../l
 import { issuePendingCertificate, listCertificatesForAdmin, renameCertificate, resendCertificateEmail, revokeCertificate } from '../../../lib/server/course/adminCertificates';
 import { listReviewsForAdmin, resolveReview } from '../../../lib/server/course/adminReviews';
 import { normalizeDisplayName } from '../../../lib/course/certificateRules';
-import { isCriterionId } from '../../../lib/course/reviewRules';
+import { RESOLUTION_MAX, isCriterionId } from '../../../lib/course/reviewRules';
 import { getCourseCatalog } from '../../../lib/course/catalog';
 import { ladderReport } from '../../../lib/course/ladder';
 
@@ -48,6 +48,7 @@ const MESSAGES: Record<string, string> = {
   not_found: 'No such record.',
   already_resolved: 'That review has already been answered.',
   no_grade: 'That request points at no grade, so there is nothing to correct.',
+  certificate_active: 'This correction takes the attempt below the pass line, and the learner already holds an active certificate for it. Set the certificate action to revoke, then resolve again.',
 };
 const deny = (error: string, status: number): Response => adminJson({ error, message: MESSAGES[error] }, status);
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -267,7 +268,10 @@ export const POST: APIRoute = async ({ request }) => {
     const reviewId = typeof body?.review_id === 'string' ? body.review_id : '';
     const resolution = typeof body?.resolution === 'string' ? body.resolution.trim() : '';
     const certificateAction = typeof body?.certificate_action === 'string' ? body.certificate_action : 'none';
-    if (!UUID_RE.test(reviewId) || !resolution || resolution.length > 2000) return deny('invalid', 400);
+    // Codepoints, not JavaScript's UTF-16 .length: the same unit normalizeReviewReason
+    // counts the learner's reason in, so an operator's answer full of emoji or other
+    // supplementary-plane characters is measured the same way on both sides of the form.
+    if (!UUID_RE.test(reviewId) || !resolution || Array.from(resolution).length > RESOLUTION_MAX) return deny('invalid', 400);
     if (!['none', 'issue', 'revoke'].includes(certificateAction)) return deny('invalid', 400);
 
     const raw = isRecord(body?.corrections) ? body.corrections : {};

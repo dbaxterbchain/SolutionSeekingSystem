@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSession } from '../../lib/useSession';
 import { useDialog, type PromptOptions } from './Dialog';
 import { DISPLAY_NAME_MAX } from '../../lib/course/certificateRules';
+import { RESOLUTION_MAX } from '../../lib/course/reviewRules';
 
 /**
  * The operator's console.
@@ -1290,10 +1291,14 @@ function ReviewsTab({
       certificate_action: certificateAction,
       corrections: { scores, principles: withdrawn.principles, tools: withdrawn.tools, misconceptions: withdrawn.misconceptions },
     });
-    if (d) notify(`Answered. The attempt now reads ${d.passed ? 'passed' : 'not yet'}${d.certificate && d.certificate !== 'none' ? `, certificate ${d.certificate}d` : ''}.`);
+    setBusy(false);
+    // A refusal leaves the panel exactly as it is, with the error already showing:
+    // resolving is final, and an operator gets one shot at the wording, so a mistyped
+    // score must not cost the answer they wrote.
+    if (!d) return;
+    notify(`Answered. The attempt now reads ${d.passed ? 'passed' : 'not yet'}${d.certificate && d.certificate !== 'none' ? `, certificate ${d.certificate}d` : ''}.`);
     await reload();
     setOpenId(null);
-    setBusy(false);
   };
 
   if (!rows) return <p className="text-slate-500">Loading…</p>;
@@ -1358,8 +1363,14 @@ function ReviewsTab({
                         max={4}
                         defaultValue={c.score}
                         onChange={(e) => {
-                          const next = Number(e.target.value);
-                          setScores((s) => (next === c.score ? Object.fromEntries(Object.entries(s).filter(([k]) => k !== c.criterion_id)) : { ...s, [c.criterion_id]: next }));
+                          const raw = e.target.value;
+                          const next = Number(raw);
+                          // An empty box reads as untouched, not zero: Number('') is 0, and
+                          // deleting a digit to retype it is the ordinary way to edit this
+                          // field, so a blank box must drop the correction, the same as
+                          // typing back the original score does.
+                          const noCorrection = raw.trim() === '' || Number.isNaN(next) || next === c.score;
+                          setScores((s) => (noCorrection ? Object.fromEntries(Object.entries(s).filter(([k]) => k !== c.criterion_id)) : { ...s, [c.criterion_id]: next }));
                         }}
                         className="mt-1 block w-16 rounded-xl border border-slate-200 px-2 py-1"
                       />
@@ -1419,7 +1430,7 @@ function ReviewsTab({
                   <textarea
                     value={resolution}
                     onChange={(e) => setResolution(e.target.value)}
-                    maxLength={2000}
+                    maxLength={RESOLUTION_MAX}
                     rows={4}
                     className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-normal"
                   />
