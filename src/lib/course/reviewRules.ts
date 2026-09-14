@@ -19,12 +19,16 @@ const LETTER_RE = /\p{L}/u;
 /**
  * The reason as it will be stored: trimmed, inner whitespace collapsed to one
  * space. Null when it is outside the bounds the column accepts, carries no
- * letter, or hides a control or format character. The bounds match the check
+ * letter, or hides a control or format character. The bounds count Unicode
+ * characters (codepoints), the same unit Postgres char_length uses, not
+ * JavaScript's UTF-16 .length: those two disagree on any text that contains a
+ * supplementary-plane character, emoji included. The bounds match the check
  * constraint in 0031, so a reason this returns can always be inserted.
  */
 export function normalizeReviewReason(raw: string): string | null {
   const reason = raw.replace(/\s+/g, ' ').trim();
-  if (reason.length < REVIEW_REASON_MIN || reason.length > REVIEW_REASON_MAX) return null;
+  const length = Array.from(reason).length;
+  if (length < REVIEW_REASON_MIN || length > REVIEW_REASON_MAX) return null;
   if (HIDDEN_RE.test(reason) || !LETTER_RE.test(reason)) return null;
   return reason;
 }

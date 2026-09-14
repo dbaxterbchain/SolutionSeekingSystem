@@ -25,13 +25,33 @@ describe('normalizeReviewReason', () => {
   });
   it('refuses a reason that is too short, too long, or has no letters', () => {
     expect(normalizeReviewReason('too short')).toBeNull();
+    expect(normalizeReviewReason('a'.repeat(REVIEW_REASON_MIN - 1))).toBeNull();
     expect(normalizeReviewReason('a'.repeat(REVIEW_REASON_MIN))).toHaveLength(REVIEW_REASON_MIN);
+    expect(normalizeReviewReason('a'.repeat(REVIEW_REASON_MAX))).toHaveLength(REVIEW_REASON_MAX);
     expect(normalizeReviewReason('a'.repeat(REVIEW_REASON_MAX + 1))).toBeNull();
     expect(normalizeReviewReason('1'.repeat(40))).toBeNull();
   });
   it('refuses control and format characters, so a reason cannot carry an invisible payload', () => {
     expect(normalizeReviewReason('a'.repeat(30) + String.fromCharCode(7))).toBeNull();
     expect(normalizeReviewReason('a'.repeat(30) + String.fromCharCode(0x202e))).toBeNull();
+  });
+  it('counts Unicode characters, not UTF-16 code units, so a stored reason always satisfies the database\'s char_length check', () => {
+    // A thumbs-up is one Unicode character but two UTF-16 code units, so "bad"
+    // plus nine of them is 21 by JS .length yet 12 characters, below
+    // REVIEW_REASON_MIN. A .length check would let this through, and the
+    // insert would then violate course_review_requests_reason_check, whose
+    // char_length sees 12.
+    const emojiPadded = 'bad' + '\u{1F44D}'.repeat(9);
+    expect(emojiPadded.length).toBe(21);
+    expect(normalizeReviewReason(emojiPadded)).toBeNull();
+
+    // A supplementary-plane letter is likewise one character but two code
+    // units, so REVIEW_REASON_MAX of them is exactly the character count the
+    // database's char_length accepts, yet twice that by JS .length. A .length
+    // check would wrongly reject this.
+    const astral = '\u{1D400}'.repeat(REVIEW_REASON_MAX);
+    expect(astral.length).toBe(REVIEW_REASON_MAX * 2);
+    expect(Array.from(normalizeReviewReason(astral) ?? '')).toHaveLength(REVIEW_REASON_MAX);
   });
 });
 
