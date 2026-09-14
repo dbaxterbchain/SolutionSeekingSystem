@@ -853,14 +853,20 @@ One video per lesson. The media baseline and the upload clicks are Bradley's, in
 The course adds migrations [`0030_course.sql`](../supabase/migrations/0030_course.sql)
 (enrollments, the enrollment ledger, progress, check attempts, Stream tokens),
 [`0031_course_assessment.sql`](../supabase/migrations/0031_course_assessment.sql) (source
-packs, attempts, responses, grading jobs, grades, certificates, review requests), and
+packs, attempts, responses, grading jobs, grades, certificates, review requests),
 [`0032_course_certificates.sql`](../supabase/migrations/0032_course_certificates.sql) (the
 certificate email claim column, the audit columns, `issue_course_certificate`,
-`revoke_course_certificate`). Apply them before the deploy that needs them, and apply `0032`
-specifically before any deploy that carries the certificates work: the certificate reads select
-its new columns and fail against a database that does not have them. The assessment route builds
-its status through that same certificate read on every action, so a database missing `0032` does
-not merely break the certificate page: it takes out saving and submitting for anyone mid-attempt.
+`revoke_course_certificate`), and
+[`0033_course_reviews.sql`](../supabase/migrations/0033_course_reviews.sql) (the review email
+claim column, who resolved a request, `create_course_review`, `resolve_course_review`). Apply
+them before the deploy that needs them, and apply `0032` specifically before any deploy that
+carries the certificates work: the certificate reads select its new columns and fail against a
+database that does not have them. The assessment route builds its status through that same
+certificate read on every action, so a database missing `0032` does not merely break the
+certificate page: it takes out saving and submitting for anyone mid-attempt. `0033` has the same
+reach: `statusFor` reads the review row alongside the certificate on every action, so a database
+missing it breaks `start`, `save`, `advance`, `submit` and `status` alike, not only the review
+form. Apply it before the deploy that carries this work, the same way.
 
 ```bash
 npx supabase db push
@@ -878,11 +884,11 @@ select proname from pg_proc where proname like '%course%' order by proname;
 
 These come back: `admin_change_course_access`, `create_course_attempt`,
 `submit_course_attempt`, `claim_course_grading_job`, `finalize_course_grade`,
-`fail_course_grading_job`, `retry_course_grading_job`, `issue_course_certificate` and
-`revoke_course_certificate`, which the routes call, plus the `course_progress_monotone` trigger
-function behind `course_progress`. A short list means a migration ran against a schema that
-already had part of it, and the missing function is the one to run by hand from the migration
-file.
+`fail_course_grading_job`, `retry_course_grading_job`, `issue_course_certificate`,
+`revoke_course_certificate`, `create_course_review` and `resolve_course_review`, which the
+routes call, plus the `course_progress_monotone` trigger function behind `course_progress`. A
+short list means a migration ran against a schema that already had part of it, and the missing
+function is the one to run by hand from the migration file.
 
 Then, on the hosted stack, **grant access to one real account from `/admin` and revoke it
 again.** That exercises `admin_change_course_access`, the ledger insert, the auth admin
@@ -1043,16 +1049,46 @@ the sales page is doing on the day someone opens it.
 benchmark clears it. Nothing is lost while it is off: a pass just waits in the pending list
 above until an operator presses Issue.
 
+### Reviews from /admin
+
+`/admin` → **Reviews** lists every review request. Open ones sort first, and each state then
+sorts newest first, so the queue reads like a support inbox: what needs an answer sits above the
+record of what has already been answered. Every row names the criterion, the learner, when it
+was filed and the grade's total at the time it was filed (a snapshot, not the attempt's current
+total, since an earlier resolution can have moved it since). An open row expands into what
+answering it needs: the grader's score, reason and quoted evidence for every criterion, the one
+the learner named highlighted, the findings that capped a score, the learner's whole response,
+and the controls for correcting it.
+
+**Corrections are two kinds of change.** A criterion's score can be typed over directly, and a
+finding, a missing or misapplied principle or tool, or a misconception, can be withdrawn with a
+checkbox. Withdrawing one lifts the cap it caused rather than only crossing it off the list. Both
+run back through `decide()` in `decision.ts`, the same function the grading worker calls, so a
+corrected grade obeys the same caps and the same pass rule as the original.
+
+**Resolving inserts, never edits.** The corrected grade is written as a new row at the next
+generation, the attempt is repointed at it, and the grade under review is left exactly as the
+grader wrote it, because `course_grades` grants `service_role` only select and insert. The
+operator also chooses what happens to a certificate in the same submit: issue one, revoke the one
+the learner holds, or leave it alone. That choice ignores `COURSE_AWARDS_ENABLED` on purpose: the
+flag holds back automatic awards until the grader has earned them, and an operator resolving a
+review has read the response themselves, which is a different kind of trust than the grader's.
+
+Resolving is final in the same way revoking a certificate is: `resolve_course_review` refuses a
+second resolution on a review that already has one, and once a row is answered it shows only its
+resolution, no more controls. Putting a wrongly answered review right means changing the row in
+the database directly, by hand.
+
 ### Registering the course events
 
 Course events follow the same four-place rule as every other event, and the mechanics are in
 the GTM and GA4 sections below. What to add:
 
 1. **The GTM custom-event trigger regex** gains
-   `course_viewed|enrollment_ready|lesson_completed|module_completed|assessment_submitted|grade_ready|grading_error|certificate_issued`.
+   `course_viewed|enrollment_ready|lesson_completed|module_completed|assessment_submitted|grade_ready|grading_error|certificate_issued|review_requested`.
    An event missing from that regex reaches the dataLayer and dies there, with no error
-   anywhere. `certificate_issued` carries no parameters, so it needs nothing added under GA4
-   custom dimensions below.
+   anywhere. `certificate_issued` and `review_requested` carry no parameters, so neither needs
+   anything added under GA4 custom dimensions below.
 2. **GA4 custom dimensions** (event-scoped): `course_id`, `sale_status`, `lesson_id`,
    `module_id`, `content_version`, `attempt_id`, `form_id`, `result`. See
    [4. GA4 UI setup](#4-ga4-ui-setup). Without them the parameters are collected and cannot
@@ -1077,6 +1113,17 @@ Phase 4 of the course plan, and most of it cannot be done by whoever wrote the c
       Cloudflare spend alert set.
 - [ ] Migrations applied to the hosted project, advisors clean apart from the documented
       acceptances.
+- [ ] **Decide what to do about `service_role`'s real grants on `course_grades`.** Migration
+      `0031` grants it only `select, insert` and calls the table append-only in a comment, but a
+      reviewer found `service_role` also holds `update` and `delete` there: the schema's default
+      ACL hands `service_role` full rights on anything `postgres` creates, so that explicit grant
+      list is not what enforces the rule. Append-only holds today only because no code path
+      issues an update or delete against `course_grades`. The same is true of every other
+      server-write-only table in the schema, which is why this was not patched inside `0033`:
+      tightening one table would leave the rest looking enforced when they are not. Check it on
+      the hosted database (`has_table_privilege('service_role', 'public.course_grades',
+      'update')`) and decide, deliberately, rather than assuming the grant list is doing the
+      work.
 - [ ] The voice audit done on everything the course added: walk the dash and AI-tell audit in
       [change-checklist.md](change-checklist.md), not just the new pages but the FAQ and pricing
       copy the course edited.
