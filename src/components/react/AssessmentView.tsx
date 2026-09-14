@@ -4,7 +4,7 @@ import { accountLink } from '../../lib/accountLink';
 import { track } from '../../lib/analytics';
 import { CRITERIA } from '../../data/certification';
 import { isAttemptFinished } from '../../lib/course/assessmentRules';
-import { REVIEW_REASON_MAX, REVIEW_REASON_MIN } from '../../lib/course/reviewRules';
+import { REVIEW_REASON_MAX, REVIEW_REASON_MIN, normalizeReviewReason } from '../../lib/course/reviewRules';
 import {
   CourseActionError,
   advanceAssessment,
@@ -992,13 +992,18 @@ function ReviewPanel({
           className="mt-4"
           onSubmit={(e) => {
             e.preventDefault();
-            const clean = reason.replace(/\s+/g, ' ').trim();
-            if (Array.from(clean).length < REVIEW_REASON_MIN) {
-              setProblem('Say a little more about what you think was missed, so somebody can look at the right thing.');
+            const normalized = normalizeReviewReason(reason);
+            if (normalized === null) {
+              const length = Array.from(reason.replace(/\s+/g, ' ').trim()).length;
+              setProblem(
+                length < REVIEW_REASON_MIN || length > REVIEW_REASON_MAX
+                  ? `Say a little more about what you think was missed, so somebody can look at the right thing. Reviews need to be between ${REVIEW_REASON_MIN} and ${REVIEW_REASON_MAX} characters.`
+                  : 'Write your reason in words. If you pasted it from somewhere else, retyping it usually fixes this.'
+              );
               return;
             }
             setProblem(null);
-            onRequestReview(criterionId, clean);
+            onRequestReview(criterionId, normalized);
           }}
         >
           <label className="block text-sm font-semibold text-slate-700">
