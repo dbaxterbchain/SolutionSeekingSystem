@@ -112,6 +112,8 @@ export type AnalyticsEvent =
   | { event: 'grading_error'; attempt_id: string }
   /** The learner confirmed the name on an issued certificate (once per certificate; the server refuses a second confirmation). */
   | { event: 'certificate_issued' }
+  /** The learner asked for a second look at a criterion (once per request; the server refuses a second open one). */
+  | { event: 'review_requested' }
   /** A visitor opened the free preview lesson's exercise (fired once, on mount). */
   | { event: 'course_preview_started'; lesson_id: string }
   /**

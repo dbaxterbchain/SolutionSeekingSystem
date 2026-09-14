@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSession } from '../../lib/useSession';
 import { accountLink } from '../../lib/accountLink';
 import { track } from '../../lib/analytics';
+import { CRITERIA } from '../../data/certification';
 import { isAttemptFinished } from '../../lib/course/assessmentRules';
+import { REVIEW_REASON_MAX, REVIEW_REASON_MIN } from '../../lib/course/reviewRules';
 import {
   CourseActionError,
   advanceAssessment,
@@ -10,6 +12,7 @@ import {
   fetchAssessmentStatus,
   listAttempts,
   notEligibleMessage,
+  requestReview,
   saveAssessmentResponse,
   startAssessment,
   submitAssessment,
@@ -19,6 +22,7 @@ import {
   type CertificateSummary,
   type CriterionFeedback,
   type PromptView,
+  type ReviewSummary,
   type StageView,
 } from '../../lib/courseClient';
 import { useDialog } from './Dialog';
@@ -56,6 +60,7 @@ const submitKeyFor = (attemptId: string): string => {
   }
 };
 const timeOf = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+const dateOf = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
 
 export default function AssessmentView(props: Props) {
   const { session, loading } = useSession();
@@ -408,6 +413,23 @@ export default function AssessmentView(props: Props) {
     }
   };
 
+  const askForReview = useCallback(
+    async (criterionId: string, reason: string) => {
+      if (!token || !attempt || busy) return;
+      setBusy(true);
+      setActionError(null);
+      try {
+        setStatus(await requestReview(token, attempt.id, criterionId, reason));
+        track({ event: 'review_requested' });
+      } catch (err) {
+        setActionError(courseErrorMessage(err instanceof CourseActionError ? err.code : 'request_failed'));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [token, attempt, busy]
+  );
+
   // ---- rendering ----
   if (loading) return <p className="text-slate-600">Loading your assessment…</p>;
   if (!session) {
@@ -445,7 +467,14 @@ export default function AssessmentView(props: Props) {
         <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-ink-800 sm:text-4xl">Final assessment</h1>
       </header>
       {viewingId ? (
-        <ReadOnlyAttempt status={status} supportContact={props.supportContact} onCheckAgain={load} />
+        <ReadOnlyAttempt
+          status={status}
+          supportContact={props.supportContact}
+          onCheckAgain={load}
+          busy={busy}
+          error={actionError}
+          onRequestReview={askForReview}
+        />
       ) : (
         <>
           {!attempt && <Intro status={status} busy={busy} error={actionError} onStart={start} />}
@@ -480,7 +509,15 @@ export default function AssessmentView(props: Props) {
             </section>
           )}
           {attempt && isAttemptFinished(attempt.state) && status.result && (
-            <Result result={status.result} awardsEnabled={status.awards_enabled} certificate={status.certificate} />
+            <Result
+              result={status.result}
+              awardsEnabled={status.awards_enabled}
+              certificate={status.certificate}
+              review={status.review}
+              busy={busy}
+              error={actionError}
+              onRequestReview={askForReview}
+            />
           )}
           {showRetake && <Retake busy={busy} error={retakeError} onRetake={onRetake} />}
         </>
@@ -496,10 +533,16 @@ function ReadOnlyAttempt({
   status,
   supportContact,
   onCheckAgain,
+  busy,
+  error,
+  onRequestReview,
 }: {
   status: AssessmentStatus;
   supportContact: string;
   onCheckAgain: () => void;
+  busy: boolean;
+  error: string | null;
+  onRequestReview: (criterionId: string, reason: string) => void;
 }) {
   const attempt = status.attempt;
   return (
@@ -509,7 +552,15 @@ function ReadOnlyAttempt({
         <a href="/course/learn/assessment/" className="font-semibold text-brand-700 underline">Back to your assessment</a>
       </p>
       {attempt && isAttemptFinished(attempt.state) && status.result && (
-        <Result result={status.result} awardsEnabled={status.awards_enabled} certificate={status.certificate} />
+        <Result
+          result={status.result}
+          awardsEnabled={status.awards_enabled}
+          certificate={status.certificate}
+          review={status.review}
+          busy={busy}
+          error={error}
+          onRequestReview={onRequestReview}
+        />
       )}
       {attempt && attempt.state === 'grading_error' && (
         <section className="mt-8 rounded-2xl border border-amber-100 bg-amber-50 p-6" role="alert">
@@ -753,7 +804,23 @@ function saveCopy(draft: Draft | undefined): string {
   return '';
 }
 
-function Result({ result, awardsEnabled, certificate }: { result: NonNullable<AssessmentStatus['result']>; awardsEnabled: boolean; certificate: CertificateSummary | null }) {
+function Result({
+  result,
+  awardsEnabled,
+  certificate,
+  review,
+  busy,
+  error,
+  onRequestReview,
+}: {
+  result: NonNullable<AssessmentStatus['result']>;
+  awardsEnabled: boolean;
+  certificate: CertificateSummary | null;
+  review: ReviewSummary | null;
+  busy: boolean;
+  error: string | null;
+  onRequestReview: (criterionId: string, reason: string) => void;
+}) {
   return (
     <section className="mt-8 space-y-6">
       <div className="rounded-2xl border border-slate-200 bg-white p-6">
@@ -789,6 +856,7 @@ function Result({ result, awardsEnabled, certificate }: { result: NonNullable<As
       {result.criteria.map((c) => (
         <Criterion key={c.criterion_id} feedback={c} caps={result.caps_applied.filter((cap) => cap.criterion_id === c.criterion_id)} />
       ))}
+      <ReviewPanel review={review} busy={busy} error={error} onRequestReview={onRequestReview} />
     </section>
   );
 }
@@ -862,5 +930,113 @@ function Criterion({ feedback: c, caps }: { feedback: CriterionFeedback; caps: C
         </p>
       )}
     </article>
+  );
+}
+
+/**
+ * Asking for a second look. One request per attempt, so the form is replaced
+ * by its own state once there is one: what was asked, and the answer when it
+ * arrives. The criterion list is the published rubric, so a learner can only
+ * point at something the result actually scored.
+ */
+function ReviewPanel({
+  review,
+  busy,
+  error,
+  onRequestReview,
+}: {
+  review: ReviewSummary | null;
+  busy: boolean;
+  error: string | null;
+  onRequestReview: (criterionId: string, reason: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [criterionId, setCriterionId] = useState<string>(CRITERIA[0].id);
+  const [reason, setReason] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+
+  if (review) {
+    return (
+      <section className="rounded-2xl border border-slate-200 bg-white p-6">
+        <h2 className="font-heading text-xl font-bold text-ink-800">Your review request</h2>
+        <p className="mt-2 text-slate-700">
+          You asked us to look again at {review.criterion_name} on {dateOf(review.created_at)}.
+        </p>
+        <p className="mt-3 whitespace-pre-wrap rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700">{review.reason}</p>
+        {review.state === 'open' ? (
+          <p className="mt-3 text-slate-700">Somebody is reading it. The answer appears here, and nothing about your result changes while you wait.</p>
+        ) : (
+          <>
+            <p className="mt-4 font-semibold text-ink-800">Our answer</p>
+            <p className="mt-1 whitespace-pre-wrap text-slate-700">{review.resolution}</p>
+            <p className="mt-3 text-sm text-slate-500">
+              Answered on {review.resolved_at ? dateOf(review.resolved_at) : ''}. Your result above is the one that stands.
+            </p>
+          </>
+        )}
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-6">
+      <h2 className="font-heading text-xl font-bold text-ink-800">Think a criterion was scored wrongly?</h2>
+      <p className="mt-2 text-slate-700">Tell us which one and why, and somebody will read your response again. You can ask once per attempt.</p>
+      {!open && (
+        <button type="button" className="btn-secondary mt-4" onClick={() => setOpen(true)}>
+          Ask for a second look
+        </button>
+      )}
+      {open && (
+        <form
+          className="mt-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const clean = reason.replace(/\s+/g, ' ').trim();
+            if (Array.from(clean).length < REVIEW_REASON_MIN) {
+              setProblem('Say a little more about what you think was missed, so somebody can look at the right thing.');
+              return;
+            }
+            setProblem(null);
+            onRequestReview(criterionId, clean);
+          }}
+        >
+          <label className="block text-sm font-semibold text-slate-700">
+            Criterion
+            <select
+              value={criterionId}
+              onChange={(e) => setCriterionId(e.target.value)}
+              className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 font-normal"
+            >
+              {CRITERIA.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="mt-4 block text-sm font-semibold text-slate-700">
+            What was missed
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={REVIEW_REASON_MAX}
+              rows={5}
+              className="mt-1 block w-full rounded-xl border border-slate-200 px-3 py-2 font-normal"
+            />
+          </label>
+          {problem && <ErrorLine text={problem} />}
+          {error && <ErrorLine text={error} />}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button type="submit" className="btn-primary" disabled={busy}>
+              {busy ? 'Sending…' : 'Send the request'}
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => setOpen(false)} disabled={busy}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
   );
 }
