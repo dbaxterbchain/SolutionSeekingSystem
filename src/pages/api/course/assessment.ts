@@ -13,11 +13,16 @@ import { PROMPT_VERSION, RUBRIC_VERSION } from '../../../lib/server/course/rubri
 import { hashSubmission } from '../../../lib/server/course/submissionHash';
 import { awardsEnabled, triggerGradingWorker } from '../../../lib/server/course/workerTrigger';
 import * as attempts from '../../../lib/server/course/attempts';
-import { loadOwnedCertificate } from '../../../lib/server/course/certificates';
+import { certificateOrigin, loadOwnedCertificate } from '../../../lib/server/course/certificates';
+import { createReview, loadOwnedReview, markReviewEmailSent, reviewSummary } from '../../../lib/server/course/reviews';
+import { notifyLearnerOfReview } from '../../../lib/server/course/reviewEmail';
+import { supabaseAdmin } from '../../../lib/server/supabaseAdmin';
+import { serverEnv } from '../../../lib/server/env';
 import { getCourseCatalog } from '../../../lib/course/catalog';
 import { certificateSummary } from '../../../lib/course/certificateRules';
 import { courseCopy } from '../../../lib/course/copy';
 import { isLearnerVisible } from '../../../lib/course/visibility';
+import { isCriterionId, normalizeReviewReason } from '../../../lib/course/reviewRules';
 import { RESPONSE_MAX_CHARS, privateSnapshot, publicSnapshot } from '../../../lib/course/assessmentForm';
 import { chooseForm, promptStage, stageProblems, summarizeAttempts, viewForLearner } from '../../../lib/course/assessmentRules';
 import { OPEN_ATTEMPT_STATES, type AssessmentHistory, type AssessmentStatus, type CriterionFeedback, type EligibilityReason, type ResultView } from '../../../lib/course/assessmentTypes';
@@ -25,12 +30,12 @@ import { OPEN_ATTEMPT_STATES, type AssessmentHistory, type AssessmentStatus, typ
 export const prerender = false;
 
 /**
- * The staged final assessment. One route, six actions, every response
+ * The staged final assessment. One route, seven actions, every response
  * no-store, every attempt read scoped to the caller so ids cannot be probed.
  * The view a learner gets is always built by viewForLearner: stages up to the
  * one they are on, nothing beyond it.
  */
-const ACTIONS = ['start', 'save', 'advance', 'submit', 'status', 'list'] as const;
+const ACTIONS = ['start', 'save', 'advance', 'submit', 'status', 'list', 'review'] as const;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REQUEST_KEY_RE = /^[A-Za-z0-9_-]{8,64}$/;
 const NO_FORMS_MESSAGE = 'Every assessment form has been used on a previous attempt. Write to course support for the next step.';
@@ -63,6 +68,8 @@ export const POST: APIRoute = async ({ request, clientAddress }) => {
         return await status(auth.user, body);
       case 'list':
         return await list(auth.user);
+      case 'review':
+        return await review(auth.user, body, origin);
       default:
         return bad('action');
     }
@@ -121,12 +128,13 @@ async function resultView(grade: attempts.GradeRow, row: attempts.AttemptRow): P
 }
 
 async function statusFor(user: User, row: attempts.AttemptRow | null): Promise<AssessmentStatus> {
-  const [responses, job, grade, elig, certificate] = await Promise.all([
+  const [responses, job, grade, elig, certificate, reviewRow] = await Promise.all([
     row ? attempts.loadResponses(row.id) : Promise.resolve([]),
     row ? attempts.loadLatestJob(row.id) : Promise.resolve(null),
     row?.grade_id ? attempts.loadGrade(row.grade_id) : Promise.resolve(null),
     eligibility(user, row),
     loadOwnedCertificate(user.id),
+    row ? loadOwnedReview(row.id, user.id) : Promise.resolve(null),
   ]);
   return {
     attempt: row ? viewForLearner(row, responses) : null,
@@ -134,7 +142,7 @@ async function statusFor(user: User, row: attempts.AttemptRow | null): Promise<A
     result: row && grade ? await resultView(grade, row) : null,
     awards_enabled: awardsEnabled(),
     certificate: certificate ? certificateSummary(certificate) : null,
-    review: null,
+    review: reviewRow ? reviewSummary(reviewRow) : null,
     eligibility: elig,
     support_contact: courseCopy('{{support_contact}}'),
   };
@@ -280,4 +288,59 @@ async function status(user: User, body: Record<string, unknown>): Promise<Respon
 async function list(user: User): Promise<Response> {
   const history: AssessmentHistory = { attempts: summarizeAttempts(await attempts.loadAttemptHistory(user.id)) };
   return privateJson(history);
+}
+
+/**
+ * Ask for a second look at one criterion. One open request per attempt, which
+ * the database enforces; the request stores the grader's scores as they stood,
+ * so a resolution can say what moved. The acknowledgement email is sent after
+ * the row exists and never blocks the answer.
+ */
+async function review(user: User, body: Record<string, unknown>, origin: string): Promise<Response> {
+  const attemptId = str(body.attempt_id);
+  if (!UUID_RE.test(attemptId)) return bad('attempt_id');
+  const criterionId = str(body.criterion_id);
+  if (!isCriterionId(criterionId)) return bad('criterion_id');
+  const reason = normalizeReviewReason(str(body.reason));
+  if (!reason) return bad('reason');
+
+  const row = await attempts.loadOwnedAttempt(attemptId, user.id);
+  if (!row) return privateJson({ error: 'not_found' }, 404);
+  if (!row.grade_id) return privateJson({ error: 'not_reviewable' }, 409);
+  const grade = await attempts.loadGrade(row.grade_id);
+  const originalScores: Record<string, number> = {};
+  for (const c of grade?.criteria ?? []) originalScores[c.criterion_id] = c.score;
+
+  const outcome = await createReview({
+    attemptId: row.id,
+    userId: user.id,
+    criterionId,
+    reason,
+    gradeId: row.grade_id,
+    originalScores,
+  });
+  // outcome.outcome's non-created member groups three literals under one
+  // discriminant, so TypeScript only narrows it away to the created variant
+  // (and its `review` field) once it is excluded as a whole via !==, not by
+  // matching each literal in its own sequential check.
+  if (outcome.outcome !== 'created') {
+    if (outcome.outcome === 'not_found') return privateJson({ error: 'not_found' }, 404);
+    if (outcome.outcome === 'not_reviewable') return privateJson({ error: 'not_reviewable' }, 409);
+    return privateJson({ error: 'review_open' }, 409);
+  }
+
+  await notifyLearnerOfReview(
+    { apiKey: serverEnv('RESEND_API_KEY'), from: serverEnv('EMAIL_FROM') },
+    { reviewId: outcome.review.id, userId: user.id, assessmentUrl: `${certificateOrigin(origin)}/course/learn/assessment/` },
+    {
+      emailFor: async (userId) => {
+        const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+        if (error) console.error(`review ${outcome.review.id}: learner lookup failed`, error);
+        return data.user?.email ?? null;
+      },
+      markSent: (id) => markReviewEmailSent(id),
+    }
+  );
+
+  return privateJson(await statusFor(user, row));
 }
