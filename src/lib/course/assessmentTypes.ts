@@ -42,7 +42,7 @@ export interface LessonLink { id: string; title: string; href: string | null }
 export interface CriterionFeedback { criterion_id: CriterionId; name: string; weight: number; score: number; effective_score: number; status: 'answered' | 'unanswered' | 'misconception'; reason: string; evidence: EvidenceView[]; revision_lessons: LessonLink[] }
 export interface ResultView { total: number; pass_total: number; passed: boolean; criteria: CriterionFeedback[]; caps_applied: CapApplied[]; misconceptions: { criterion_id: CriterionId; description: string }[]; graded_at: string }
 export type EligibilityReason = 'ready' | 'modules_incomplete' | 'already_passed' | 'open_attempt';
-export interface AssessmentStatus { attempt: AttemptView | null; job: JobView | null; result: ResultView | null; awards_enabled: boolean; certificate: CertificateSummary | null; eligibility: { eligible: boolean; reason: EligibilityReason }; support_contact: string }
+export interface AssessmentStatus { attempt: AttemptView | null; job: JobView | null; result: ResultView | null; awards_enabled: boolean; certificate: CertificateSummary | null; review: ReviewSummary | null; eligibility: { eligible: boolean; reason: EligibilityReason }; support_contact: string }
 
 /** One row of a learner's attempt history. Outcome fields are null until a grade exists. */
 export interface AttemptSummary {
@@ -100,4 +100,63 @@ export interface PublicCertificate {
   serial: string;
   certification_version: string;
   issued_at: string;
+}
+
+export type ReviewState = 'open' | 'resolved';
+export type CertificateAction = 'none' | 'issue' | 'revoke';
+
+/** What the learner sees about their own review on the assessment page. */
+export interface ReviewSummary {
+  id: string;
+  criterion_id: CriterionId;
+  criterion_name: string;
+  state: ReviewState;
+  reason: string;
+  resolution: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+
+/** What an operator changes when resolving. Anything absent keeps what the grader said. */
+export interface ReviewCorrections {
+  scores: Partial<Record<CriterionId, Score>>;
+  /** Principles whose coverage finding the operator judged wrong. */
+  principles: PrincipleId[];
+  /** Tools whose coverage finding the operator judged wrong. */
+  tools: ToolId[];
+  /** Positions in the stored material_misconceptions array to drop. */
+  misconceptions: number[];
+}
+
+/** One row of the operator's review queue, with everything judging it needs. */
+export interface AdminReviewView {
+  id: string;
+  attempt_id: string;
+  user_id: string;
+  email: string | null;
+  state: ReviewState;
+  criterion_id: CriterionId;
+  criterion_name: string;
+  reason: string;
+  created_at: string;
+  resolved_at: string | null;
+  owner: string | null;
+  resolution: string | null;
+  certificate_action: CertificateAction;
+  /** The grade under review, as the grader left it. */
+  grade: {
+    id: string;
+    total: number;
+    passed: boolean;
+    rubric_version: string;
+    criteria: ValidatedCriterion[];
+    principles: ValidatedCoverage<PrincipleId>[];
+    tools: ValidatedCoverage<ToolId>[];
+    misconceptions: ValidatedMisconception[];
+    caps_applied: CapApplied[];
+  } | null;
+  /** The learner's own words, so a score can be judged against them. */
+  responses: { prompt_id: string; prompt_label: string; text: string }[];
+  /** Whether this learner holds a certificate for the attempt's version right now. */
+  certificate: { id: string; serial: string; status: 'active' | 'revoked' } | null;
 }

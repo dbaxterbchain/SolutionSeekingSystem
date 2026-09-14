@@ -134,6 +134,7 @@ async function statusFor(user: User, row: attempts.AttemptRow | null): Promise<A
     result: row && grade ? await resultView(grade, row) : null,
     awards_enabled: awardsEnabled(),
     certificate: certificate ? certificateSummary(certificate) : null,
+    review: null,
     eligibility: elig,
     support_contact: courseCopy('{{support_contact}}'),
   };
