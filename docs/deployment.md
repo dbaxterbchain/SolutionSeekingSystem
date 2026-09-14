@@ -1079,6 +1079,11 @@ second resolution on a review that already has one, and once a row is answered i
 resolution, no more controls. Putting a wrongly answered review right means changing the row in
 the database directly, by hand.
 
+A learner gets one review per attempt in practice: the page stops offering the form the moment
+any row exists for that attempt, open or resolved, and shows that row instead. The route
+underneath, `create_course_review`, only refuses a second **open** request, because the operator
+side needs to stay able to record a further corrected grade through a fresh review and resolution.
+
 **The review email.** Filing a request emails the learner "We received your review request" with
 a link to the assessment page, sent right after the row is created. It is sent once per review:
 the call that sets `email_sent_at` on the review row, where it is null, is the only one that
